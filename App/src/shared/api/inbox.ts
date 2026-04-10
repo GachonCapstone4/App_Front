@@ -7,6 +7,7 @@ type InboxListApiItem = {
   subject: string;
   received_at: string;
   status: string;
+  draft_status?: string | null;
   category_name: string | null;
   schedule_detected: boolean;
   has_attachments: boolean;

@@ -7,6 +7,7 @@ type InboxListApiItem = {
   subject: string;
   received_at: string;
   status: string;
+  draft_status?: string | null;
   category_name: string | null;
   schedule_detected: boolean;
   has_attachments: boolean;
@@ -48,7 +49,11 @@ type InboxDetailApiResponse = {
   } | null;
 };
 
-export function mapBackendInboxStatus(status: string): EmailStatus {
+export function mapBackendInboxStatus(status: string, draftStatus?: string | null): EmailStatus {
+  if (draftStatus === "SKIPPED") {
+    return "unsent";
+  }
+
   if (status === "PROCESSED") {
     return "completed";
   }
@@ -69,7 +74,15 @@ function mergeFrontendStatus(currentStatus: EmailStatus, draftStatus?: string | 
     return "unsent";
   }
 
-  if (currentStatus === "completed" || currentStatus === "unsent") {
+  if (draftStatus === "SENT" || draftStatus === "EDITED") {
+    return "completed";
+  }
+
+  if (currentStatus === "unsent") {
+    return "unsent";
+  }
+
+  if (currentStatus === "completed") {
     return "completed";
   }
 
@@ -192,10 +205,11 @@ export function mapInboxListItem(item: InboxListApiItem): EmailItem {
     receivedDate: formatInboxReceivedDate(item.received_at),
     category: item.category_name ?? "미분류",
     confidence: 0,
-    status: mapBackendInboxStatus(item.status),
+    status: mapBackendInboxStatus(item.status, item.draft_status ?? null),
     sentTime: "",
     schedule: item.schedule_detected ? { detected: false } : { detected: false },
     draft: "",
+    draftStatus: item.draft_status ?? undefined,
   };
 }
 

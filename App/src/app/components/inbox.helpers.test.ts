@@ -12,6 +12,7 @@ describe("inbox helpers", () => {
     expect(mapBackendInboxStatus("PENDING_REVIEW")).toBe("pending");
     expect(mapBackendInboxStatus("PROCESSED")).toBe("completed");
     expect(mapBackendInboxStatus("AUTO_SENT")).toBe("auto-sent");
+    expect(mapBackendInboxStatus("PROCESSED", "SKIPPED")).toBe("unsent");
   });
 
   it("maps frontend status to backend query status", () => {
@@ -135,6 +136,44 @@ describe("inbox helpers", () => {
           subject: null,
           body: null,
         },
+      },
+    );
+
+    expect(merged.status).toBe("unsent");
+  });
+
+  it("keeps unsent status from the list when detail draft status is missing", () => {
+    const merged = mergeInboxDetail(
+      {
+        id: "1",
+        sender: "발신자",
+        senderEmail: "",
+        company: "",
+        subject: "제목",
+        preview: "",
+        summary: "",
+        body: "",
+        time: "오전 10:00",
+        receivedDate: "4.4.",
+        category: "미분류",
+        confidence: 0,
+        status: "unsent",
+        sentTime: "",
+        schedule: { detected: false },
+        draft: "",
+        draftStatus: "SKIPPED",
+      },
+      {
+        email_info: {
+          email_id: 1,
+          sender_name: "박민수",
+          subject: "가격 문의",
+          body: "본문",
+          received_at: "2026-04-04T10:23:00",
+          has_attachments: false,
+        },
+        ai_analysis: null,
+        draft_reply: null,
       },
     );
 

@@ -370,7 +370,7 @@ export function InboxPage() {
         : !useDemoDataMode
           ? {
               title: "현재 수신함 연결 범위",
-              description: "목록 상태는 백엔드 목록 응답과 상세의 초안 상태를 함께 사용해 보강합니다. 추천 초안, 첨부 다운로드, 일정 액션은 아직 현재 화면에 직접 연결하지 않았습니다.",
+              description: "미발송 상태는 이제 백엔드 목록의 draft_status를 우선 사용합니다. 추천 초안, 첨부 다운로드, 일정 액션은 아직 현재 화면에 직접 연결하지 않았습니다.",
               tone: "neutral" as const,
             }
           : null;
