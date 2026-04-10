@@ -7,23 +7,25 @@ import {
 import { getMyProfile, loginWithPassword, signupUser } from "./auth";
 import { getBusinessProfile } from "./business";
 import { getMyIntegrationSafe } from "./integrations";
+import { getOnboardingStatusSafe } from "./onboarding";
 
 type SessionBootstrapOptions = {
   onboardingCompleted?: boolean;
 };
 
 async function buildSessionFromServerState(options?: SessionBootstrapOptions) {
-  const [profile, integration, businessProfile] = await Promise.all([
+  const [profile, integration, businessProfile, onboardingStatus] = await Promise.all([
     getMyProfile(),
     getMyIntegrationSafe(),
     getBusinessProfile(),
+    getOnboardingStatusSafe(),
   ]);
 
   const onboardingCompleted =
     options?.onboardingCompleted ??
     (profile.role === "ADMIN"
       ? true
-      : Boolean(integration?.connectedEmail || businessProfile));
+      : onboardingStatus ?? Boolean(integration?.connectedEmail || businessProfile));
 
   return createAuthenticatedSession({
     name: profile.name,

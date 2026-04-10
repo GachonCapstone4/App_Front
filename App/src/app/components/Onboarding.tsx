@@ -43,8 +43,6 @@ import {
   getBusinessFaqs,
   getBusinessProfile,
   getBusinessResources,
-  getTemplates,
-  regenerateBusinessTemplates,
   upsertBusinessProfile,
   uploadBusinessFile,
 } from "../../shared/api/business";
@@ -53,6 +51,10 @@ import {
   getGoogleAuthorizationUrl,
   getMyIntegrationSafe,
 } from "../../shared/api/integrations";
+import {
+  completeOnboarding as completeOnboardingRequest,
+  generateInitialBusinessTemplates,
+} from "../../shared/api/onboarding";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
 import {
@@ -211,6 +213,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const [initializing, setInitializing] = useState(!scenarioId);
   const [templateGenerationMessage, setTemplateGenerationMessage] = useState<string | null>(null);
   const [generatedTemplateCount, setGeneratedTemplateCount] = useState(0);
+  const [completingOnboarding, setCompletingOnboarding] = useState(false);
 
   // Template generation states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -810,6 +813,28 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     navigate("/app");
   };
 
+  const finalizeOnboarding = async () => {
+    if (demoMode) {
+      markOnboardingComplete();
+      return true;
+    }
+
+    try {
+      setCompletingOnboarding(true);
+      await completeOnboardingRequest();
+      markOnboardingComplete();
+      return true;
+    } catch (error) {
+      setTemplateGenerationMessage(
+        getErrorMessage(error, "온보딩 완료 상태를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+      );
+      toast.error(getErrorMessage(error, "온보딩 완료 상태를 저장하지 못했습니다."));
+      return false;
+    } finally {
+      setCompletingOnboarding(false);
+    }
+  };
+
   const runTemplateGenerationAnimation = (templateCount: number) => {
     clearGenerationTimeouts();
     setCurrentMainStep(3);
@@ -828,9 +853,16 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
       window.setTimeout(() => setTemplateProgress(5), 3600),
       window.setTimeout(() => setGenerationStep(3), 4000),
       window.setTimeout(() => {
-        markOnboardingComplete();
-        setIsGenerating(false);
-        setCurrentMainStep(4);
+        void finalizeOnboarding().then((completed) => {
+          if (!completed) {
+            setIsGenerating(false);
+            setCurrentMainStep(3);
+            return;
+          }
+
+          setIsGenerating(false);
+          setCurrentMainStep(4);
+        });
       }, 5000),
     ];
   };
@@ -885,19 +917,28 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
     try {
       setTemplateGenerationMessage(null);
-      const templates = await getTemplates();
+      const categoryIds = categories
+        .map((category) => category.categoryId)
+        .filter((categoryId): categoryId is number => typeof categoryId === "number");
+      const faqIds = faqItems
+        .map((faq) => faq.faqId)
+        .filter((faqId): faqId is number => typeof faqId === "number");
+      const resourceIds = uploadedFiles
+        .map((file) => file.resourceId)
+        .filter((resourceId): resourceId is number => typeof resourceId === "number");
 
-      if (templates.length === 0) {
-        setTemplateGenerationMessage(
-          "현재 백엔드는 온보딩용 초기 템플릿 생성을 직접 지원하지 않아 마지막 단계는 시뮬레이션으로 대체할 수 없습니다. 비즈니스 프로필 저장까지는 완료되었고, 초기 템플릿 생성 API가 추가되면 이 단계까지 연결할 수 있습니다.",
-        );
-        toast.error("초기 템플릿 생성 API가 아직 없어 마지막 단계를 완료할 수 없습니다.");
+      if (categoryIds.length === 0) {
+        toast.error("초기 템플릿 생성을 위해 최소 한 개 이상의 카테고리가 필요합니다.");
         return;
       }
 
-      const response = await regenerateBusinessTemplates({
-        regenerateAll: true,
-        templateIds: [],
+      const response = await generateInitialBusinessTemplates({
+        industryType: businessType,
+        emailTone: mapToneToApiTone(tone),
+        companyDescription: description.trim(),
+        categoryIds,
+        faqIds,
+        resourceIds,
       });
 
       runTemplateGenerationAnimation(response.processingCount);
@@ -1979,12 +2020,12 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                 {/* Action Button */}
                 <button
                   onClick={() => {
-                    markOnboardingComplete();
                     navigate("/app");
                   }}
+                  disabled={completingOnboarding}
                   className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#2DD4BF] text-[#1E2A3A] rounded-xl hover:bg-[#14B8A6] transition-colors"
                 >
-                  대시보드로 이동
+                  {completingOnboarding ? "완료 상태 저장 중..." : "대시보드로 이동"}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
