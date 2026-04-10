@@ -19,7 +19,7 @@ type DashboardSummaryApiResponse = {
 };
 
 type DashboardScheduleApiResponse = {
-  data: Array<{
+  schedules: Array<{
     event_id: number;
     title: string;
     start_datetime: string;
@@ -43,7 +43,7 @@ type DashboardWeeklySummaryApiResponse = {
 };
 
 type DashboardRecentEmailApiResponse = {
-  data: Array<{
+  emails: Array<{
     email_id: number;
     sender_name: string;
     sender_company: string | null;

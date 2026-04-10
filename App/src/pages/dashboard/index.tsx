@@ -26,9 +26,9 @@ import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 
 type DashboardState = {
   summary: Awaited<ReturnType<typeof getDashboardSummary>> | null;
-  schedules: Awaited<ReturnType<typeof getDashboardSchedules>>["data"];
+  schedules: Awaited<ReturnType<typeof getDashboardSchedules>>["schedules"];
   weeklySummary: Awaited<ReturnType<typeof getDashboardWeeklySummary>> | null;
-  recentEmails: Awaited<ReturnType<typeof getDashboardRecentEmails>>["data"];
+  recentEmails: Awaited<ReturnType<typeof getDashboardRecentEmails>>["emails"];
 };
 
 function formatSignedNumber(value: number, suffix = "") {
@@ -68,6 +68,16 @@ function isVideoSchedule(source: string) {
     normalizedSource.includes("meet") ||
     normalizedSource.includes("video")
   );
+}
+
+function formatDateRange(start: string, end: string) {
+  const format = (date: string) =>
+    new Intl.DateTimeFormat("ko-KR", {
+      month: "numeric",
+      day: "numeric",
+    }).format(new Date(date));
+
+  return `${format(start)} - ${format(end)}`;
 }
 
 function toInboxStatusLabel(status: string) {
@@ -128,10 +138,7 @@ const demoDashboardState: DashboardState = {
     },
   ],
   weeklySummary: {
-    date_range: {
-      start: "2026-02-24",
-      end: "2026-03-02",
-    },
+    date_range: { start: "2026-02-24", end: "2026-03-02" },
     categories: [
       { category_name: "가격 문의", count: 12, color: "#2DD4BF" },
       { category_name: "일정 조율", count: 7, color: "#38BDF8" },
@@ -214,9 +221,9 @@ export function DashboardPage() {
 
         setDashboardState({
           summary,
-          schedules: schedules.data,
+          schedules: schedules.schedules,
           weeklySummary,
-          recentEmails: recentEmails.data,
+          recentEmails: recentEmails.emails,
         });
       })
       .catch((error) => {
@@ -387,7 +394,7 @@ export function DashboardPage() {
                 title="일정 데이터를 불러오지 못했습니다"
                 description="다가오는 일정 패널 응답이 지연되고 있습니다. 캘린더 화면에서 다시 확인해 주세요."
               />
-            ) : dashboardState.schedules.length === 0 ? (
+            ) : (dashboardState.schedules ?? []).length === 0 ? (
               <StatePanel
                 title="예정된 일정이 없습니다"
                 description="확정되거나 등록 대기 중인 일정이 아직 없습니다."
@@ -395,7 +402,7 @@ export function DashboardPage() {
               />
             ) : (
               <div className="space-y-3">
-                {dashboardState.schedules.map((event) => (
+                {(dashboardState.schedules ?? []).map((event) => (
                   <div
                     key={event.event_id}
                     className="flex flex-wrap items-center gap-4 rounded-2xl border border-[#E2E8F0] px-4 py-4"
@@ -446,7 +453,7 @@ export function DashboardPage() {
                 title="최근 메일 패널을 표시할 수 없습니다"
                 description="수신 메일 목록 응답을 확인하지 못했습니다. 수신함에서 전체 목록을 확인해 주세요."
               />
-            ) : dashboardState.recentEmails.length === 0 ? (
+            ) : (dashboardState.recentEmails ?? []).length === 0 ? (
               <StatePanel
                 title="최근 수신 이메일이 없습니다"
                 description="표시할 최근 메일이 아직 없습니다."
@@ -454,7 +461,7 @@ export function DashboardPage() {
               />
             ) : (
               <div className="space-y-3">
-                {dashboardState.recentEmails.slice(0, 4).map((email) => {
+                {(dashboardState.recentEmails ?? []).slice(0, 4).map((email) => {
                   const statusMeta = toInboxStatusLabel(email.status);
 
                   return (
@@ -490,7 +497,10 @@ export function DashboardPage() {
           title="이번 주 요약"
           description={
             dashboardState.weeklySummary
-              ? `${dashboardState.weeklySummary.date_range.start} - ${dashboardState.weeklySummary.date_range.end}`
+              ? formatDateRange(
+                  dashboardState.weeklySummary.date_range.start,
+                  dashboardState.weeklySummary.date_range.end,
+                )
               : undefined
           }
         >
