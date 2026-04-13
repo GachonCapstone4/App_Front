@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, createBrowserRouter } from "react-router";
+import { Link, Navigate, createBrowserRouter, useLocation } from "react-router";
 import { AppShell } from "../../shared/ui/AppShell";
 import {
   canAccessUserWorkspace,
@@ -8,6 +8,18 @@ import {
 } from "../../shared/lib/app-session";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { AdminRootLayout } from "../../admin/AdminRootLayout";
+
+function hasGoogleOAuthCallbackParams(search: string) {
+  const searchParams = new URLSearchParams(search);
+
+  return (
+    searchParams.has("google_oauth") ||
+    searchParams.has("gmail_connected") ||
+    searchParams.has("calendar_connected") ||
+    searchParams.has("gmail") ||
+    searchParams.has("calendar")
+  );
+}
 
 function AuthEntryGate({ children }: { children: ReactNode }) {
   const session = getAppSession();
@@ -47,6 +59,14 @@ function OnboardingGate({ children }: { children: ReactNode }) {
 
 function AppGate() {
   const session = getAppSession();
+  const location = useLocation();
+
+  if (
+    location.pathname === "/app/settings" &&
+    hasGoogleOAuthCallbackParams(location.search)
+  ) {
+    return <Navigate replace to={`/oauth/google/callback${location.search}`} />;
+  }
 
   if (!session.authenticated) {
     return <Navigate replace to="/" />;
@@ -91,6 +111,16 @@ function AdminGate() {
   return <AdminRootLayout />;
 }
 
+function LegacySettingsGate() {
+  const location = useLocation();
+
+  if (hasGoogleOAuthCallbackParams(location.search)) {
+    return <Navigate replace to={`/oauth/google/callback${location.search}`} />;
+  }
+
+  return <Navigate replace to="/app/settings?tab=email" />;
+}
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -124,6 +154,10 @@ export const router = createBrowserRouter([
       const module = await import("../../pages/google-oauth-callback");
       return { Component: module.GoogleOAuthCallbackPage };
     },
+  },
+  {
+    path: "/settings",
+    Component: LegacySettingsGate,
   },
   {
     path: "/app",

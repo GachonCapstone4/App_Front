@@ -12,10 +12,15 @@ type GoogleOAuthPopupMessage = {
 export function GoogleOAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const result = searchParams.get("google_oauth") ?? "error";
+  const legacyGmailConnected = searchParams.get("gmail");
+  const legacyCalendarConnected = searchParams.get("calendar");
+  const gmailConnected = searchParams.get("gmail_connected") ?? legacyGmailConnected ?? "false";
+  const calendarConnected =
+    searchParams.get("calendar_connected") ?? legacyCalendarConnected ?? "false";
+  const result =
+    searchParams.get("google_oauth") ??
+    (gmailConnected === "true" || calendarConnected === "true" ? "success" : "error");
   const message = searchParams.get("message") ?? "";
-  const gmailConnected = searchParams.get("gmail_connected") ?? "false";
-  const calendarConnected = searchParams.get("calendar_connected") ?? "false";
 
   useEffect(() => {
     const payload: GoogleOAuthPopupMessage = {
@@ -33,7 +38,17 @@ export function GoogleOAuthCallbackPage() {
     }
 
     const timer = window.setTimeout(() => {
-      navigate(`/app/settings?tab=email&google_oauth=${encodeURIComponent(result)}`, {
+      const nextSearchParams = new URLSearchParams();
+      nextSearchParams.set("tab", "email");
+      nextSearchParams.set("google_oauth", result);
+      nextSearchParams.set("gmail_connected", gmailConnected);
+      nextSearchParams.set("calendar_connected", calendarConnected);
+
+      if (message) {
+        nextSearchParams.set("message", message);
+      }
+
+      navigate(`/app/settings?${nextSearchParams.toString()}`, {
         replace: true,
       });
     }, 1200);
