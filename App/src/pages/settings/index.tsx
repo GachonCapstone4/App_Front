@@ -17,6 +17,10 @@ import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTab = searchParams.get("tab");
+  const googleOAuthResult = searchParams.get("google_oauth");
+  const googleOAuthMessage = searchParams.get("message");
+  const gmailConnected = searchParams.get("gmail_connected");
+  const calendarConnected = searchParams.get("calendar_connected");
   const scenarioId = resolveDemoScenarioId(searchParams.get("scenario"), "settings-demo");
   const [activeTab, setActiveTab] = useState<SettingsTabId>(
     (searchTab as SettingsTabId) || (defaultSettingsState.activeTab as SettingsTabId)
@@ -57,6 +61,10 @@ export function SettingsPage() {
         <EmailIntegrationSettingsPanel
           accounts={defaultSettingsState.emailAccounts}
           scenarioId={scenarioId}
+          oauthResult={googleOAuthResult}
+          oauthMessage={googleOAuthMessage}
+          gmailConnected={gmailConnected}
+          calendarConnected={calendarConnected}
         />
       ) : null}
       {activeTab === "support" ? <AdminInquirySettingsPanel scenarioId={scenarioId} /> : null}

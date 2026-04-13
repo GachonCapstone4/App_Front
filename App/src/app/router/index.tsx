@@ -119,6 +119,13 @@ export const router = createBrowserRouter([
     },
   },
   {
+    path: "/oauth/google/callback",
+    lazy: async () => {
+      const module = await import("../../pages/google-oauth-callback");
+      return { Component: module.GoogleOAuthCallbackPage };
+    },
+  },
+  {
     path: "/app",
     element: <AppGate />,
     children: [

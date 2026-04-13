@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Unplug, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { EmailAccount } from "../../../shared/types";
@@ -16,7 +16,19 @@ import { StateBanner } from "../../../shared/ui/primitives/StateBanner";
 interface EmailIntegrationSettingsPanelProps {
   accounts: EmailAccount[];
   scenarioId?: string | null;
+  oauthResult?: string | null;
+  oauthMessage?: string | null;
+  gmailConnected?: string | null;
+  calendarConnected?: string | null;
 }
+
+type GoogleOAuthPopupMessage = {
+  type: "emailassist-google-oauth";
+  result: string;
+  message: string;
+  gmailConnected: string;
+  calendarConnected: string;
+};
 
 function GmailIcon() {
   return (
@@ -63,6 +75,10 @@ function formatSyncDate(value: string | null) {
 export function EmailIntegrationSettingsPanel({
   accounts,
   scenarioId,
+  oauthResult,
+  oauthMessage,
+  gmailConnected,
+  calendarConnected,
 }: EmailIntegrationSettingsPanelProps) {
   const useDemoDataMode =
     scenarioId === "settings-demo" || Boolean(scenarioId?.startsWith("settings-"));
@@ -72,6 +88,15 @@ export function EmailIntegrationSettingsPanel({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [popupResult, setPopupResult] = useState<GoogleOAuthPopupMessage | null>(null);
+  const bannerResult = popupResult?.result ?? oauthResult;
+  const bannerMessage = popupResult?.message ?? oauthMessage;
+  const bannerGmailConnected = popupResult?.gmailConnected ?? gmailConnected;
+  const bannerCalendarConnected = popupResult?.calendarConnected ?? calendarConnected;
+  const popupWindowFeatures = useMemo(
+    () => "popup=yes,width=640,height=820,resizable=yes,scrollbars=yes",
+    [],
+  );
 
   const loadIntegration = async () => {
     const nextIntegration = await getMyIntegrationSafe();
@@ -127,6 +152,42 @@ export function EmailIntegrationSettingsPanel({
     };
   }, [accounts, useDemoDataMode]);
 
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent<GoogleOAuthPopupMessage>) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data?.type !== "emailassist-google-oauth") {
+        return;
+      }
+
+      setPopupResult(event.data);
+
+      if (event.data.result === "success") {
+        void loadIntegration()
+          .then(() => {
+            toast.success("Google 계정 연동을 완료했습니다.");
+          })
+          .catch((error) => {
+            toast.error(getErrorMessage(error, "연동 상태를 다시 불러오지 못했습니다."));
+          });
+        return;
+      }
+
+      toast.error(event.data.message || "Google 계정 연동을 완료하지 못했습니다.");
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [useDemoDataMode]);
+
   const handleRefresh = async () => {
     if (useDemoDataMode) {
       toast.success("데모 모드에서 연동 상태를 새로고침했습니다.");
@@ -170,10 +231,14 @@ export function EmailIntegrationSettingsPanel({
 
     try {
       const authorizationUrl = await getGoogleAuthorizationUrl();
-      window.open(authorizationUrl, "_blank", "noopener,noreferrer");
-      toast.message(
-        "Google 인증을 새 탭에서 시작했습니다. 인증이 끝나면 이 화면에서 새로고침을 눌러 주세요.",
-      );
+      const popup = window.open(authorizationUrl, "emailassist-google-oauth", popupWindowFeatures);
+
+      if (!popup) {
+        toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+        return;
+      }
+
+      popup.focus();
     } catch (error) {
       toast.error(getErrorMessage(error, "Google 인증을 시작하지 못했습니다."));
     }
@@ -223,6 +288,24 @@ export function EmailIntegrationSettingsPanel({
         <StateBanner
           title="Google 인증 확인을 완료하지 못했습니다"
           description="OAuth 복귀 응답을 검증하지 못했습니다. 계정 연결을 다시 시도해 주세요."
+          tone="error"
+          className="mb-5"
+        />
+      ) : null}
+      {bannerResult === "success" ? (
+        <StateBanner
+          title="Google 계정 연동을 완료했습니다"
+          description={`Gmail ${bannerGmailConnected === "true" ? "연결됨" : "미연결"} / Calendar ${
+            bannerCalendarConnected === "true" ? "연결됨" : "미연결"
+          }`}
+          tone="info"
+          className="mb-5"
+        />
+      ) : null}
+      {bannerResult === "error" ? (
+        <StateBanner
+          title="Google 계정 연동을 완료하지 못했습니다"
+          description={bannerMessage || "OAuth 처리 중 오류가 발생했습니다. 다시 시도해 주세요."}
           tone="error"
           className="mb-5"
         />
@@ -292,9 +375,9 @@ export function EmailIntegrationSettingsPanel({
         </div>
       </div>
 
-      {!integration ? (
+      {!integration && !bannerResult ? (
         <p className="mt-4 text-xs text-muted-foreground">
-          현재 백엔드 OAuth 콜백은 JSON 응답으로 끝나기 때문에 인증 후 이 화면에서 새로고침해 상태를 확인해야 합니다.
+          Google 계정을 연결하면 인증이 별도 창에서 진행되고, 완료 후 이 이메일 연동 화면으로 돌아옵니다.
         </p>
       ) : null}
     </SectionCard>

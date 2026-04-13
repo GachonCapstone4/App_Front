@@ -994,7 +994,13 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
       runTemplateGenerationAnimation(response.processingCount);
     } catch (error) {
-      toast.error(getErrorMessage(error, "템플릿 생성 작업을 시작하지 못했습니다."));
+      const message =
+        error instanceof Error && error.message === "Network Error"
+          ? "초기 템플릿 생성 요청에 실패했습니다. 백엔드 서버가 실행 중인지 확인해 주세요."
+          : getErrorMessage(error, "템플릿 생성 작업을 시작하지 못했습니다.");
+
+      setTemplateGenerationMessage(message);
+      toast.error(message);
     }
   };
 
@@ -1860,7 +1866,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                     <div className="flex flex-col items-end gap-2">
                       {templateGenerationMessage ? (
                         <StateBanner
-                          title="초기 템플릿 생성은 아직 백엔드와 완전히 연결되지 않았습니다"
+                          title="초기 템플릿 생성 요청에 실패했습니다"
                           description={templateGenerationMessage}
                           tone="warning"
                           className="max-w-[420px]"
