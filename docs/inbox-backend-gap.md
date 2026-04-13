@@ -1,8 +1,9 @@
 # 수신함 프론트-백엔드 연결 갭 정리
 
-기준일: 2026-04-04
+기준일: 2026-04-10
 
 이 문서는 현재 `frontend/App` 수신함 화면 흐름을 기준으로, `Backend_Server` 실제 API와 아직 맞지 않는 항목을 정리한다.
+최신 백엔드 원격 추적 브랜치 기준으로 `draft_status`, `sender_email`, 고정 `schedule` 응답이 추가된 점을 반영했다.
 
 ## 1. 현재 연결된 범위
 
@@ -49,103 +50,57 @@
 - `SENT`
 - `SKIPPED`
 
-즉 현재 `unsent`는 이메일 상태로 직접 존재하지 않고, 상세 응답에서 `draft_reply.status = SKIPPED`일 때만 추론 가능하다.
+즉 현재 `unsent`는 이메일 상태로 직접 존재하지 않지만, 최신 목록 응답의 `draft_status=SKIPPED`로 직접 구분할 수 있다.
 
 ## 4. 현재 연결 방식
 
 현재 프론트는 아래처럼 보강한다.
 
-- 목록 응답의 `status=PROCESSED`는 일단 `completed`로 매핑
-- 이후 상세 응답을 읽고 `draft_reply.status=SKIPPED`이면 `unsent`로 재분류
+- 목록 응답의 `draft_status=SKIPPED`는 바로 `unsent`로 매핑
+- `draft_status=SENT | EDITED`는 `completed`로 매핑
+- 그 외 `status=PROCESSED`는 `completed`, `AUTO_SENT`는 `auto-sent`로 매핑
 
 이 방식으로 현재 요구사항인 “읽음 확인은 했지만 답변을 발송하지 않은 메일” 묶음은 구현 가능하다.
 
 다만 한계가 있다.
 
-- 목록 API만으로는 `completed`와 `unsent`를 구분할 수 없음
-- 프론트가 상세를 추가 조회해야 함
-- 목록 규모가 커질수록 비효율적
+- 목록 단계의 상태 분류는 정리됐지만, 화면 내부 다른 영역은 아직 최신 상세 응답을 전부 활용하지 않는다
 
-## 5. 백엔드에 필요한 목록 API 보강
+## 5. 최신 백엔드에서 이미 해소된 항목
 
-### 5.1 최소 보강안
+### 5.1 목록 응답 `draft_status`
 
-`GET /api/inbox` 응답에 아래 필드 추가:
+- 최신 백엔드 원격 기준으로 `GET /api/inbox` 응답에 `draft_status`가 추가됐다.
+- 프론트는 이 값을 이미 반영해 목록 단계에서 `completed`와 `unsent`를 구분한다.
 
-- `draft_status`
+### 5.2 상세 응답 `sender_email`
 
-예시:
+- 최신 백엔드 원격 기준으로 `GET /api/inbox/{emailId}`의 `email_info.sender_email`이 추가됐다.
+- 프론트 `InboxDetailApiResponse`는 이미 optional 필드로 선언해 두었지만, 관련 UI 활용은 아직 제한적이다.
 
-```json
-{
-  "email_id": 501,
-  "sender_name": "박민수",
-  "subject": "엔터프라이즈 플랜 가격 문의",
-  "received_at": "2026-03-12T10:23:00",
-  "status": "PROCESSED",
-  "draft_status": "SKIPPED",
-  "category_name": "가격문의",
-  "schedule_detected": true,
-  "has_attachments": true
-}
-```
+### 5.3 상세 응답 `ai_analysis.schedule`
 
-이 정도만 추가돼도 프론트는 목록만으로 `completed`와 `unsent`를 안정적으로 구분할 수 있다.
+- 최신 백엔드 원격 기준으로 `ai_analysis.schedule`에 아래 구조가 추가됐다.
+  - `has_schedule`
+  - `title`
+  - `date`
+  - `start_time`
+  - `end_time`
+  - `location`
+  - `participants`
+- 이는 기존 `entities` 자유 구조보다 프론트 일정 카드 렌더링에 훨씬 적합하다.
 
-### 5.2 더 좋은 보강안
+## 6. 프론트가 아직 수정해야 하는 항목
 
-목록 응답에 프론트 친화 상태를 별도 제공:
+### 6.1 일정 카드가 `schedule` 대신 `entities`를 우선 사용
 
-- `display_status`
+- 프론트 수신함은 일정 정보를 아직 `ai_analysis.entities` 중심으로 해석한다.
+- 최신 백엔드의 고정 `ai_analysis.schedule` 구조를 우선 사용하도록 수정하는 편이 낫다.
 
-가능 값:
+### 6.2 `display_status`는 여전히 없어서 프론트 재해석이 필요
 
-- `PENDING_REVIEW`
-- `COMPLETED`
-- `UNSENT`
-- `AUTO_SENT`
-
-이 경우 프론트는 별도 재해석 없이 바로 탭 분류 가능하다.
-
-## 6. 상세 API에 필요한 보강
-
-현재 상세 응답에는 아래 값이 빠져 있다.
-
-- `sender_email`
-
-프론트 메일 상세 패널은 발신자 이메일 표시를 사용하므로, 아래 필드가 필요하다.
-
-- `email_info.sender_email`
-
-권장 예시:
-
-```json
-{
-  "email_info": {
-    "email_id": 501,
-    "sender_name": "박민수",
-    "sender_email": "minsu.park@techsolution.co.kr",
-    "subject": "엔터프라이즈 플랜 가격 문의",
-    "body": "...",
-    "received_at": "2026-03-12T10:23:00",
-    "has_attachments": true
-  }
-}
-```
-
-## 7. 일정 감지 정보의 한계
-
-현재 상세 응답의 `ai_analysis.entities`는 구조가 고정돼 있지 않다.
-
-그래서 프론트는 현재 아래 값이 있을 때만 일정 감지 카드를 안정적으로 보여줄 수 있다.
-
-- `title`
-- `date`
-- `time` 또는 `start_time`
-- `location`
-- `participants`
-
-이 값들이 AI/백엔드에서 고정 스키마로 오지 않으면 일정 카드 렌더링은 불안정할 수 있다.
+- `draft_status` 추가로 최소 요구사항은 충족됐지만, 목록 응답에 `display_status` 같은 프론트 친화 상태는 아직 없다.
+- 따라서 `PENDING_REVIEW / PROCESSED / AUTO_SENT + draft_status` 조합을 프론트에서 여전히 해석해야 한다.
 
 ## 8. 첨부파일/추천 초안/일정 액션의 현재 상태
 
@@ -163,10 +118,8 @@
 - 추천 초안 비교 UX가 아직 없음
 - 일정 액션은 캘린더 연결 범위와 함께 정리 필요
 
-## 9. 백엔드 우선 보완 순서
+## 9. 현재 남은 우선 작업
 
-1. `GET /api/inbox` 목록 응답에 `draft_status` 추가
-2. 또는 목록 응답에 `display_status` 추가
-3. `GET /api/inbox/{emailId}` 상세 응답에 `sender_email` 추가
-4. `ai_analysis.entities`의 일정 관련 구조를 고정 스키마로 정리
-5. 이후 추천 초안/첨부파일/일정 액션을 화면에 직접 연결
+1. 일정 카드 렌더링을 `ai_analysis.schedule` 기준으로 전환
+2. 발신자 이메일을 상세/패널 UI에서 직접 활용
+3. 이후 추천 초안/첨부파일/일정 액션을 화면에 직접 연결

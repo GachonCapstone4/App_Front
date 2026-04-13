@@ -1,4 +1,10 @@
-import type { EmailItem, EmailStatus, EmailSchedule } from "../../shared/types";
+import type {
+  EmailItem,
+  EmailRecommendationItem,
+  RecommendationState,
+  EmailSchedule,
+  EmailStatus,
+} from "../../shared/types";
 
 type InboxListApiItem = {
   email_id: number;
@@ -47,6 +53,15 @@ type InboxDetailApiResponse = {
     subject: string | null;
     body: string | null;
   } | null;
+};
+
+type InboxRecommendationApiItem = {
+  draft_id: number;
+  template_title?: string | null;
+  subject: string;
+  body: string;
+  similarity: number;
+  email_id: number;
 };
 
 export function mapBackendInboxStatus(status: string, draftStatus?: string | null): EmailStatus {
@@ -191,10 +206,12 @@ function buildSchedule(entities: Record<string, unknown> | null, detected: boole
 
 export function mapInboxListItem(item: InboxListApiItem): EmailItem {
   const senderEmail = item.sender_email ?? "";
+  const senderName = item.sender_name?.trim() || senderEmail || "발신자 정보 없음";
+  const categoryName = item.category_name?.trim() || "분석 대기";
 
   return {
     id: String(item.email_id),
-    sender: item.sender_name ?? "발신자",
+    sender: senderName,
     senderEmail,
     company: deriveCompanyFromEmail(senderEmail),
     subject: item.subject,
@@ -203,13 +220,15 @@ export function mapInboxListItem(item: InboxListApiItem): EmailItem {
     body: "",
     time: formatInboxTime(item.received_at),
     receivedDate: formatInboxReceivedDate(item.received_at),
-    category: item.category_name ?? "미분류",
+    category: categoryName,
     confidence: 0,
     status: mapBackendInboxStatus(item.status, item.draft_status ?? null),
     sentTime: "",
     schedule: item.schedule_detected ? { detected: false } : { detected: false },
     draft: "",
     draftStatus: item.draft_status ?? undefined,
+    recommendations: [],
+    recommendationState: "idle",
   };
 }
 
@@ -227,10 +246,14 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
     body: emailInfo.body,
     preview: aiAnalysis?.summary ?? current.preview,
     summary: aiAnalysis?.summary ?? "",
+    matchingText:
+      typeof aiAnalysis?.entities?.matching_text === "string"
+        ? aiAnalysis.entities.matching_text
+        : undefined,
     category:
-      current.category && current.category !== "미분류"
+      current.category && current.category !== "분석 대기" && current.category !== "미분류"
         ? current.category
-        : aiAnalysis?.intent || "미분류",
+        : aiAnalysis?.intent || "분석 대기",
     confidence: aiAnalysis?.confidence_score ? Number(aiAnalysis.confidence_score) : 0,
     schedule: buildSchedule(aiAnalysis?.entities ?? null, aiAnalysis?.schedule_detected === true),
     draft: draftReply?.body ?? "",
@@ -240,5 +263,42 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
     autoCompletedCount: draftReply?.variables?.auto_completed_count ?? undefined,
     requiredInputCount: draftReply?.variables?.required_input_count ?? undefined,
     draftStatus: draftReply?.status ?? undefined,
+  };
+}
+
+export function mapInboxRecommendation(item: InboxRecommendationApiItem): EmailRecommendationItem | null {
+  if (!item.template_title?.trim() || !item.subject?.trim() || !item.body?.trim()) {
+    return null;
+  }
+
+  return {
+    draftId: item.draft_id,
+    templateTitle: item.template_title,
+    subject: item.subject,
+    body: item.body,
+    similarity: Number(item.similarity),
+    emailId: item.email_id,
+  };
+}
+
+export function mergeInboxRecommendations(
+  current: EmailItem,
+  recommendations: EmailRecommendationItem[],
+  recommendationState: RecommendationState,
+  recommendationError?: string,
+): EmailItem {
+  const primary = recommendations[0];
+  const shouldPrefillDraft = !current.draft.trim() && Boolean(primary);
+  const shouldPrefillTemplateName = !current.templateName && Boolean(primary);
+  const shouldPrefillDraftSubject = !current.draftSubject && Boolean(primary);
+
+  return {
+    ...current,
+    recommendations,
+    recommendationState,
+    recommendationError,
+    draft: shouldPrefillDraft && primary ? primary.body : current.draft,
+    templateName: shouldPrefillTemplateName && primary ? primary.templateTitle : current.templateName,
+    draftSubject: shouldPrefillDraftSubject && primary ? primary.subject : current.draftSubject,
   };
 }

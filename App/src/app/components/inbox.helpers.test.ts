@@ -5,6 +5,8 @@ import {
   mapBackendInboxStatus,
   mapFrontendInboxStatus,
   mergeInboxDetail,
+  mergeInboxRecommendations,
+  mapInboxRecommendation,
 } from "./inbox.helpers";
 
 describe("inbox helpers", () => {
@@ -178,5 +180,46 @@ describe("inbox helpers", () => {
     );
 
     expect(merged.status).toBe("unsent");
+  });
+
+  it("maps recommendation payloads and prefills draft content when no draft exists", () => {
+    const recommendation = mapInboxRecommendation({
+      draft_id: 15,
+      template_title: "미팅 조율 템플릿",
+      subject: "Re: 미팅 일정 조율",
+      body: "안녕하세요. 다음 주 수요일 오전 11시에 미팅 가능합니다.",
+      similarity: 0.91,
+      email_id: 1,
+    });
+
+    expect(recommendation).not.toBeNull();
+
+    const merged = mergeInboxRecommendations(
+      {
+        id: "1",
+        sender: "발신자",
+        senderEmail: "",
+        company: "",
+        subject: "제목",
+        preview: "",
+        summary: "",
+        body: "",
+        time: "오전 10:00",
+        receivedDate: "4.4.",
+        category: "미분류",
+        confidence: 0,
+        status: "pending",
+        sentTime: "",
+        schedule: { detected: false },
+        draft: "",
+      },
+      recommendation ? [recommendation] : [],
+      "ready",
+    );
+
+    expect(merged.templateName).toBe("미팅 조율 템플릿");
+    expect(merged.draftSubject).toBe("Re: 미팅 일정 조율");
+    expect(merged.draft).toContain("다음 주 수요일");
+    expect(merged.recommendations).toHaveLength(1);
   });
 });

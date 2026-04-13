@@ -35,12 +35,12 @@
 ### `GET /api/onboarding/status`
 
 - 응답값: `onboarding_completed`
-- 현재 프론트 세션 복원 로직은 아직 이 값을 쓰지 않고, 연동 여부/프로필 존재 여부로 임시 판정한다.
+- 현재 프론트 세션 복원 로직은 이 값을 우선 사용하고, 구버전 백엔드와의 호환이 필요할 때만 임시 판정으로 폴백한다.
 
 ### `POST /api/onboarding/complete`
 
 - 백엔드는 `Users.onboarding_completed`를 갱신할 수 있다.
-- 현재 프론트는 마지막 완료 시 여전히 로컬 세션의 `markOnboardingComplete()`에 의존한다.
+- 현재 프론트는 마지막 완료 시 `POST /api/onboarding/complete`를 먼저 호출하고, 성공 후 로컬 세션을 갱신한다.
 
 ### `POST /api/business/templates/generate-initial`
 

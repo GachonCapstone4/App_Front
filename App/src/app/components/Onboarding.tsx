@@ -803,6 +803,56 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     }
   };
 
+  const ensurePersistedCategories = async (): Promise<OnboardingCategoryItem[]> => {
+    const pendingCategories = categories.filter((category) => typeof category.categoryId !== "number");
+    if (demoMode || pendingCategories.length === 0) {
+      return categories;
+    }
+
+    setSavingCategory(true);
+    try {
+      const existingCategories = await getBusinessCategories();
+      const existingByName = new Map(
+        existingCategories.map((category) => [category.categoryName, category]),
+      );
+
+      const persistedCategories = await Promise.all(
+        categories.map(async (category) => {
+          if (typeof category.categoryId === "number") {
+            return category;
+          }
+
+          const matchedExisting = existingByName.get(category.name);
+          if (matchedExisting) {
+            return {
+              ...category,
+              id: String(matchedExisting.categoryId),
+              categoryId: matchedExisting.categoryId,
+              color: matchedExisting.color ?? category.color,
+            };
+          }
+
+          const savedCategory = await createBusinessCategory({
+            categoryName: category.name,
+            color: category.color,
+          });
+
+          return {
+            ...category,
+            id: String(savedCategory.categoryId),
+            categoryId: savedCategory.categoryId,
+            color: savedCategory.color ?? category.color,
+          };
+        }),
+      );
+
+      setCategories(persistedCategories);
+      return persistedCategories;
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   const handleCancelGeneration = () => {
     clearGenerationTimeouts();
     setIsGenerating(false);
@@ -917,7 +967,8 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
     try {
       setTemplateGenerationMessage(null);
-      const categoryIds = categories
+      const persistedCategories = await ensurePersistedCategories();
+      const categoryIds = persistedCategories
         .map((category) => category.categoryId)
         .filter((categoryId): categoryId is number => typeof categoryId === "number");
       const faqIds = faqItems

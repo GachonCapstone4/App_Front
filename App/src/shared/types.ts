@@ -41,6 +41,17 @@ export interface UndetectedSchedule {
 
 export type EmailSchedule = DetectedSchedule | UndetectedSchedule;
 
+export interface EmailRecommendationItem {
+  draftId: number;
+  templateTitle: string;
+  subject: string;
+  body: string;
+  similarity: number;
+  emailId: number;
+}
+
+export type RecommendationState = "idle" | "loading" | "ready" | "empty" | "error";
+
 export interface EmailItem {
   id: string;
   sender: string;
@@ -49,6 +60,7 @@ export interface EmailItem {
   subject: string;
   preview: string;
   summary: string;
+  matchingText?: string;
   body: string;
   time: string;
   receivedDate: string;
@@ -63,6 +75,9 @@ export interface EmailItem {
   autoCompletedCount?: number;
   requiredInputCount?: number;
   draftStatus?: string;
+  recommendations?: EmailRecommendationItem[];
+  recommendationState?: RecommendationState;
+  recommendationError?: string;
 }
 
 export interface NotificationItem {

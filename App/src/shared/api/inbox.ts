@@ -14,8 +14,8 @@ type InboxListApiItem = {
 };
 
 type InboxListApiResponse = {
-  total_elements: number;
-  content: InboxListApiItem[];
+  total_elements?: number;
+  content?: InboxListApiItem[] | null;
 };
 
 type InboxDetailApiResponse = {
@@ -58,8 +58,27 @@ type InboxActionApiResponse = {
   message: string;
 };
 
+type InboxSeedApiResponse = {
+  message: string;
+  email_id: number;
+};
+
+type InboxRecommendationApiItem = {
+  draft_id: number;
+  template_title?: string | null;
+  subject: string;
+  body: string;
+  similarity: number;
+  email_id: number;
+};
+
+type InboxRecommendationsApiResponse = {
+  drafts?: InboxRecommendationApiItem[] | null;
+};
+
 export type InboxListSnapshot = InboxListApiResponse;
 export type InboxDetailSnapshot = InboxDetailApiResponse;
+export type InboxRecommendationSnapshot = InboxRecommendationApiItem;
 
 export async function getInboxList(payload?: {
   page?: number;
@@ -74,12 +93,26 @@ export async function getInboxList(payload?: {
     },
   });
 
-  return response.data;
+  return {
+    total_elements: response.data?.total_elements ?? 0,
+    content: Array.isArray(response.data?.content) ? response.data.content : [],
+  };
 }
 
 export async function getInboxDetail(emailId: number) {
   const response = await api.get<InboxDetailApiResponse>(`/api/inbox/${emailId}`);
   return response.data;
+}
+
+export async function getInboxRecommendations(emailId: number, topK = 3) {
+  const response = await api.get<InboxRecommendationsApiResponse>(`/api/inbox/${emailId}/recommendations`, {
+    params: {
+      topK,
+    },
+    timeout: 10000,
+  });
+
+  return Array.isArray(response.data?.drafts) ? response.data.drafts : [];
 }
 
 export async function sendInboxReply(emailId: number) {
@@ -103,5 +136,10 @@ export async function skipInboxReply(emailId: number) {
     action: "SKIP",
     content: null,
   });
+  return response.data;
+}
+
+export async function seedInboxTestEmail() {
+  const response = await api.post<InboxSeedApiResponse>("/api/inbox/test-seed");
   return response.data;
 }

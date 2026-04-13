@@ -3,19 +3,12 @@ import { AlertTriangle, CheckCircle2, FileText, PencilLine, Send, SkipForward } 
 import { toast } from "sonner";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import type { EmailItem, EmailStatus } from "../../../shared/types";
+import { StatePanel } from "../../../shared/ui/primitives/StatePanel";
 
 const metaByStatus = emailStatusMeta as Record<
   EmailStatus,
   { label: string; tone: string; banner: string }
 >;
-
-const templateNameByCategory: Record<string, string> = {
-  가격문의: "가격 안내 템플릿",
-  불만접수: "불만 접수 응답 템플릿",
-  미팅요청: "미팅 조율 템플릿",
-  계약문의: "계약 검토 응답 템플릿",
-  기술지원: "기술 지원 템플릿",
-};
 
 const variableTypeByToken: Record<string, "auto" | "required"> = {
   "{{회사명}}": "auto",
@@ -164,13 +157,15 @@ export function DraftPanel({
 
   const meta = metaByStatus[email.status];
   const readonly = email.status !== "pending";
-  const templateName =
-    email.templateName || templateNameByCategory[email.category] || "기본 답변 템플릿";
+  const recommendations = email.recommendations ?? [];
+  const recommendationState = email.recommendationState ?? "idle";
+  const templateName = email.templateName || recommendations[0]?.templateTitle || "";
   const tokenCounts = getVariableCounts(email.draft);
   const counts = {
     auto: email.autoCompletedCount ?? tokenCounts.auto,
     required: email.requiredInputCount ?? tokenCounts.required,
   };
+  const showDraftFallbackState = !readonly && !email.draft.trim();
 
   return (
     <div className="flex h-full flex-col">
@@ -191,17 +186,62 @@ export function DraftPanel({
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <FileText className="h-3.5 w-3.5 shrink-0 text-[#94A3B8] dark:text-muted-foreground" />
-            <span className="truncate text-xs text-[#64748B] dark:text-muted-foreground">{templateName}</span>
+            <span className="truncate text-xs text-[#64748B] dark:text-muted-foreground">
+              {templateName || "연결된 템플릿 없음"}
+            </span>
           </div>
-          <button
-            type="button"
-            className="shrink-0 text-xs font-medium text-[#14B8A6] dark:text-[#5EEAD4]"
-            onClick={handleOpenTemplate}
-          >
-            템플릿 보기 →
-          </button>
+          {templateName ? (
+            <button
+              type="button"
+              className="shrink-0 text-xs font-medium text-[#14B8A6] dark:text-[#5EEAD4]"
+              onClick={handleOpenTemplate}
+            >
+              템플릿 보기 →
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {recommendations.length ? (
+        <div className="mt-3 rounded-xl border border-border bg-card px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8] dark:text-muted-foreground">
+            추천 템플릿
+          </p>
+          <div className="mt-3 space-y-2">
+            {recommendations.map((recommendation, index) => {
+              const similarityLabel = `${Math.round(recommendation.similarity * 100)}%`;
+              const isPrimary =
+                recommendation.templateTitle === templateName &&
+                recommendation.subject === (email.draftSubject || `Re: ${email.subject}`);
+
+              return (
+                <div
+                  key={`${recommendation.draftId}-${index}`}
+                  className={`rounded-xl border px-3 py-3 ${
+                    isPrimary
+                      ? "border-[#14B8A6] bg-[#F0FDFA] dark:border-[#5EEAD4] dark:bg-[#0B2728]"
+                      : "border-border bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[#1E2A3A] dark:text-foreground">
+                        {recommendation.templateTitle}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-[#64748B] dark:text-muted-foreground">
+                        {recommendation.subject}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[#0F766E] dark:bg-card dark:text-[#5EEAD4]">
+                      {similarityLabel}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {readonly ? (
         <div className="mt-4">
@@ -220,29 +260,54 @@ export function DraftPanel({
         </div>
       )}
 
-      <div className={`mt-4 rounded-2xl border border-border bg-card ${readonly ? "opacity-85" : ""}`}>
-        <div className="space-y-4 border-b border-border px-4 py-4">
-          <div>
-            <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">받는 사람</p>
-            <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
-              {email.sender} &lt;{email.senderEmail}&gt;
-            </p>
+      {showDraftFallbackState ? (
+        recommendationState === "loading" || recommendationState === "idle" ? (
+          <StatePanel
+            title="RAG 추천을 불러오는 중입니다"
+            description="실제 템플릿 매칭 결과가 준비되면 이 영역에 표시됩니다."
+            tone="neutral"
+            className="mt-4 min-h-[280px]"
+          />
+        ) : recommendationState === "error" ? (
+          <StatePanel
+            title="추천 템플릿을 불러오지 못했습니다"
+            description={email.recommendationError || "RAG 추천 결과를 확인하는 중 오류가 발생했습니다."}
+            tone="error"
+            className="mt-4 min-h-[280px]"
+          />
+        ) : recommendationState === "empty" ? (
+          <StatePanel
+            title="매칭된 템플릿이 없습니다"
+            description="현재 메일과 일치하는 템플릿을 찾지 못했습니다. 템플릿 라이브러리와 RAG 인덱스를 확인해 주세요."
+            tone="empty"
+            className="mt-4 min-h-[280px]"
+          />
+        ) : null
+      ) : (
+        <div className={`mt-4 rounded-2xl border border-border bg-card ${readonly ? "opacity-85" : ""}`}>
+          <div className="space-y-4 border-b border-border px-4 py-4">
+            <div>
+              <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">받는 사람</p>
+              <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
+                {email.sender} &lt;{email.senderEmail}&gt;
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">제목</p>
+              <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
+                {email.draftSubject || `Re: ${email.subject}`}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">제목</p>
-            <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
-              {email.draftSubject || `Re: ${email.subject}`}
-            </p>
+          <div className="px-4 py-4">
+            <div className="whitespace-pre-wrap text-sm leading-8 text-[#475569] dark:text-muted-foreground">
+              {renderDraftText(email.draft, !readonly)}
+            </div>
           </div>
         </div>
-
-        <div className="px-4 py-4">
-          <div className="whitespace-pre-wrap text-sm leading-8 text-[#475569] dark:text-muted-foreground">
-            {renderDraftText(email.draft, !readonly)}
-          </div>
-        </div>
-      </div>
+      )}
 
       {readonly ? null : (
         <div className="mt-5">

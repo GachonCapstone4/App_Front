@@ -2,6 +2,7 @@ import { StatusBadge } from "../../../shared/ui/primitives/StatusBadge";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import { ScheduleDetectionCard } from "./ScheduleDetectionCard";
 import type { EmailItem, EmailStatus, StatusBadgeTone } from "../../../shared/types";
+import { StatePanel } from "../../../shared/ui/primitives/StatePanel";
 
 const metaByStatus = emailStatusMeta as Record<
   EmailStatus,
@@ -68,9 +69,18 @@ export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0F766E]">
             메일 요약
           </p>
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#334155]">
-            {email.summary}
-          </p>
+          {email.summary.trim() ? (
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#334155]">
+              {email.summary}
+            </p>
+          ) : (
+            <StatePanel
+              title="메일 요약을 생성하는 중입니다"
+              description="AI 서버 분석이 완료되면 실제 요약 결과가 이 영역에 표시됩니다."
+              tone="neutral"
+              className="mt-3 min-h-[160px]"
+            />
+          )}
         </div>
 
         <div className="my-4 h-px bg-[#E2E8F0]" />

@@ -14,6 +14,8 @@ import {
   editAndSendInboxReply,
   getInboxDetail,
   getInboxList,
+  getInboxRecommendations,
+  seedInboxTestEmail,
   sendInboxReply,
   skipInboxReply,
 } from "../../shared/api/inbox";
@@ -22,6 +24,8 @@ import {
   mapFrontendInboxStatus,
   mapInboxListItem,
   mergeInboxDetail,
+  mapInboxRecommendation,
+  mergeInboxRecommendations,
 } from "../../app/components/inbox.helpers";
 import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 
@@ -63,6 +67,10 @@ export function InboxPage() {
   };
 
   const getInitialSelectedEmailId = () => {
+    if (!useDemoDataMode) {
+      return "";
+    }
+
     if (emptyScenario) {
       return "";
     }
@@ -80,7 +88,7 @@ export function InboxPage() {
   };
 
   const [emails, setEmails] = useState<EmailItem[]>(() =>
-    emptyScenario ? [] : (emailItems as EmailItem[])
+    useDemoDataMode && !emptyScenario ? (emailItems as EmailItem[]) : []
   );
   const [activeStatus, setActiveStatus] = useState<InboxStatus>(getInitialStatus);
   const [selectedEmailId, setSelectedEmailId] = useState(getInitialSelectedEmailId);
@@ -88,6 +96,8 @@ export function InboxPage() {
   const [isLoadingList, setIsLoadingList] = useState(!useDemoDataMode);
   const [listLoadError, setListLoadError] = useState<string | null>(null);
   const [isHydratingDetails, setIsHydratingDetails] = useState(false);
+  const [isSeedingTestEmail, setIsSeedingTestEmail] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!useDemoDataMode) {
@@ -128,7 +138,7 @@ export function InboxPage() {
           return;
         }
 
-        const mappedList = listResponse.content.map(mapInboxListItem);
+        const mappedList = (listResponse.content ?? []).map(mapInboxListItem);
         setEmails(mappedList);
 
         if (!mappedList.length) {
@@ -182,7 +192,7 @@ export function InboxPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeStatus, useDemoDataMode]);
+  }, [activeStatus, reloadToken, useDemoDataMode]);
 
   const visibleEmails = useMemo<EmailItem[]>(
     () =>
@@ -208,6 +218,14 @@ export function InboxPage() {
     visibleEmails.find((item: EmailItem) => item.id === selectedEmailId) ||
     visibleEmails[0] ||
     null;
+  const selectedRecommendationState = selectedEmail?.recommendationState;
+  const selectedMatchingText = selectedEmail?.matchingText?.trim() ?? "";
+
+  const shouldPollSelectedEmail =
+    !useDemoDataMode &&
+    selectedEmail != null &&
+    selectedEmail.status === "pending" &&
+    (!selectedEmail.summary.trim() || !selectedEmail.matchingText);
 
   const selectedEmailLoading =
     !useDemoDataMode &&
@@ -240,6 +258,150 @@ export function InboxPage() {
 
   const pendingCount = emails.filter((item: EmailItem) => item.status === "pending").length;
   const unsentCount = emails.filter((item: EmailItem) => item.status === "unsent").length;
+
+  useEffect(() => {
+    if (useDemoDataMode || !selectedEmailId || !selectedEmail) {
+      return;
+    }
+
+    if (!selectedMatchingText) {
+      return;
+    }
+
+    if (selectedRecommendationState && selectedRecommendationState !== "idle") {
+      return;
+    }
+
+    setEmails((current) =>
+      current.map((item) =>
+        item.id === selectedEmailId
+          ? { ...item, recommendationState: "loading", recommendationError: undefined }
+          : item,
+      ),
+    );
+  }, [
+    selectedMatchingText,
+    selectedRecommendationState,
+    selectedEmailId,
+    useDemoDataMode,
+  ]);
+
+  useEffect(() => {
+    if (useDemoDataMode || !selectedEmailId || !selectedEmail) {
+      return;
+    }
+
+    if (!selectedMatchingText || selectedRecommendationState !== "loading") {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadRecommendations() {
+      try {
+        const response = await getInboxRecommendations(Number(selectedEmailId), 3);
+        if (cancelled) {
+          return;
+        }
+
+        const recommendations = (response ?? [])
+          .map(mapInboxRecommendation)
+          .filter((item): item is NonNullable<typeof item> => item != null);
+
+        setEmails((current) =>
+          current.map((item) =>
+            item.id === selectedEmailId
+              ? mergeInboxRecommendations(
+                  item,
+                  recommendations,
+                  recommendations.length ? "ready" : "empty",
+                )
+              : item,
+          ),
+        );
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setEmails((current) =>
+          current.map((item) =>
+            item.id === selectedEmailId
+              ? mergeInboxRecommendations(
+                  item,
+                  [],
+                  "error",
+                  getErrorMessage(error, "추천 템플릿을 불러오지 못했습니다."),
+                )
+              : item,
+          ),
+        );
+      }
+    }
+
+    void loadRecommendations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedMatchingText,
+    selectedRecommendationState,
+    selectedEmailId,
+    useDemoDataMode,
+  ]);
+
+  useEffect(() => {
+    if (!shouldPollSelectedEmail || !selectedEmailId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function refreshSelectedEmail() {
+      try {
+        const detail = await getInboxDetail(Number(selectedEmailId));
+        if (cancelled) {
+          return;
+        }
+
+        setEmails((current) =>
+          current.map((item) => {
+            if (item.id !== selectedEmailId) {
+              return item;
+            }
+
+            const merged = mergeInboxDetail(item, detail);
+            const shouldReloadRecommendations =
+              Boolean(merged.matchingText) &&
+              !merged.recommendations?.length &&
+              merged.recommendationState === "error";
+
+            return shouldReloadRecommendations
+              ? {
+                  ...merged,
+                  recommendations: [],
+                  recommendationState: "idle",
+                  recommendationError: undefined,
+                }
+              : merged;
+          }),
+        );
+      } catch (_error) {
+        // Polling failures should not replace the current UI state.
+      }
+    }
+
+    void refreshSelectedEmail();
+    const intervalId = window.setInterval(() => {
+      void refreshSelectedEmail();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [selectedEmailId, shouldPollSelectedEmail]);
 
   const handleSend = async () => {
     if (!selectedEmail) {
@@ -354,6 +516,47 @@ export function InboxPage() {
     }
   };
 
+  const handleSeedTestEmail = async () => {
+    if (useDemoDataMode || isSeedingTestEmail) {
+      return;
+    }
+
+    try {
+      setIsSeedingTestEmail(true);
+      const response = await seedInboxTestEmail();
+      setActiveStatus("pending");
+      setSelectedEmailId(String(response.email_id));
+      setReloadToken((current) => current + 1);
+      toast.success(response.message || "테스트 메일을 추가했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "테스트 메일을 추가하지 못했습니다."));
+    } finally {
+      setIsSeedingTestEmail(false);
+    }
+  };
+
+  const emptyInboxAction = !useDemoDataMode ? (
+    <button
+      type="button"
+      className="app-cta-accent inline-flex min-w-[180px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium"
+      onClick={() => void handleSeedTestEmail()}
+      disabled={isSeedingTestEmail}
+    >
+      {isSeedingTestEmail ? "테스트 메일 추가 중..." : "테스트 메일 추가"}
+    </button>
+  ) : null;
+
+  const seedTestEmailAction = !useDemoDataMode ? (
+    <button
+      type="button"
+      className="app-secondary-button inline-flex min-w-[140px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium"
+      onClick={() => void handleSeedTestEmail()}
+      disabled={isSeedingTestEmail}
+    >
+      {isSeedingTestEmail ? "추가 중..." : "테스트 메일 추가"}
+    </button>
+  ) : null;
+
   const draftBanner =
     draftSendErrorScenario
       ? {
@@ -370,7 +573,7 @@ export function InboxPage() {
         : !useDemoDataMode
           ? {
               title: "현재 수신함 연결 범위",
-              description: "미발송 상태는 이제 백엔드 목록의 draft_status를 우선 사용합니다. 추천 초안, 첨부 다운로드, 일정 액션은 아직 현재 화면에 직접 연결하지 않았습니다.",
+              description: "미발송 상태는 백엔드 draft_status를 우선 사용하며, 추천 템플릿은 RAG 매칭 결과를 기준으로 순차 로드합니다.",
               tone: "neutral" as const,
             }
           : null;
@@ -437,13 +640,14 @@ export function InboxPage() {
           </div>
         ) : (
           <div className="border-b border-border bg-card">
-            <div className="px-4 pt-4">
+            <div className="flex items-center justify-between gap-3 px-4 pt-4">
               <InboxStatusTabs
                 activeStatus={activeStatus}
                 pendingCount={pendingCount}
                 unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
+              {seedTestEmailAction}
             </div>
 
             <div className="px-2 py-2">
@@ -463,8 +667,9 @@ export function InboxPage() {
               ) : visibleEmails.length === 0 ? (
                 <StatePanel
                   title="표시할 이메일이 없습니다"
-                  description="현재 필터 조건에 맞는 메일이 없습니다. 다른 상태 탭을 선택해 보세요."
+                  description="현재 필터 조건에 맞는 메일이 없습니다. 로컬 테스트용 메일을 추가하거나 다른 상태 탭을 선택해 보세요."
                   tone="empty"
+                  action={emptyInboxAction}
                   className="min-h-[320px]"
                 />
               ) : (
@@ -482,13 +687,14 @@ export function InboxPage() {
       <div className="hidden h-full min-h-0 xl:grid xl:grid-cols-[320px_minmax(0,1fr)_390px]">
         <div className="flex min-h-0 flex-col border-r border-border bg-card">
           <div className="px-5 pt-5">
-            <div>
+            <div className="flex items-center justify-between gap-3">
               <InboxStatusTabs
                 activeStatus={activeStatus}
                 pendingCount={pendingCount}
                 unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
+              {seedTestEmailAction}
             </div>
           </div>
 
@@ -510,8 +716,9 @@ export function InboxPage() {
               ) : visibleEmails.length === 0 ? (
                 <StatePanel
                   title="선택한 상태에 메일이 없습니다"
-                  description="검토할 메일이 모두 처리되었거나 필터 조건에 맞는 항목이 없습니다."
+                  description="검토할 메일이 모두 처리되었거나 필터 조건에 맞는 항목이 없습니다. 로컬 테스트용 메일을 추가해 바로 확인할 수 있습니다."
                   tone="empty"
+                  action={emptyInboxAction}
                   className="min-h-[520px]"
                 />
               ) : (
