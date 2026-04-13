@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Calendar, Check, Mail, type LucideIcon } from "lucide-react";
+import { Bot, Calendar, Check, Mail, type LucideIcon } from "lucide-react";
 
 type FooterItem = {
   icon: LucideIcon;
@@ -7,8 +7,8 @@ type FooterItem = {
 };
 
 type AuthOnboardingLayoutProps = {
-  title: string;
-  subtitle: string;
+  title: ReactNode;
+  subtitle: ReactNode;
   footerItems: FooterItem[];
   stepBar?: ReactNode;
   children: ReactNode;
@@ -145,7 +145,11 @@ function FlyingEnvelopeBackground() {
               <span className="ai-core__ring ai-core__ring--inner" />
               <span className="ai-core__burst ai-core__burst--one" />
               <span className="ai-core__burst ai-core__burst--two" />
-              <span className="ai-core__dot" />
+              <span className="ai-core__dot flex items-center justify-center rounded-full border border-white/18 bg-[radial-gradient(circle_at_30%_30%,rgba(196,255,241,0.96),rgba(45,212,191,0.76)_52%,rgba(13,148,136,0.72)_100%)] shadow-[0_0_30px_rgba(45,212,191,0.36)]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#102232]/88 ring-1 ring-white/12 xl:h-10 xl:w-10">
+                  <Bot className="h-4 w-4 text-[#7AF2D2] xl:h-[18px] xl:w-[18px]" />
+                </span>
+              </span>
             </div>
           </div>
 
