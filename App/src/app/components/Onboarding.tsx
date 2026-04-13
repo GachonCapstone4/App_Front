@@ -55,6 +55,10 @@ import {
   completeOnboarding as completeOnboardingRequest,
   generateInitialBusinessTemplates,
 } from "../../shared/api/onboarding";
+import {
+  navigateGoogleOAuthPopup,
+  openGoogleOAuthPopup,
+} from "../../shared/lib/google-oauth-popup";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
 import {
@@ -696,8 +700,16 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
     try {
       setCheckingIntegration(true);
+      const popup = openGoogleOAuthPopup();
+
+      if (!popup) {
+        setCheckingIntegration(false);
+        toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+        return;
+      }
+
       const authorizationUrl = await getGoogleAuthorizationUrl();
-      window.open(authorizationUrl, "_blank", "noopener,noreferrer");
+      navigateGoogleOAuthPopup(popup, authorizationUrl);
       toast("연결 창에서 권한 동의를 마치면 이 화면에서 자동으로 상태를 확인합니다.");
 
       let attempts = 0;

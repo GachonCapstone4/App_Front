@@ -57,6 +57,10 @@ import {
   getMyIntegrationSafe,
 } from "../../shared/api/integrations";
 import {
+  navigateGoogleOAuthPopup,
+  openGoogleOAuthPopup,
+} from "../../shared/lib/google-oauth-popup";
+import {
   getTemplateLibrary,
   type TemplateSnapshot,
 } from "../../shared/api/templates";
@@ -827,8 +831,15 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
 
   const handleConnectCalendar = async () => {
     try {
+      const popup = openGoogleOAuthPopup();
+
+      if (!popup) {
+        toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+        return;
+      }
+
       const authorizationUrl = await getGoogleAuthorizationUrl();
-      window.open(authorizationUrl, "_blank", "noopener,noreferrer");
+      navigateGoogleOAuthPopup(popup, authorizationUrl);
       toast("연동이 완료되면 설정 또는 이 화면을 새로고침해 상태를 확인해 주세요.");
     } catch (error) {
       toast.error(getErrorMessage(error, "Google 캘린더 연결을 시작하지 못했습니다."));
