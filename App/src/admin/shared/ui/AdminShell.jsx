@@ -1,4 +1,5 @@
-﻿import { NavLink, Outlet, useNavigate } from "react-router";
+﻿import { useEffect, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
 import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Users } from "lucide-react";
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
@@ -14,8 +15,15 @@ const navItems = [
 export function AdminShell() {
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
-  const session = getAppSession();
+  const [session, setSession] = useState(() => getAppSession());
   const theme = resolvedTheme === "dark" ? "dark" : "light";
+
+  useEffect(() => {
+    const syncSession = () => setSession(getAppSession());
+
+    window.addEventListener("emailassist-session-updated", syncSession);
+    return () => window.removeEventListener("emailassist-session-updated", syncSession);
+  }, []);
 
   return (
     <div className="admin-layout">
@@ -63,7 +71,6 @@ export function AdminShell() {
             </p>
             <div className="mt-3 space-y-1 text-[11px] text-white/55">
               <p>권한: {session.role === "ADMIN" ? "관리자" : "일반 사용자"}</p>
-              <p>접속 IP: {session.clientIp || "-"}</p>
             </div>
             <button
               type="button"

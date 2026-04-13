@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Filter, Send } from "lucide-react";
 import { useSearchParams } from "react-router";
+import {
+  getAdminSupportTicket,
+  getAdminSupportTickets,
+  replyAdminSupportTicket,
+} from "../../shared/api/admin";
+import { getErrorMessage } from "../../shared/api/http";
 import { inquiries, responseHistory } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -11,6 +17,7 @@ import { StatusBadge } from "../shared/ui/StatusBadge";
 export function InquiriesPage() {
   const [searchParams] = useSearchParams();
   const scenarioId = searchParams.get("scenario");
+  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
   const loadErrorScenario = scenarioId === "admin-inquiries-load-error";
   const emptyScenario = scenarioId === "admin-inquiries-empty";
   const replyErrorScenario = scenarioId === "admin-inquiries-reply-error";
@@ -29,17 +36,67 @@ export function InquiriesPage() {
       ? "관리자 답변 저장 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
       : "",
   );
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [savingReply, setSavingReply] = useState(false);
+
+  const loadTickets = async () => {
+    const nextTickets = await getAdminSupportTickets(50);
+    const mappedTickets = nextTickets.map((ticket) => ({
+      id: ticket.ticketId,
+      requester: `사용자 #${ticket.userId}`,
+      company: "계정 상세 정보 미연동",
+      title: ticket.title,
+      status: ticket.status === "ANSWERED" ? "답변완료" : "답변전",
+      email: `user-${ticket.userId}`,
+      industry: "업종 정보 미연동",
+      latestResponder: ticket.status === "ANSWERED" ? "관리자" : "고객",
+      content: "",
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.createdAt,
+    }));
+
+    setInquiryItems(mappedTickets);
+    setSelectedId((current) => current || mappedTickets[0]?.id || "");
+  };
 
   useEffect(() => {
-    if (emptyScenario) {
+    if (useDemoDataMode && emptyScenario) {
       setInquiryItems([]);
       setSelectedId("");
       return;
     }
 
-    setInquiryItems(inquiries);
-    setSelectedId((current) => current || inquiries[0]?.id || "");
-  }, [emptyScenario]);
+    if (useDemoDataMode) {
+      setInquiryItems(inquiries);
+      setSelectedId((current) => current || inquiries[0]?.id || "");
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    setErrorNotice("");
+
+    void loadTickets()
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setErrorNotice(getErrorMessage(error, "문의 목록을 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [emptyScenario, useDemoDataMode]);
 
   const filteredInquiries = useMemo(
     () =>
@@ -62,7 +119,35 @@ export function InquiriesPage() {
 
   const selectedInquiry =
     filteredInquiries.find((inquiry) => inquiry.id === selectedId) ?? filteredInquiries[0] ?? null;
-  const history = historyMap[selectedInquiry?.id] ?? [];
+  const history = useMemo(() => {
+    if (!selectedInquiry) {
+      return [];
+    }
+
+    if (useDemoDataMode) {
+      return historyMap[selectedInquiry.id] ?? [];
+    }
+
+    const items = [
+      {
+        at: selectedInquiry.createdAt,
+        author: selectedInquiry.requester,
+        channel: "문의 접수",
+        note: selectedInquiry.content,
+      },
+    ];
+
+    if (selectedInquiry.status === "답변완료" && selectedInquiry.latestResponder === "관리자") {
+      items.unshift({
+        at: selectedInquiry.updatedAt,
+        author: "관리자",
+        channel: "관리자 답변",
+        note: replyDraft.trim() && saveNotice ? replyDraft.trim() : "저장된 관리자 답변",
+      });
+    }
+
+    return items;
+  }, [historyMap, replyDraft, saveNotice, selectedInquiry, useDemoDataMode]);
 
   const summaryCards = useMemo(
     () => [
@@ -89,6 +174,65 @@ export function InquiriesPage() {
     const trimmedReply = replyDraft.trim();
 
     if (!selectedInquiry || !trimmedReply) {
+      return;
+    }
+
+    if (!useDemoDataMode) {
+      setSavingReply(true);
+      setSaveNotice("");
+      setErrorNotice("");
+
+      void replyAdminSupportTicket(selectedInquiry.id, trimmedReply)
+        .then(async () => {
+          const [ticketDetail, tickets] = await Promise.all([
+            getAdminSupportTicket(selectedInquiry.id),
+            getAdminSupportTickets(50),
+          ]);
+
+          const mappedTickets = tickets.map((ticket) => ({
+            id: ticket.ticketId,
+            requester: `사용자 #${ticket.userId}`,
+            company: "계정 상세 정보 미연동",
+            title: ticket.title,
+            status: ticket.status === "ANSWERED" ? "답변완료" : "답변전",
+            email: `user-${ticket.userId}`,
+            industry: "업종 정보 미연동",
+            latestResponder: ticket.status === "ANSWERED" ? "관리자" : "고객",
+            content: "",
+            createdAt: ticket.createdAt,
+            updatedAt: ticket.createdAt,
+          }));
+
+          setInquiryItems(mappedTickets);
+          setSelectedId(String(ticketDetail.ticketId));
+          setReplyDraft("");
+          setSaveNotice("답변을 저장했고 문의 상태를 답변완료로 갱신했습니다.");
+          setHistoryMap((current) => ({
+            ...current,
+            [selectedInquiry.id]: [
+              {
+                at: ticketDetail.repliedAt ?? "방금 전",
+                author: "관리자",
+                channel: "관리자 답변",
+                note: ticketDetail.adminReply ?? trimmedReply,
+              },
+              {
+                at: ticketDetail.createdAt,
+                author: `사용자 #${ticketDetail.userId}`,
+                channel: "문의 접수",
+                note: ticketDetail.content,
+              },
+            ],
+          }));
+        })
+        .catch((error) => {
+          setSaveNotice("");
+          setErrorNotice(getErrorMessage(error, "관리자 답변 저장 요청을 처리하지 못했습니다."));
+        })
+        .finally(() => {
+          setSavingReply(false);
+        });
+
       return;
     }
 
@@ -145,11 +289,94 @@ export function InquiriesPage() {
     );
   }, [replyErrorScenario, selectedId]);
 
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    if (!selectedInquiry?.id) {
+      return;
+    }
+
+    let mounted = true;
+    setDetailLoading(true);
+
+    void getAdminSupportTicket(selectedInquiry.id)
+      .then((ticketDetail) => {
+        if (!mounted) {
+          return;
+        }
+
+        setInquiryItems((current) =>
+          current.map((item) =>
+            item.id === selectedInquiry.id
+              ? {
+                  ...item,
+                  content: ticketDetail.content,
+                  status: ticketDetail.status === "ANSWERED" ? "답변완료" : "답변전",
+                  latestResponder: ticketDetail.adminReply ? "관리자" : "고객",
+                  updatedAt: ticketDetail.repliedAt ?? ticketDetail.createdAt,
+                }
+              : item,
+          ),
+        );
+
+        setHistoryMap((current) => ({
+          ...current,
+          [selectedInquiry.id]: [
+            ...(ticketDetail.adminReply
+              ? [
+                  {
+                    at: ticketDetail.repliedAt ?? ticketDetail.createdAt,
+                    author: "관리자",
+                    channel: "관리자 답변",
+                    note: ticketDetail.adminReply,
+                  },
+                ]
+              : []),
+            {
+              at: ticketDetail.createdAt,
+              author: `사용자 #${ticketDetail.userId}`,
+              channel: "문의 접수",
+              note: ticketDetail.content,
+            },
+          ],
+        }));
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setErrorNotice(getErrorMessage(error, "문의 상세를 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setDetailLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedInquiry?.id, useDemoDataMode]);
+
   if (loadErrorScenario) {
     return (
       <AdminStatePage
         title="문의 대응 화면을 불러오지 못했습니다"
         description="문의 목록과 답변 이력 데이터를 가져오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+      />
+    );
+  }
+
+  if (!useDemoDataMode && loading) {
+    return (
+      <AdminStatePage
+        title="문의 대응 화면을 불러오는 중입니다"
+        description="관리자 문의 목록과 상세 데이터를 가져오고 있습니다."
       />
     );
   }
@@ -339,10 +566,10 @@ export function InquiriesPage() {
                       type="button"
                       className="admin-button"
                       onClick={handleSubmitReply}
-                      disabled={!replyDraft.trim()}
+                      disabled={!replyDraft.trim() || savingReply}
                     >
                       <Send size={14} />
-                      답변 저장
+                      {savingReply ? "저장 중..." : "답변 저장"}
                     </button>
                   </div>
                 </div>
@@ -358,19 +585,33 @@ export function InquiriesPage() {
                   </div>
 
                   <div className="admin-timeline">
-                    {history.map((item) => (
-                      <article key={`${item.at}-${item.author}`} className="admin-timeline-item">
-                        <div className="admin-timeline-marker" />
-                        <div className="admin-timeline-content">
-                          <div className="admin-timeline-meta">
-                            <strong>{item.author}</strong>
-                            <span>{item.channel}</span>
-                            <span>{item.at}</span>
+                    {detailLoading ? (
+                      <AdminStateNotice
+                        title="문의 상세를 불러오는 중입니다"
+                        description="사용자 문의 내용과 관리자 답변 상태를 확인하고 있습니다."
+                        tone="empty"
+                      />
+                    ) : history.length > 0 ? (
+                      history.map((item) => (
+                        <article key={`${item.at}-${item.author}`} className="admin-timeline-item">
+                          <div className="admin-timeline-marker" />
+                          <div className="admin-timeline-content">
+                            <div className="admin-timeline-meta">
+                              <strong>{item.author}</strong>
+                              <span>{item.channel}</span>
+                              <span>{item.at}</span>
+                            </div>
+                            <p>{item.note}</p>
                           </div>
-                          <p>{item.note}</p>
-                        </div>
-                      </article>
-                    ))}
+                        </article>
+                      ))
+                    ) : (
+                      <AdminStateNotice
+                        title="답변 이력이 없습니다"
+                        description="현재는 문의 접수와 관리자 답변 1건 기준으로 기록을 확인할 수 있습니다."
+                        tone="empty"
+                      />
+                    )}
                   </div>
                 </div>
               </div>

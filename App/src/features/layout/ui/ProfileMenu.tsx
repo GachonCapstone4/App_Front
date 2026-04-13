@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { LogOut, Moon, Settings } from "lucide-react";
 import { useNavigate } from "react-router";
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
@@ -19,11 +20,18 @@ export function ProfileMenu({
 }: ProfileMenuProps) {
   const navigate = useNavigate();
   const nextThemeLabel = theme === "light" ? "다크" : "라이트";
-  const session = getAppSession();
+  const [session, setSession] = useState(() => getAppSession());
   const userName = session.userName || "사용자";
   const userEmail = session.userEmail || "user@gmail.com";
   const roleLabel = session.role === "ADMIN" ? "관리자" : "일반 사용자";
   const avatarLabel = userName.charAt(0) || "사";
+
+  useEffect(() => {
+    const syncSession = () => setSession(getAppSession());
+
+    window.addEventListener("emailassist-session-updated", syncSession);
+    return () => window.removeEventListener("emailassist-session-updated", syncSession);
+  }, []);
 
   return (
     <div className="relative">

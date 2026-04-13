@@ -5,7 +5,7 @@ export const navigationGroups = [
     id: "primary",
     items: [
       { to: "/app", label: "대시보드", icon: LayoutGrid, end: true },
-      { to: "/app/inbox", label: "수신함", icon: Inbox, badge: "3" },
+      { to: "/app/inbox", label: "수신함", icon: Inbox },
       { to: "/app/calendar", label: "캘린더", icon: CalendarDays },
       { to: "/app/templates", label: "템플릿 라이브러리", icon: Mail },
       { to: "/app/profile", label: "비즈니스 프로필", icon: Building2 },
