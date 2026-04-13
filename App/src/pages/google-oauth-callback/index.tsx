@@ -9,6 +9,9 @@ type GoogleOAuthPopupMessage = {
   calendarConnected: string;
 };
 
+const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
+const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
+
 export function GoogleOAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -31,12 +34,19 @@ export function GoogleOAuthCallbackPage() {
       calendarConnected,
     };
 
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(payload, window.location.origin);
+    const openedAsPopup =
+      window.name === GOOGLE_OAUTH_POPUP_NAME || Boolean(window.opener && !window.opener.closed);
+
+    if (openedAsPopup) {
+      window.localStorage.setItem(GOOGLE_OAUTH_STORAGE_KEY, JSON.stringify(payload));
+
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, window.location.origin);
+      }
+
       const closeTimer = window.setInterval(() => {
         window.close();
       }, 250);
-
       window.close();
 
       return () => {

@@ -30,6 +30,34 @@ type GoogleOAuthPopupMessage = {
   calendarConnected: string;
 };
 
+const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
+
+function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
+
+    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
+      return null;
+    }
+
+    return {
+      type: "emailassist-google-oauth",
+      result: parsed.result,
+      message: typeof parsed.message === "string" ? parsed.message : "",
+      gmailConnected:
+        typeof parsed.gmailConnected === "string" ? parsed.gmailConnected : "false",
+      calendarConnected:
+        typeof parsed.calendarConnected === "string" ? parsed.calendarConnected : "false",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function GmailIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -99,6 +127,27 @@ export function EmailIntegrationSettingsPanel({
     [],
   );
 
+  const handlePopupResult = async (payload: GoogleOAuthPopupMessage) => {
+    setPopupResult(payload);
+
+    if (popupWindowRef.current && !popupWindowRef.current.closed) {
+      popupWindowRef.current.close();
+    }
+    popupWindowRef.current = null;
+
+    if (payload.result === "success") {
+      try {
+        await loadIntegration();
+        toast.success("Google 계정 연동을 완료했습니다.");
+      } catch (error) {
+        toast.error(getErrorMessage(error, "연동 상태를 다시 불러오지 못했습니다."));
+      }
+      return;
+    }
+
+    toast.error(payload.message || "Google 계정 연동을 완료하지 못했습니다.");
+  };
+
   const loadIntegration = async () => {
     const nextIntegration = await getMyIntegrationSafe();
     setIntegration(nextIntegration);
@@ -167,35 +216,46 @@ export function EmailIntegrationSettingsPanel({
         return;
       }
 
-      setPopupResult(event.data);
+      void handlePopupResult(event.data);
+    };
 
-      if (event.data.result === "success") {
-        if (popupWindowRef.current && !popupWindowRef.current.closed) {
-          popupWindowRef.current.close();
-        }
-        popupWindowRef.current = null;
-
-        void loadIntegration()
-          .then(() => {
-            toast.success("Google 계정 연동을 완료했습니다.");
-          })
-          .catch((error) => {
-            toast.error(getErrorMessage(error, "연동 상태를 다시 불러오지 못했습니다."));
-          });
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== GOOGLE_OAUTH_STORAGE_KEY) {
         return;
       }
 
-      if (popupWindowRef.current && !popupWindowRef.current.closed) {
-        popupWindowRef.current.close();
+      const payload = parseStoredGoogleOAuthResult(event.newValue);
+      if (!payload) {
+        return;
       }
-      popupWindowRef.current = null;
-      toast.error(event.data.message || "Google 계정 연동을 완료하지 못했습니다.");
+
+      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+      void handlePopupResult(payload);
     };
 
     window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
     return () => {
       window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
     };
+  }, [useDemoDataMode]);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    const payload = parseStoredGoogleOAuthResult(
+      window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
+    );
+
+    if (!payload) {
+      return;
+    }
+
+    window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+    void handlePopupResult(payload);
   }, [useDemoDataMode]);
 
   const handleRefresh = async () => {
