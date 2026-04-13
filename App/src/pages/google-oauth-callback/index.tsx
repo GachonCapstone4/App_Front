@@ -33,8 +33,15 @@ export function GoogleOAuthCallbackPage() {
 
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage(payload, window.location.origin);
+      const closeTimer = window.setInterval(() => {
+        window.close();
+      }, 250);
+
       window.close();
-      return;
+
+      return () => {
+        window.clearInterval(closeTimer);
+      };
     }
 
     const timer = window.setTimeout(() => {
@@ -68,6 +75,9 @@ export function GoogleOAuthCallbackPage() {
           {result === "success"
             ? "잠시 후 이 창이 닫히고, 원래 열어둔 이메일 연동 화면으로 돌아갑니다."
             : message || "잠시 후 원래 화면으로 돌아갑니다."}
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          창이 자동으로 닫히지 않으면 이 탭을 닫고 원래 화면으로 돌아가 주세요.
         </p>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw, Unplug, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { EmailAccount } from "../../../shared/types";
@@ -89,6 +89,7 @@ export function EmailIntegrationSettingsPanel({
   const [refreshing, setRefreshing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [popupResult, setPopupResult] = useState<GoogleOAuthPopupMessage | null>(null);
+  const popupWindowRef = useRef<Window | null>(null);
   const bannerResult = popupResult?.result ?? oauthResult;
   const bannerMessage = popupResult?.message ?? oauthMessage;
   const bannerGmailConnected = popupResult?.gmailConnected ?? gmailConnected;
@@ -169,6 +170,11 @@ export function EmailIntegrationSettingsPanel({
       setPopupResult(event.data);
 
       if (event.data.result === "success") {
+        if (popupWindowRef.current && !popupWindowRef.current.closed) {
+          popupWindowRef.current.close();
+        }
+        popupWindowRef.current = null;
+
         void loadIntegration()
           .then(() => {
             toast.success("Google 계정 연동을 완료했습니다.");
@@ -179,6 +185,10 @@ export function EmailIntegrationSettingsPanel({
         return;
       }
 
+      if (popupWindowRef.current && !popupWindowRef.current.closed) {
+        popupWindowRef.current.close();
+      }
+      popupWindowRef.current = null;
       toast.error(event.data.message || "Google 계정 연동을 완료하지 못했습니다.");
     };
 
@@ -238,6 +248,7 @@ export function EmailIntegrationSettingsPanel({
         return;
       }
 
+      popupWindowRef.current = popup;
       popup.focus();
     } catch (error) {
       toast.error(getErrorMessage(error, "Google 인증을 시작하지 못했습니다."));
