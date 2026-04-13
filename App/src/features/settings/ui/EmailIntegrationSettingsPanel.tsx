@@ -31,6 +31,7 @@ type GoogleOAuthPopupMessage = {
 };
 
 const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
+const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
 
 function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
   if (!value) {
@@ -300,8 +301,7 @@ export function EmailIntegrationSettingsPanel({
     }
 
     try {
-      const authorizationUrl = await getGoogleAuthorizationUrl();
-      const popup = window.open(authorizationUrl, "emailassist-google-oauth", popupWindowFeatures);
+      const popup = window.open("", GOOGLE_OAUTH_POPUP_NAME, popupWindowFeatures);
 
       if (!popup) {
         toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
@@ -309,8 +309,22 @@ export function EmailIntegrationSettingsPanel({
       }
 
       popupWindowRef.current = popup;
+      popup.document.title = "Google 인증을 준비하고 있습니다";
+      popup.document.body.innerHTML = `
+        <div style="font-family: system-ui, sans-serif; padding: 32px; color: #0f172a; line-height: 1.6;">
+          <h1 style="font-size: 18px; margin: 0 0 12px;">Google 인증을 준비하고 있습니다</h1>
+          <p style="margin: 0;">잠시 후 Google 로그인 화면으로 이동합니다.</p>
+        </div>
+      `;
+
+      const authorizationUrl = await getGoogleAuthorizationUrl();
+      popup.location.href = authorizationUrl;
       popup.focus();
     } catch (error) {
+      if (popupWindowRef.current && !popupWindowRef.current.closed) {
+        popupWindowRef.current.close();
+      }
+      popupWindowRef.current = null;
       toast.error(getErrorMessage(error, "Google 인증을 시작하지 못했습니다."));
     }
   };
