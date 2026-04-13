@@ -1,7 +1,7 @@
 import { api } from "./http";
 
 type SupportTicketListApiResponse = {
-  data: Array<{
+  tickets?: Array<{
     ticket_id: number;
     title: string;
     content_preview: string;
@@ -45,7 +45,9 @@ export async function getSupportTickets(status?: "PENDING" | "ANSWERED") {
     params: status ? { status } : undefined,
   });
 
-  return response.data.data.map((ticket) => ({
+  const tickets = Array.isArray(response.data.tickets) ? response.data.tickets : [];
+
+  return tickets.map((ticket) => ({
     ticketId: String(ticket.ticket_id),
     title: ticket.title,
     contentPreview: ticket.content_preview,
