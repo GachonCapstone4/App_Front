@@ -7,6 +7,8 @@ type OnboardingStatusApiResponse = {
 type InitialTemplateGenerateApiResponse = {
   status: string;
   processing_count: number;
+  job_ids: string[];
+  knowledge_job_id?: string | null;
 };
 
 export async function getOnboardingStatus() {
@@ -53,5 +55,7 @@ export async function generateInitialBusinessTemplates(payload: {
   return {
     status: response.data.status,
     processingCount: response.data.processing_count,
+    jobIds: response.data.job_ids ?? [],
+    knowledgeJobId: response.data.knowledge_job_id ?? null,
   };
 }

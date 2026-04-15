@@ -24,6 +24,10 @@ function resolveBaseUrl() {
   return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl : "/";
 }
 
+export function getApiBaseUrl() {
+  return resolveBaseUrl();
+}
+
 export const api = axios.create({
   baseURL: resolveBaseUrl(),
   headers: {

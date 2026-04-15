@@ -30,6 +30,7 @@ import {
 import {
   deriveGoogleIntegrationEmail,
   getAppSession,
+  getAccessToken,
   markOnboardingComplete,
   setConnectedEmail as persistConnectedEmail,
 } from "../../shared/lib/app-session";
@@ -46,7 +47,7 @@ import {
   upsertBusinessProfile,
   uploadBusinessFile,
 } from "../../shared/api/business";
-import { getErrorMessage } from "../../shared/api/http";
+import { getApiBaseUrl, getErrorMessage } from "../../shared/api/http";
 import {
   getGoogleAuthorizationUrl,
   getMyIntegrationSafe,
@@ -187,6 +188,12 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const generationTimeoutsRef = useRef<number[]>([]);
   const integrationPollingRef = useRef<number | null>(null);
+  const generationEventSourceRef = useRef<EventSource | null>(null);
+  const onboardingDraftJobIdsRef = useRef<string[]>([]);
+  const onboardingDraftJobStatusRef = useRef<Record<string, string>>({});
+  const onboardingKnowledgeJobIdRef = useRef<string | null>(null);
+  const onboardingTemplateIndexCompletedRef = useRef(0);
+  const finalizeOnboardingRef = useRef(false);
   const categoryComposerRef = useRef<HTMLDivElement | null>(null);
   const [currentMainStep, setCurrentMainStep] = useState(1);
   const [currentSubStep, setCurrentSubStep] = useState(0);
@@ -216,6 +223,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [initializing, setInitializing] = useState(!scenarioId);
   const [templateGenerationMessage, setTemplateGenerationMessage] = useState<string | null>(null);
+  const [templateGenerationStatus, setTemplateGenerationStatus] = useState<string | null>(null);
   const [generatedTemplateCount, setGeneratedTemplateCount] = useState(0);
   const [completingOnboarding, setCompletingOnboarding] = useState(false);
 
@@ -245,6 +253,16 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     generationTimeoutsRef.current = [];
   };
 
+  const clearGenerationEventSource = () => {
+    generationEventSourceRef.current?.close();
+    generationEventSourceRef.current = null;
+    onboardingDraftJobIdsRef.current = [];
+    onboardingDraftJobStatusRef.current = {};
+    onboardingKnowledgeJobIdRef.current = null;
+    onboardingTemplateIndexCompletedRef.current = 0;
+    finalizeOnboardingRef.current = false;
+  };
+
   const clearIntegrationPolling = () => {
     if (integrationPollingRef.current !== null) {
       window.clearInterval(integrationPollingRef.current);
@@ -256,6 +274,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     () => () => {
       clearGenerationTimeouts();
       clearIntegrationPolling();
+      clearGenerationEventSource();
     },
     [],
   );
@@ -867,9 +886,11 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
   const handleCancelGeneration = () => {
     clearGenerationTimeouts();
+    clearGenerationEventSource();
     setIsGenerating(false);
     setGenerationStep(0);
     setTemplateProgress(0);
+    setTemplateGenerationStatus(null);
     markOnboardingComplete();
     toast.message("설정은 저장되지 않았지만 나중에 다시 진행할 수 있습니다.");
     navigate("/app");
@@ -895,6 +916,199 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     } finally {
       setCompletingOnboarding(false);
     }
+  };
+
+  const updateGenerationProgress = (draftJobIds: string[]) => {
+    const trackedStatuses = draftJobIds.map(
+      (jobId) => onboardingDraftJobStatusRef.current[jobId] ?? "QUEUED",
+    );
+    const completedCount = trackedStatuses.filter((status) => status === "COMPLETED").length;
+    const failedCount = trackedStatuses.filter((status) => status === "FAILED").length;
+    const templateIndexCompleted = onboardingTemplateIndexCompletedRef.current;
+    const hasKnowledgeJob = Boolean(onboardingKnowledgeJobIdRef.current);
+
+    setGeneratedTemplateCount(draftJobIds.length);
+    setTemplateProgress(completedCount);
+
+    if (failedCount > 0) {
+      return {
+        completedCount,
+        failedCount,
+        templateIndexCompleted,
+        isCompleted: false,
+      };
+    }
+
+    if (
+      completedCount === draftJobIds.length &&
+      draftJobIds.length > 0 &&
+      templateIndexCompleted >= draftJobIds.length
+    ) {
+      setGenerationStep(4);
+      setTemplateGenerationStatus("맞춤 템플릿 구성이 완료되었습니다.");
+      return {
+        completedCount,
+        failedCount,
+        templateIndexCompleted,
+        isCompleted: true,
+      };
+    }
+
+    if (hasKnowledgeJob) {
+      setGenerationStep(1);
+    }
+
+    return {
+      completedCount,
+      failedCount,
+      templateIndexCompleted,
+      isCompleted: false,
+    };
+  };
+
+  const completeOnboardingAfterGeneration = async () => {
+    if (finalizeOnboardingRef.current) {
+      return;
+    }
+
+    finalizeOnboardingRef.current = true;
+    const completed = await finalizeOnboarding();
+
+    if (!completed) {
+      finalizeOnboardingRef.current = false;
+      setIsGenerating(false);
+      setCurrentMainStep(3);
+      return;
+    }
+
+    clearGenerationEventSource();
+    setIsGenerating(false);
+    setTemplateGenerationStatus(null);
+    setCurrentMainStep(4);
+  };
+
+  const startTemplateGenerationSse = (
+    draftJobIds: string[],
+    knowledgeJobId: string | null,
+  ) => {
+    const accessToken = getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("인증 토큰이 없어 템플릿 생성 상태를 구독할 수 없습니다.");
+    }
+
+    const apiBaseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const streamUrl = `${apiBaseUrl}/api/mail/stream?access_token=${encodeURIComponent(accessToken)}`;
+
+    clearGenerationEventSource();
+    onboardingDraftJobIdsRef.current = draftJobIds;
+    onboardingDraftJobStatusRef.current = Object.fromEntries(
+      draftJobIds.map((jobId) => [jobId, "QUEUED"]),
+    );
+    onboardingKnowledgeJobIdRef.current = knowledgeJobId;
+    onboardingTemplateIndexCompletedRef.current = 0;
+    finalizeOnboardingRef.current = false;
+
+    const eventSource = new EventSource(streamUrl);
+    generationEventSourceRef.current = eventSource;
+
+    eventSource.addEventListener("rag-job-updated", (event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
+          job_id?: string;
+          job_type?: string;
+          status?: string;
+          progress_step?: string;
+          progress_message?: string;
+          error_message?: string;
+        };
+
+        const jobId = payload.job_id?.trim();
+        const jobType = payload.job_type?.trim() || "";
+        const isTrackedDraftJob = Boolean(jobId && onboardingDraftJobIdsRef.current.includes(jobId));
+        const isTrackedKnowledgeJob = Boolean(
+          jobId &&
+            onboardingKnowledgeJobIdRef.current &&
+            jobId === onboardingKnowledgeJobIdRef.current,
+        );
+        const isTemplateIndexEvent = jobType === "templates.index";
+
+        if (!jobId || (!isTrackedDraftJob && !isTrackedKnowledgeJob && !isTemplateIndexEvent)) {
+          return;
+        }
+
+        setTemplateGenerationMessage(null);
+
+        if (payload.status === "FAILED") {
+          clearGenerationEventSource();
+          setIsGenerating(false);
+          setCurrentMainStep(3);
+          setTemplateGenerationStatus(null);
+          setTemplateGenerationMessage(
+            payload.error_message || "템플릿 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          );
+          toast.error(payload.error_message || "템플릿 생성 중 오류가 발생했습니다.");
+          return;
+        }
+
+        if (isTrackedKnowledgeJob) {
+          if (payload.status === "COMPLETED") {
+            setGenerationStep(2);
+            setTemplateGenerationStatus("회사 자료를 바탕으로 템플릿 초안을 만들고 있습니다.");
+          } else {
+            setGenerationStep(1);
+            setTemplateGenerationStatus(
+              payload.progress_message?.trim() || "업로드한 자료를 정리하고 있습니다.",
+            );
+          }
+          return;
+        }
+
+        if (isTrackedDraftJob) {
+          onboardingDraftJobStatusRef.current[jobId] = payload.status?.trim() || "PROCESSING";
+          const completedDraftCount = Object.values(onboardingDraftJobStatusRef.current).filter(
+            (status) => status === "COMPLETED",
+          ).length;
+
+          setGenerationStep(2);
+          setTemplateGenerationStatus(
+            completedDraftCount > 0
+              ? `카테고리에 맞는 템플릿을 만드는 중입니다. (${completedDraftCount}/${onboardingDraftJobIdsRef.current.length})`
+              : payload.progress_message?.trim() || "카테고리에 맞는 템플릿을 만들고 있습니다.",
+          );
+        }
+
+        if (isTemplateIndexEvent) {
+          if (payload.status === "COMPLETED") {
+            onboardingTemplateIndexCompletedRef.current += 1;
+          }
+          setGenerationStep(3);
+          setTemplateGenerationStatus(
+            payload.status === "COMPLETED"
+              ? `생성된 템플릿을 정리하고 있습니다. (${Math.min(onboardingTemplateIndexCompletedRef.current, onboardingDraftJobIdsRef.current.length)}/${onboardingDraftJobIdsRef.current.length})`
+              : payload.progress_message?.trim() || "생성된 템플릿을 정리하고 있습니다.",
+          );
+        }
+
+        const progress = updateGenerationProgress(onboardingDraftJobIdsRef.current);
+
+        if (progress.isCompleted) {
+          void completeOnboardingAfterGeneration();
+        }
+      } catch (error) {
+        console.error("rag-job-updated parse error", error);
+      }
+    });
+
+    eventSource.onerror = () => {
+      if (finalizeOnboardingRef.current) {
+        return;
+      }
+
+      setTemplateGenerationMessage(
+        "템플릿 생성 상태 연결이 끊어졌습니다. 잠시 후 다시 시도해 주세요.",
+      );
+    };
   };
 
   const runTemplateGenerationAnimation = (templateCount: number) => {
@@ -979,6 +1193,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
     try {
       setTemplateGenerationMessage(null);
+      setTemplateGenerationStatus(null);
       const persistedCategories = await ensurePersistedCategories();
       const categoryIds = persistedCategories
         .map((category) => category.categoryId)
@@ -1004,7 +1219,21 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
         resourceIds,
       });
 
-      runTemplateGenerationAnimation(response.processingCount);
+      if (!response.jobIds.length) {
+        throw new Error("템플릿 생성 작업 정보가 없어 진행 상태를 확인할 수 없습니다.");
+      }
+
+      setCurrentMainStep(3);
+      setIsGenerating(true);
+      setGenerationStep(response.knowledgeJobId ? 1 : 2);
+      setTemplateProgress(0);
+      setGeneratedTemplateCount(response.processingCount);
+      setTemplateGenerationStatus(
+        response.knowledgeJobId
+          ? "업로드한 자료를 확인하고 있습니다."
+          : "카테고리에 맞는 템플릿 생성을 시작합니다.",
+      );
+      startTemplateGenerationSse(response.jobIds, response.knowledgeJobId);
     } catch (error) {
       const message =
         error instanceof Error && error.message === "Network Error"
@@ -1012,6 +1241,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
           : getErrorMessage(error, "템플릿 생성 작업을 시작하지 못했습니다.");
 
       setTemplateGenerationMessage(message);
+      setTemplateGenerationStatus(null);
       toast.error(message);
     }
   };
@@ -1918,6 +2148,12 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                   있습니다
                 </p>
 
+                {templateGenerationStatus ? (
+                  <div className="mb-6 rounded-xl border border-[#CFFAFE] bg-[#F0FDFA] px-4 py-3 text-[13px] text-[#0F766E]">
+                    {templateGenerationStatus}
+                  </div>
+                ) : null}
+
                 {templateGenerationErrorScenario ? (
                   <StateBanner
                     title="맞춤 템플릿 생성을 완료하지 못했습니다"
@@ -1928,23 +2164,6 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                 ) : null}
 
                 <div className="space-y-4 mb-8">
-                  <div className="flex items-start gap-3">
-                    {generationStep > 0 ? (
-                      <Check className="w-5 h-5 text-[#2DD4BF] shrink-0 mt-0.5" />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-[#E2E8F0] shrink-0 mt-0.5" />
-                    )}
-                    <p
-                      className={`text-[13px] ${
-                        generationStep > 0
-                          ? "text-[#1E2A3A]"
-                          : "text-[#94A3B8]"
-                      }`}
-                    >
-                      회사 프로필 분석 완료
-                    </p>
-                  </div>
-
                   <div className="flex items-start gap-3">
                     {generationStep > 1 ? (
                       <Check className="w-5 h-5 text-[#2DD4BF] shrink-0 mt-0.5" />
@@ -1960,7 +2179,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                           : "text-[#94A3B8]"
                       }`}
                     >
-                      비즈니스 자료 학습 완료
+                      업로드한 자료를 확인하고 있습니다
                     </p>
                   </div>
 
@@ -1972,29 +2191,48 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                     ) : (
                       <div className="w-5 h-5 rounded-full border-2 border-[#E2E8F0] shrink-0 mt-0.5" />
                     )}
+                    <p
+                      className={`text-[13px] ${
+                        generationStep >= 2
+                          ? "text-[#1E2A3A]"
+                          : "text-[#94A3B8]"
+                      }`}
+                    >
+                      카테고리별 맞춤 템플릿을 만들고 있습니다
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    {generationStep > 3 ? (
+                      <Check className="w-5 h-5 text-[#2DD4BF] shrink-0 mt-0.5" />
+                    ) : generationStep === 3 ? (
+                      <Loader2 className="w-5 h-5 text-[#2DD4BF] animate-spin shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border-2 border-[#E2E8F0] shrink-0 mt-0.5" />
+                    )}
                     <div className="flex-1">
                       <p
                         className={`text-[13px] mb-2 ${
-                          generationStep >= 2
+                          generationStep >= 3
                             ? "text-[#1E2A3A]"
                             : "text-[#94A3B8]"
                         }`}
                       >
-                        카테고리별 템플릿 생성 중
+                        생성된 템플릿을 정리하고 있습니다
                       </p>
-                      {generationStep === 2 && (
+                      {generationStep >= 2 && (
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-[#64748B]">가격문의</span>
+                            <span className="text-[#64748B]">완료된 템플릿</span>
                             <span className="text-[#94A3B8]">
-                              {templateProgress}/5
+                              {templateProgress}/{Math.max(generatedTemplateCount, 1)}
                             </span>
                           </div>
                           <div className="w-full h-1.5 bg-[#F1F5F9] rounded-full overflow-hidden">
                             <div
                               className="h-full bg-[#2DD4BF] transition-all duration-300"
                               style={{
-                                width: `${(templateProgress / 5) * 100}%`,
+                                width: `${(templateProgress / Math.max(generatedTemplateCount, 1)) * 100}%`,
                               }}
                             />
                           </div>
@@ -2004,26 +2242,28 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    {generationStep > 3 ? (
+                    {generationStep > 4 ? (
                       <Check className="w-5 h-5 text-[#2DD4BF] shrink-0 mt-0.5" />
+                    ) : generationStep === 4 ? (
+                      <Loader2 className="w-5 h-5 text-[#2DD4BF] animate-spin shrink-0 mt-0.5" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border-2 border-[#E2E8F0] shrink-0 mt-0.5" />
                     )}
                     <p
                       className={`text-[13px] ${
-                        generationStep > 3
+                        generationStep >= 4
                           ? "text-[#1E2A3A]"
                           : "text-[#94A3B8]"
                       }`}
                     >
-                      키워드 및 분류 규칙 설정
+                      작업을 마무리하고 있습니다
                     </p>
                   </div>
                 </div>
 
                 <div className="text-center mb-4">
                   <p className="text-[12px] text-[#94A3B8]">
-                    약 30초~1분 소요됩니다
+                    작업 상태는 백엔드 처리 결과와 실시간으로 동기화됩니다
                   </p>
                 </div>
 
