@@ -1,3 +1,8 @@
+import { useState } from "react";
+import { Download, Paperclip } from "lucide-react";
+import { toast } from "sonner";
+import { downloadInboxAttachment } from "../../../shared/api/inbox";
+import { getErrorMessage } from "../../../shared/api/http";
 import { StatusBadge } from "../../../shared/ui/primitives/StatusBadge";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import { ScheduleDetectionCard } from "./ScheduleDetectionCard";
@@ -26,9 +31,38 @@ interface EmailThreadPanelProps {
 }
 
 export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
+
   if (!email) {
     return null;
   }
+
+  const formatAttachmentSize = (size?: number) => {
+    if (typeof size !== "number" || Number.isNaN(size) || size <= 0) {
+      return null;
+    }
+
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)}MB`;
+    }
+
+    if (size >= 1024) {
+      return `${Math.round(size / 1024)}KB`;
+    }
+
+    return `${size}B`;
+  };
+
+  const handleDownloadAttachment = async (attachmentId: number, fileName: string) => {
+    try {
+      setDownloadingAttachmentId(attachmentId);
+      await downloadInboxAttachment(Number(email.id), attachmentId, fileName);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "첨부파일을 다운로드하지 못했습니다."));
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -85,6 +119,60 @@ export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
 
         <div className="my-4 h-px bg-[#E2E8F0]" />
         <pre className="whitespace-pre-wrap font-sans text-[14px] leading-8 text-[#475569]">{email.body}</pre>
+
+        {email.attachments?.length ? (
+          <>
+            <div className="my-4 h-px bg-[#E2E8F0]" />
+
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0F766E]">
+                첨부파일
+              </p>
+
+              <div className="space-y-2">
+                {email.attachments.map((attachment) => {
+                  const sizeLabel = formatAttachmentSize(attachment.size);
+                  const downloading = downloadingAttachmentId === attachment.attachmentId;
+
+                  return (
+                    <button
+                      key={attachment.attachmentId}
+                      type="button"
+                      onClick={() =>
+                        void handleDownloadAttachment(
+                          attachment.attachmentId,
+                          attachment.fileName,
+                        )
+                      }
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#D7E2EC] bg-white px-4 py-3 text-left transition hover:border-[#9EDFD2] hover:bg-[#F8FFFD]"
+                      disabled={downloading}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E6FFFA] text-[#0F766E]">
+                          <Paperclip className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-[#1E2A3A]">
+                            {attachment.fileName}
+                          </p>
+                          <p className="truncate text-xs text-[#94A3B8]">
+                            {attachment.contentType}
+                            {sizeLabel ? ` · ${sizeLabel}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[#0F766E]">
+                        <Download className="h-3.5 w-3.5" />
+                        {downloading ? "다운로드 중..." : "다운로드"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <ScheduleDetectionCard schedule={email.schedule} emailId={email.id} emailSubject={email.subject} />

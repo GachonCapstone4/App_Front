@@ -1,10 +1,18 @@
 export function isDemoModeEnabled() {
-  return false;
+  return import.meta.env.VITE_DEMO_MODE === "true";
 }
 
 export function resolveDemoScenarioId(
   scenarioId: string | null,
-  _defaultScenarioId: string,
+  defaultScenarioId: string,
 ) {
-  return scenarioId;
+  if (scenarioId) {
+    return scenarioId;
+  }
+
+  if (isDemoModeEnabled()) {
+    return defaultScenarioId;
+  }
+
+  return null;
 }

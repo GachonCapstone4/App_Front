@@ -1,5 +1,12 @@
 import { api } from "./http";
 
+type InboxAttachmentApiItem = {
+  attachment_id: number;
+  file_name: string;
+  content_type: string;
+  size?: number | null;
+};
+
 type InboxListApiItem = {
   email_id: number;
   sender_name: string | null;
@@ -27,6 +34,7 @@ type InboxDetailApiResponse = {
     body: string;
     received_at: string;
     has_attachments: boolean;
+    attachments?: InboxAttachmentApiItem[] | null;
   };
   ai_analysis: {
     domain: string | null;
@@ -102,6 +110,57 @@ export async function getInboxList(payload?: {
 export async function getInboxDetail(emailId: number) {
   const response = await api.get<InboxDetailApiResponse>(`/api/inbox/${emailId}`);
   return response.data;
+}
+
+function parseDownloadFileName(contentDisposition: string | undefined, fallbackFileName: string) {
+  if (!contentDisposition) {
+    return fallbackFileName;
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallbackFileName;
+    }
+  }
+
+  const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+  if (filenameMatch?.[1]) {
+    return filenameMatch[1];
+  }
+
+  return fallbackFileName;
+}
+
+export async function downloadInboxAttachment(
+  emailId: number,
+  attachmentId: number,
+  fallbackFileName: string,
+) {
+  const response = await api.get<Blob>(`/api/inbox/${emailId}/attachments/${attachmentId}`, {
+    responseType: "blob",
+  });
+
+  const blob = response.data instanceof Blob
+    ? response.data
+    : new Blob([response.data], {
+        type: response.headers["content-type"] || "application/octet-stream",
+      });
+  const fileName = parseDownloadFileName(
+    response.headers["content-disposition"],
+    fallbackFileName,
+  );
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(objectUrl);
 }
 
 export async function getInboxRecommendations(emailId: number, topK = 3) {

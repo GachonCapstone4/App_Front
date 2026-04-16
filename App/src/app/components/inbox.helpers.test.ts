@@ -100,6 +100,59 @@ describe("inbox helpers", () => {
     expect(merged.schedule.detected).toBe(true);
   });
 
+  it("keeps attachment metadata from inbox detail", () => {
+    const merged = mergeInboxDetail(
+      {
+        id: "1",
+        sender: "발신자",
+        senderEmail: "sender@example.com",
+        company: "",
+        subject: "제목",
+        preview: "",
+        summary: "",
+        body: "",
+        time: "오전 10:00",
+        receivedDate: "4.4.",
+        category: "미분류",
+        confidence: 0,
+        status: "pending",
+        sentTime: "",
+        schedule: { detected: false },
+        draft: "",
+      },
+      {
+        email_info: {
+          email_id: 1,
+          sender_name: "박민수",
+          sender_email: "minsu.park@techsolution.co.kr",
+          subject: "가격 문의",
+          body: "본문",
+          received_at: "2026-04-04T10:23:00",
+          has_attachments: true,
+          attachments: [
+            {
+              attachment_id: 1,
+              file_name: "견적서.pdf",
+              content_type: "application/pdf",
+              size: 204800,
+            },
+          ],
+        },
+        ai_analysis: null,
+        draft_reply: null,
+      },
+    );
+
+    expect(merged.attachments).toEqual([
+      {
+        attachmentId: 1,
+        fileName: "견적서.pdf",
+        contentType: "application/pdf",
+        size: 204800,
+      },
+    ]);
+  });
+
   it("maps skipped draft replies to unsent status", () => {
     const merged = mergeInboxDetail(
       {

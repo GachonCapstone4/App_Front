@@ -41,6 +41,13 @@ export interface UndetectedSchedule {
 
 export type EmailSchedule = DetectedSchedule | UndetectedSchedule;
 
+export interface EmailAttachment {
+  attachmentId: number;
+  fileName: string;
+  contentType: string;
+  size?: number;
+}
+
 export interface EmailRecommendationItem {
   draftId: number;
   templateTitle: string;
@@ -75,6 +82,7 @@ export interface EmailItem {
   autoCompletedCount?: number;
   requiredInputCount?: number;
   draftStatus?: string;
+  attachments?: EmailAttachment[];
   recommendations?: EmailRecommendationItem[];
   recommendationState?: RecommendationState;
   recommendationError?: string;

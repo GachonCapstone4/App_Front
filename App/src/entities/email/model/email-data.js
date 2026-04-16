@@ -62,6 +62,20 @@ export const emailItems = [
       location: "Zoom 화상회의",
       attendees: ["박민수"],
     },
+    attachments: [
+      {
+        attachmentId: 1,
+        fileName: "엔터프라이즈_플랜_가격표.pdf",
+        contentType: "application/pdf",
+        size: 482310,
+      },
+      {
+        attachmentId: 2,
+        fileName: "도입_지원_안내서.pdf",
+        contentType: "application/pdf",
+        size: 215040,
+      },
+    ],
     draft: `안녕하세요, 박민수님.
 
 {{회사명}}에 관심을 가져주셔서 감사합니다.

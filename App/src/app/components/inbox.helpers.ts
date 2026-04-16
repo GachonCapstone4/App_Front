@@ -1,10 +1,18 @@
 import type {
+  EmailAttachment,
   EmailItem,
   EmailRecommendationItem,
   RecommendationState,
   EmailSchedule,
   EmailStatus,
 } from "../../shared/types";
+
+type InboxAttachmentApiItem = {
+  attachment_id: number;
+  file_name: string;
+  content_type: string;
+  size?: number | null;
+};
 
 type InboxListApiItem = {
   email_id: number;
@@ -28,6 +36,7 @@ type InboxDetailApiResponse = {
     body: string;
     received_at: string;
     has_attachments: boolean;
+    attachments?: InboxAttachmentApiItem[] | null;
   };
   ai_analysis: {
     domain: string | null;
@@ -236,6 +245,14 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
   const aiAnalysis = detail.ai_analysis;
   const draftReply = detail.draft_reply;
   const emailInfo = detail.email_info;
+  const attachments: EmailAttachment[] = Array.isArray(emailInfo.attachments)
+    ? emailInfo.attachments.map((attachment) => ({
+        attachmentId: attachment.attachment_id,
+        fileName: attachment.file_name,
+        contentType: attachment.content_type,
+        size: attachment.size ?? undefined,
+      }))
+    : [];
 
   return {
     ...current,
@@ -263,6 +280,7 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
     autoCompletedCount: draftReply?.variables?.auto_completed_count ?? undefined,
     requiredInputCount: draftReply?.variables?.required_input_count ?? undefined,
     draftStatus: draftReply?.status ?? undefined,
+    attachments,
   };
 }
 
