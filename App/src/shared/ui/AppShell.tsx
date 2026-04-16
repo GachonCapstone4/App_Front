@@ -8,6 +8,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../api/notifications";
+import { subscribeAppEvent } from "../lib/app-event-stream";
 import { useUiStore } from "../../app/store/uiStore";
 import { AppSidebar } from "../../features/layout/ui/AppSidebar";
 import { GlobalSearchPanel } from "../../features/layout/ui/GlobalSearchPanel";
@@ -69,25 +70,64 @@ export function AppShell() {
     }
 
     let mounted = true;
+    let refreshQueued = false;
+    let refreshInFlight = false;
 
-    void getNotifications()
-      .then((items) => {
+    const loadNotifications = async (silent = false) => {
+      if (refreshInFlight) {
+        refreshQueued = true;
+        return;
+      }
+
+      refreshInFlight = true;
+
+      try {
+        const items = await getNotifications();
+
         if (!mounted) {
           return;
         }
 
         setNotifications(items);
-      })
-      .catch((error) => {
-        if (!mounted) {
+      } catch (error) {
+        if (!mounted || silent) {
           return;
         }
 
         toast.error(error instanceof Error ? error.message : "알림을 불러오지 못했습니다.");
-      });
+      } finally {
+        refreshInFlight = false;
+
+        if (refreshQueued) {
+          refreshQueued = false;
+          void loadNotifications(true);
+        }
+      }
+    };
+
+    void loadNotifications();
+
+    const unsubscribeClassify = subscribeAppEvent("classify-complete", () => {
+      void loadNotifications(true);
+    });
+    const unsubscribeSupport = subscribeAppEvent("support-ticket-updated", () => {
+      void loadNotifications(true);
+    });
+    const unsubscribeTemplateMatch = subscribeAppEvent("template-match-updated", () => {
+      void loadNotifications(true);
+    });
+    const unsubscribeRag = subscribeAppEvent("rag-job-updated", (payload) => {
+      if (payload.status === "COMPLETED" || payload.status === "FAILED") {
+        void loadNotifications(true);
+      }
+    });
 
     return () => {
       mounted = false;
+      unsubscribeClassify();
+      unsubscribeSupport();
+      unsubscribeTemplateMatch();
+      unsubscribeRag();
     };
   }, [demoMode]);
 

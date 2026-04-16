@@ -27,6 +27,7 @@ import {
   mapInboxRecommendation,
   mergeInboxRecommendations,
 } from "../../app/components/inbox.helpers";
+import { subscribeAppEvent } from "../../shared/lib/app-event-stream";
 import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 
 type InboxStatus = "all" | EmailStatus;
@@ -98,6 +99,37 @@ export function InboxPage() {
   const [isHydratingDetails, setIsHydratingDetails] = useState(false);
   const [isSeedingTestEmail, setIsSeedingTestEmail] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+
+  const refreshEmailDetail = async (emailId: string) => {
+    try {
+      const detail = await getInboxDetail(Number(emailId));
+
+      setEmails((current) =>
+        current.map((item) => {
+          if (item.id !== emailId) {
+            return item;
+          }
+
+          const merged = mergeInboxDetail(item, detail);
+          const shouldReloadRecommendations =
+            Boolean(merged.matchingText) &&
+            !merged.recommendations?.length &&
+            merged.recommendationState === "error";
+
+          return shouldReloadRecommendations
+            ? {
+                ...merged,
+                recommendations: [],
+                recommendationState: "idle",
+                recommendationError: undefined,
+              }
+            : merged;
+        }),
+      );
+    } catch (_error) {
+      // Background SSE refresh should not replace the current UI state.
+    }
+  };
 
   useEffect(() => {
     if (!useDemoDataMode) {
@@ -402,6 +434,43 @@ export function InboxPage() {
       window.clearInterval(intervalId);
     };
   }, [selectedEmailId, shouldPollSelectedEmail]);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    const handleEmailRefresh = (emailId: string) => {
+      if (!emailId) {
+        setReloadToken((current) => current + 1);
+        return;
+      }
+
+      if (emails.some((item) => item.id === emailId)) {
+        void refreshEmailDetail(emailId);
+        return;
+      }
+
+      if (activeStatus === "all" || activeStatus === "pending") {
+        setReloadToken((current) => current + 1);
+      }
+    };
+
+    const unsubscribeClassify = subscribeAppEvent("classify-complete", (payload) => {
+      const eventEmailId = payload.email_id == null ? "" : String(payload.email_id).trim();
+      handleEmailRefresh(eventEmailId);
+    });
+
+    const unsubscribeTemplateMatch = subscribeAppEvent("template-match-updated", (payload) => {
+      const eventEmailId = payload.email_id == null ? "" : String(payload.email_id).trim();
+      handleEmailRefresh(eventEmailId);
+    });
+
+    return () => {
+      unsubscribeClassify();
+      unsubscribeTemplateMatch();
+    };
+  }, [activeStatus, emails, useDemoDataMode]);
 
   const handleSend = async () => {
     if (!selectedEmail) {

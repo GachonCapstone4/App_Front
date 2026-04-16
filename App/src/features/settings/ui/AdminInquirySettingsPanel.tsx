@@ -9,6 +9,7 @@ import {
   type SupportTicketSummary,
 } from "../../../shared/api/support";
 import { getErrorMessage } from "../../../shared/api/http";
+import { subscribeAppEvent } from "../../../shared/lib/app-event-stream";
 import { SectionCard } from "../../../shared/ui/primitives/SectionCard";
 import { StateBanner } from "../../../shared/ui/primitives/StateBanner";
 import { StatusBadge } from "../../../shared/ui/primitives/StatusBadge";
@@ -103,10 +104,31 @@ export function AdminInquirySettingsPanel({
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadTickets = async () => {
-    const nextTickets = await getSupportTickets();
-    setTickets(nextTickets);
-    setSelectedTicketId((current) => current || nextTickets[0]?.ticketId || "");
+  const loadTickets = async (silent = false) => {
+    try {
+      const nextTickets = await getSupportTickets();
+      setTickets(nextTickets);
+      setSelectedTicketId((current) => current || nextTickets[0]?.ticketId || "");
+    } catch (error) {
+      if (!silent) {
+        throw error;
+      }
+    }
+  };
+
+  const loadTicketDetail = async (ticketId: string, silent = false) => {
+    setDetailLoading(true);
+
+    try {
+      const ticketDetail = await getSupportTicket(ticketId);
+      setSelectedTicket(ticketDetail);
+    } catch (error) {
+      if (!silent) {
+        throw error;
+      }
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -197,33 +219,42 @@ export function AdminInquirySettingsPanel({
     }
 
     let mounted = true;
-    setDetailLoading(true);
 
-    void getSupportTicket(selectedTicketId)
-      .then((ticketDetail) => {
-        if (!mounted) {
-          return;
-        }
-
-        setSelectedTicket(ticketDetail);
-      })
+    void loadTicketDetail(selectedTicketId)
       .catch((error) => {
         if (!mounted) {
           return;
         }
 
         toast.error(getErrorMessage(error, "문의 상세를 불러오지 못했습니다."));
-      })
-      .finally(() => {
-        if (!mounted) {
-          return;
-        }
-
-        setDetailLoading(false);
       });
 
     return () => {
       mounted = false;
+    };
+  }, [selectedTicketId, useDemoDataMode]);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    const unsubscribe = subscribeAppEvent("support-ticket-updated", (payload) => {
+      const ticketId = payload.ticket_id == null ? "" : String(payload.ticket_id).trim();
+
+      if (!ticketId) {
+        return;
+      }
+
+      void loadTickets(true);
+
+      if (ticketId === selectedTicketId) {
+        void loadTicketDetail(ticketId, true);
+      }
+    });
+
+    return () => {
+      unsubscribe();
     };
   }, [selectedTicketId, useDemoDataMode]);
 
