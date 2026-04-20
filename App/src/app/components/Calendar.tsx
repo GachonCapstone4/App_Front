@@ -51,10 +51,12 @@ import {
   type CalendarEventSnapshot,
   updateCalendarEvent,
 } from "../../shared/api/calendar";
+import { getInboxDetail, getInboxList } from "../../shared/api/inbox";
 import { getErrorMessage } from "../../shared/api/http";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
 import { StatePanel } from "../../shared/ui/primitives/StatePanel";
+import { mapInboxListItem, mergeInboxDetail } from "./inbox.helpers";
 import {
   type CalendarEventType,
   getCalendarMonthRange,
@@ -63,6 +65,7 @@ import {
   splitCalendarDateTime,
   toCalendarApiDateTime,
 } from "./calendar.helpers";
+import type { EmailItem } from "../../shared/types";
 
 export interface CalendarEvent {
   id: string;
@@ -92,6 +95,17 @@ interface CalendarEventDraft {
   location: string;
   attendeesText: string;
   notes: string;
+}
+
+interface CalendarEmailCandidate {
+  emailId: string;
+  sender: string;
+  subject: string;
+  title: string;
+  date: string;
+  time: string;
+  linkedEventId?: string;
+  isRegistered: boolean;
 }
 
 const initialEvents: CalendarEvent[] = [
@@ -468,6 +482,9 @@ export function Calendar({ scenarioId }: CalendarProps) {
   });
   const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
   const [isLoading, setIsLoading] = useState(!useDemoDataMode);
+  const [emailCandidates, setEmailCandidates] = useState<EmailItem[]>([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(!useDemoDataMode);
+  const [candidateLoadError, setCandidateLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -505,16 +522,67 @@ export function Calendar({ scenarioId }: CalendarProps) {
     }
   }
 
+  async function loadEmailCandidates() {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    setIsLoadingCandidates(true);
+    setCandidateLoadError(null);
+
+    try {
+      const listResponse = await getInboxList({ size: 100 });
+      const detectedEmails = (listResponse.content ?? []).filter((item) => item.schedule_detected);
+      const mappedDetectedEmails = detectedEmails.map(mapInboxListItem);
+
+      if (!mappedDetectedEmails.length) {
+        setEmailCandidates([]);
+        return;
+      }
+
+      const detailResults = await Promise.allSettled(
+        mappedDetectedEmails.map(async (item) => {
+          const detail = await getInboxDetail(Number(item.id));
+          return mergeInboxDetail(item, detail);
+        }),
+      );
+
+      const hydratedCandidates = detailResults
+        .filter(
+          (result): result is PromiseFulfilledResult<EmailItem> => result.status === "fulfilled",
+        )
+        .map((result) => result.value)
+        .filter((item) => item.schedule.detected);
+
+      setEmailCandidates(hydratedCandidates);
+    } catch (error) {
+      setCandidateLoadError(getErrorMessage(error, "이메일 일정 후보를 불러오지 못했습니다."));
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  }
+
   useEffect(() => {
     if (useDemoDataMode) {
       setEvents(initialEvents);
       setIsLoading(false);
       setLoadError(null);
+      setEmailCandidates([]);
+      setIsLoadingCandidates(false);
+      setCandidateLoadError(null);
       return;
     }
 
     void loadEvents();
   }, [currentMonth, currentYear, useDemoDataMode]);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    void loadEmailCandidates();
+  }, [useDemoDataMode]);
 
   useEffect(() => {
     const state = location.state as
@@ -688,10 +756,95 @@ export function Calendar({ scenarioId }: CalendarProps) {
     () => visibleEvents.filter((event) => event.fromEmail),
     [visibleEvents],
   );
+  const monthlyEmailCandidates = useMemo<CalendarEmailCandidate[]>(() => {
+    if (useDemoDataMode) {
+      return emailLinkedEvents
+        .flatMap((event) => {
+          if (!event.fromEmail) {
+            return [];
+          }
+
+          return [
+            {
+              emailId: event.fromEmail.id,
+              sender: event.fromEmail.sender,
+              subject: event.fromEmail.subject,
+              title: event.title,
+              date: event.date,
+              time: event.startTime,
+              linkedEventId: event.id,
+              isRegistered: true,
+            } satisfies CalendarEmailCandidate,
+          ];
+        });
+    }
+
+    return emailCandidates
+      .flatMap((email) => {
+        if (!email.schedule.detected) {
+          return [];
+        }
+
+        const candidateDate = email.schedule.suggestedDate;
+        const [candidateYear, candidateMonth] = candidateDate.split("-").map(Number);
+
+        if (candidateYear !== currentYear || candidateMonth !== currentMonth + 1) {
+          return [];
+        }
+
+        const linkedEvent = visibleEvents.find((event) => event.fromEmail?.id === email.id);
+
+        return [
+          {
+            emailId: email.id,
+            sender: email.sender,
+            subject: email.subject,
+            title: email.schedule.title,
+            date: candidateDate,
+            time: email.schedule.suggestedTime,
+            linkedEventId: linkedEvent?.id,
+            isRegistered: Boolean(linkedEvent),
+          },
+        ];
+      })
+      .sort((left, right) => {
+        const leftKey = `${left.date} ${left.time}`;
+        const rightKey = `${right.date} ${right.time}`;
+        return leftKey.localeCompare(rightKey);
+      });
+  }, [currentMonth, currentYear, emailCandidates, emailLinkedEvents, useDemoDataMode, visibleEvents]);
   const pendingEvents = useMemo(
     () => visibleEvents.filter((event) => !event.confirmed),
     [visibleEvents],
   );
+
+  const openEmailCandidate = (candidate: CalendarEmailCandidate) => {
+    if (candidate.linkedEventId) {
+      setSelectedDate(candidate.date);
+      setSelectedEventId(candidate.linkedEventId);
+      return;
+    }
+
+    const matchedEmail = emailCandidates.find((item) => item.id === candidate.emailId);
+    if (!matchedEmail?.schedule.detected) {
+      return;
+    }
+
+    setSelectedEventId(null);
+    setSelectedDate(matchedEmail.schedule.suggestedDate);
+    setDraft({
+      title: matchedEmail.schedule.title,
+      date: matchedEmail.schedule.suggestedDate,
+      startTime: matchedEmail.schedule.suggestedTime,
+      endTime: matchedEmail.schedule.suggestedTime,
+      type: matchedEmail.schedule.type === "video" ? "video" : "meeting",
+      location: matchedEmail.schedule.location,
+      attendeesText: matchedEmail.sender,
+      notes: `${matchedEmail.subject} 이메일에서 감지된 일정`,
+    });
+    setEditorMode("create");
+    setEditorOpen(true);
+  };
 
   const openCreateDialog = () => {
     setEditorMode("create");
@@ -1346,32 +1499,47 @@ export function Calendar({ scenarioId }: CalendarProps) {
                   </p>
                 </div>
                 <div className="space-y-2 px-4 pb-4">
-                  {emailLinkedEvents.length > 0 ? (
-                    emailLinkedEvents.slice(0, 4).map((event) => (
+                  {!useDemoDataMode && isLoadingCandidates ? (
+                    <StatePanel
+                      title="이메일 일정 후보를 불러오는 중입니다"
+                      description="일정이 감지된 메일을 현재 월 기준으로 정리하고 있습니다."
+                      tone="neutral"
+                      className="min-h-[180px]"
+                    />
+                  ) : candidateLoadError ? (
+                    <StatePanel
+                      title="이메일 일정 후보를 불러오지 못했습니다"
+                      description={candidateLoadError}
+                      tone="error"
+                      className="min-h-[180px]"
+                    />
+                  ) : monthlyEmailCandidates.length > 0 ? (
+                    monthlyEmailCandidates.slice(0, 6).map((candidate) => (
                       <button
-                        key={event.id}
-                        onClick={() => {
-                          setSelectedDate(event.date);
-                          setSelectedEventId(event.id);
-                        }}
+                        key={`${candidate.emailId}-${candidate.date}-${candidate.time}`}
+                        onClick={() => openEmailCandidate(candidate)}
                         className="w-full rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left transition-colors hover:border-[#CBD5E1] dark:border-border dark:bg-[#131D2F] dark:hover:border-[#475569]"
                       >
                         <div className="mb-1 flex items-center gap-2">
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: event.color }}
-                          />
+                          <span className={`h-2 w-2 rounded-full ${candidate.isRegistered ? "bg-[#10B981]" : "bg-[#F59E0B]"}`} />
                           <span className="flex-1 truncate text-[12px] text-[#1E2A3A] dark:text-foreground">
-                            {event.title}
+                            {candidate.title}
                           </span>
-                          {!event.confirmed ? (
-                            <span className="app-warning-pill rounded-full px-1.5 py-0.5 text-[9px]">
-                              대기
-                            </span>
-                          ) : null}
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[9px] ${
+                              candidate.isRegistered
+                                ? "app-success-pill"
+                                : "app-warning-pill"
+                            }`}
+                          >
+                            {candidate.isRegistered ? "등록됨" : "미등록"}
+                          </span>
                         </div>
-                        <p className="text-[10px] text-[#94A3B8] dark:text-muted-foreground">
-                          {event.date.replace(/-/g, ".")} {event.startTime}
+                        <p className="truncate text-[10px] text-[#64748B] dark:text-muted-foreground">
+                          {candidate.sender} · "{candidate.subject}"
+                        </p>
+                        <p className="mt-1 text-[10px] text-[#94A3B8] dark:text-muted-foreground">
+                          {candidate.date.replace(/-/g, ".")} {candidate.time}
                         </p>
                       </button>
                     ))
