@@ -44,13 +44,6 @@ import {
 import { Calendar as DatePickerCalendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import {
   confirmCalendarEvent,
   createCalendarEvent,
   deleteCalendarEvent,
@@ -301,20 +294,6 @@ function mapSnapshotToEvent(snapshot: CalendarEventSnapshot): CalendarEvent {
   };
 }
 
-const typeIcons: Record<CalendarEvent["type"], typeof Video> = {
-  meeting: Users,
-  call: Clock,
-  video: Video,
-  deadline: CalendarCheck,
-};
-
-const typeLabels: Record<CalendarEvent["type"], string> = {
-  meeting: "대면 미팅",
-  call: "전화",
-  video: "화상회의",
-  deadline: "마감",
-};
-
 const colorByType: Record<CalendarEvent["type"], string> = {
   meeting: "#8B5CF6",
   call: "#F59E0B",
@@ -327,17 +306,6 @@ const timeOptions = Array.from({ length: 48 }, (_, index) => {
   const minute = index % 2 === 0 ? "00" : "30";
   return `${hour}:${minute}`;
 });
-
-const eventTypeOptions: Array<{
-  value: CalendarEvent["type"];
-  label: string;
-  icon: typeof Users;
-}> = [
-  { value: "meeting", label: "대면 미팅", icon: Users },
-  { value: "video", label: "화상회의", icon: Video },
-  { value: "call", label: "전화", icon: Clock },
-  { value: "deadline", label: "마감", icon: CalendarCheck },
-];
 
 function parseDateValue(value: string) {
   const [year, month, day] = value.split("-").map(Number);
@@ -1187,16 +1155,10 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 </div>
 
                 <div className="app-soft-surface flex items-center gap-3 rounded-lg p-3">
-                  {(() => {
-                    const TypeIcon = typeIcons[selectedEvent.type];
-                    return <TypeIcon className="h-4 w-4 text-[#64748B] dark:text-muted-foreground" />;
-                  })()}
+                  <Clock className="h-4 w-4 text-[#64748B] dark:text-muted-foreground" />
                   <div>
                     <p className="text-[13px] text-[#1E2A3A] dark:text-foreground">
                       {selectedEvent.date.replace(/-/g, ".")} {selectedEvent.startTime} - {selectedEvent.endTime}
-                    </p>
-                    <p className="text-[11px] text-[#94A3B8] dark:text-muted-foreground">
-                      {typeLabels[selectedEvent.type]}
                     </p>
                   </div>
                 </div>
@@ -1217,30 +1179,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
                           회의 링크 열기
                         </button>
                       ) : null}
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedEvent.attendees.length > 0 ? (
-                  <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-wider text-[#94A3B8] dark:text-muted-foreground">
-                      참석자
-                    </p>
-                    <div className="space-y-2">
-                      {selectedEvent.attendees.map((attendee) => (
-                        <div key={attendee.email} className="flex items-center gap-3">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1E2A3A] text-[10px] text-white dark:bg-[#18263A]">
-                            {attendee.name[0]}
-                          </div>
-                          <div>
-                            <p className="text-[12px] text-[#1E2A3A] dark:text-foreground">
-                              {attendee.name}
-                              <span className="text-[#94A3B8] dark:text-muted-foreground"> · {attendee.company}</span>
-                            </p>
-                            <p className="text-[10px] text-[#CBD5E1] dark:text-[#64748B]">{attendee.email}</p>
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 ) : null}
@@ -1280,10 +1218,10 @@ export function Calendar({ scenarioId }: CalendarProps) {
                   </div>
                 ) : null}
 
-                {!useDemoDataMode && (!selectedEvent.location || selectedEvent.attendees.length === 0) ? (
+                {!useDemoDataMode && (!selectedEvent.location || !selectedEvent.notes) ? (
                   <StateBanner
                     title="일부 상세 정보는 아직 백엔드와 연결되지 않았습니다"
-                    description="현재 API 응답에는 장소, 참석자, 메모가 포함되지 않아 이 일정에서는 표시되지 않을 수 있습니다."
+                    description="현재 API 응답에는 장소와 메모가 포함되지 않아 이 일정에서는 표시되지 않을 수 있습니다."
                     tone="neutral"
                   />
                 ) : null}
@@ -1360,7 +1298,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
 
               <div className="divide-y divide-[#F1F5F9] dark:divide-border">
                 {selectedDateEvents.map((event) => {
-                  const TypeIcon = typeIcons[event.type];
                   return (
                     <button
                       key={event.id}
@@ -1385,10 +1322,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {event.startTime} - {event.endTime}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <TypeIcon className="h-3 w-3" />
-                              {typeLabels[event.type]}
                             </span>
                           </div>
                           {event.fromEmail ? (
@@ -1479,7 +1412,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
           {!useDemoDataMode ? (
             <StateBanner
               title="지금 저장되는 항목"
-              description="실제 백엔드에는 제목, 날짜, 시작 시간, 종료 시간만 저장됩니다. 장소, 참석자, 메모는 문서화된 미구현 항목으로 남겨두고 있습니다."
+              description="실제 백엔드에는 제목, 날짜, 시작 시간, 종료 시간만 저장됩니다. 장소와 메모는 문서화된 미구현 항목으로 남겨두고 있습니다."
               tone="warning"
             />
           ) : null}
@@ -1494,40 +1427,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 }
                 className="app-form-input h-11 w-full rounded-xl px-4 text-sm"
               />
-            </label>
-
-            <label className="space-y-2 text-sm text-foreground">
-              <span>유형</span>
-              <Select
-                value={draft.type}
-                onValueChange={(value) =>
-                  setDraft((current) => ({
-                    ...current,
-                    type: value as CalendarEvent["type"],
-                  }))
-                }
-              >
-                <SelectTrigger className="app-form-input h-11 w-full rounded-xl px-4 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border border-border bg-card p-1 shadow-xl">
-                  {eventTypeOptions.map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <SelectItem
-                        key={option.value}
-                        value={option.value}
-                        className="rounded-xl py-2.5 focus:bg-[#F8FAFC] focus:text-[#1E2A3A] dark:focus:bg-[#1E293B] dark:focus:text-foreground"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          {option.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
             </label>
 
             <div className="grid gap-3 md:col-span-2 md:grid-cols-[1.1fr_1fr_1fr]">
@@ -1569,22 +1468,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, location: event.target.value }))
                 }
-                disabled={!useDemoDataMode}
-                className="app-form-input h-11 w-full rounded-xl px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </label>
-
-            <label className="space-y-2 text-sm text-foreground md:col-span-2">
-              <span>참석자</span>
-              <input
-                value={draft.attendeesText}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    attendeesText: event.target.value,
-                  }))
-                }
-                placeholder="이름을 쉼표로 구분하세요"
                 disabled={!useDemoDataMode}
                 className="app-form-input h-11 w-full rounded-xl px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               />

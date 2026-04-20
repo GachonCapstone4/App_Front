@@ -63,7 +63,6 @@ export function EmailListPanel({
                 </p>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <StatusBadge label={email.category} tone="teal" />
                   <StatusBadge label={metaByStatus[email.status].label} tone={getTone(email.status)} />
                   {email.schedule?.detected ? <StatusBadge label="일정 감지" tone="teal" /> : null}
                 </div>

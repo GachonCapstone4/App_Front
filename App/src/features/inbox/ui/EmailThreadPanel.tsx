@@ -68,7 +68,6 @@ export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge label={`신뢰도 ${email.confidence}%`} tone={getConfidenceTone(email.confidence)} />
-        <StatusBadge label={email.category} tone="teal" />
         <StatusBadge label={metaByStatus[email.status].label} tone={metaByStatus[email.status].tone} />
       </div>
 

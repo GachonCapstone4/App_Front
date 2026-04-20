@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { CalendarDays, Clock3, MapPin, Sparkles, Users } from "lucide-react";
+import { Clock3, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { DetectedSchedule, EmailSchedule } from "../../../shared/types";
 
@@ -60,16 +60,8 @@ export function ScheduleDetectionCard({
             {detectedSchedule.suggestedDate} {detectedSchedule.suggestedTime} ({detectedSchedule.duration})
           </p>
           <p className="flex items-center gap-2">
-            {detectedSchedule.type === "video" ? <CalendarDays className="h-4 w-4" /> : <Users className="h-4 w-4" />}
-            {detectedSchedule.type === "video" ? "화상회의" : "오프라인 미팅"}
-          </p>
-          <p className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             {detectedSchedule.location}
-          </p>
-          <p className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            {detectedSchedule.attendees.join(", ")}
           </p>
         </div>
       </div>
