@@ -5,10 +5,15 @@ type CalendarEventApiResponse = {
   title: string;
   start_datetime: string;
   end_datetime: string | null;
+  event_type?: string | null;
+  location?: string | null;
+  notes?: string | null;
   source: string | null;
   status: string | null;
   is_calendar_added: boolean;
   email_id?: number | null;
+  email_sender_name?: string | null;
+  email_subject?: string | null;
   created_at: string;
   updated_at?: string;
 };
@@ -22,10 +27,15 @@ export type CalendarEventSnapshot = {
   title: string;
   startDatetime: string;
   endDatetime: string | null;
+  eventType: string | null;
+  location: string | null;
+  notes: string | null;
   source: string | null;
   status: string | null;
   isCalendarAdded: boolean;
   emailId: number | null;
+  emailSenderName: string | null;
+  emailSubject: string | null;
   createdAt: string;
   updatedAt: string | null;
 };
@@ -36,10 +46,15 @@ function mapCalendarSnapshot(event: CalendarEventApiResponse): CalendarEventSnap
     title: event.title,
     startDatetime: event.start_datetime,
     endDatetime: event.end_datetime,
+    eventType: event.event_type ?? null,
+    location: event.location ?? null,
+    notes: event.notes ?? null,
     source: event.source,
     status: event.status,
     isCalendarAdded: event.is_calendar_added,
     emailId: event.email_id ?? null,
+    emailSenderName: event.email_sender_name ?? null,
+    emailSubject: event.email_subject ?? null,
     createdAt: event.created_at,
     updatedAt: event.updated_at ?? null,
   };

@@ -281,7 +281,8 @@ function mapSnapshotToEvent(snapshot: CalendarEventSnapshot): CalendarEvent {
     snapshot.endDatetime ?? snapshot.startDatetime,
     start.time,
   );
-  const normalizedType = inferCalendarEventType(snapshot.title);
+  const normalizedType = (snapshot.eventType as CalendarEvent["type"] | null)
+    ?? inferCalendarEventType(snapshot.title);
   const confirmed = snapshot.status === "CONFIRMED";
 
   return {
@@ -292,17 +293,19 @@ function mapSnapshotToEvent(snapshot: CalendarEventSnapshot): CalendarEvent {
     startTime: start.time,
     endTime: end.time,
     type: normalizedType,
+    location: snapshot.location ?? undefined,
     attendees: [],
     color: colorByType[normalizedType],
     confirmed,
+    notes: snapshot.notes ?? undefined,
     source: snapshot.source,
     status: snapshot.status,
     isCalendarAdded: snapshot.isCalendarAdded,
     fromEmail: snapshot.emailId
       ? {
           id: String(snapshot.emailId),
-          sender: `이메일 #${snapshot.emailId}`,
-          subject: "연결된 원본 이메일",
+          sender: snapshot.emailSenderName ?? `이메일 #${snapshot.emailId}`,
+          subject: snapshot.emailSubject ?? "연결된 원본 이메일",
         }
       : undefined,
   };
@@ -1369,14 +1372,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
                       {selectedEvent.notes}
                     </p>
                   </div>
-                ) : null}
-
-                {!useDemoDataMode && (!selectedEvent.location || !selectedEvent.notes) ? (
-                  <StateBanner
-                    title="일부 상세 정보는 아직 백엔드와 연결되지 않았습니다"
-                    description="현재 API 응답에는 장소와 메모가 포함되지 않아 이 일정에서는 표시되지 않을 수 있습니다."
-                    tone="neutral"
-                  />
                 ) : null}
 
                 <div className="flex gap-2 border-t border-[#F1F5F9] pt-3 dark:border-border">
