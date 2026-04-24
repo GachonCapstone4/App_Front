@@ -1,4 +1,3 @@
-import { getApiBaseUrl } from "../api/http";
 import { getAccessToken } from "./app-session";
 
 export type ClassifyCompleteEventPayload = {
@@ -61,15 +60,24 @@ function closeEventSource() {
   eventSource = null;
 }
 
-function buildStreamUrl() {
+function getSseBaseUrl() {
+  const envBaseUrl = import.meta.env.VITE_SSE_BASE_URL?.trim();
+
+  if (envBaseUrl && envBaseUrl.length > 0) {
+    return envBaseUrl.replace(/\/$/, "");
+  }
+
+  return "";
+}
+
+export function buildAppEventStreamUrl() {
   const accessToken = getAccessToken().trim();
 
   if (!accessToken) {
     return null;
   }
 
-  const apiBaseUrl = getApiBaseUrl().replace(/\/$/, "");
-  return `${apiBaseUrl}/api/mail/stream?access_token=${encodeURIComponent(accessToken)}`;
+  return `${getSseBaseUrl()}/sse/connect?access_token=${encodeURIComponent(accessToken)}`;
 }
 
 function parseEventPayload<T>(event: Event): T | null {
@@ -110,7 +118,7 @@ function ensureEventSource() {
     return;
   }
 
-  const streamUrl = buildStreamUrl();
+  const streamUrl = buildAppEventStreamUrl();
 
   if (!streamUrl) {
     return;

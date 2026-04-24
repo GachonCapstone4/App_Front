@@ -30,7 +30,6 @@ import {
 import {
   deriveGoogleIntegrationEmail,
   getAppSession,
-  getAccessToken,
   markOnboardingComplete,
   setConnectedEmail as persistConnectedEmail,
 } from "../../shared/lib/app-session";
@@ -47,7 +46,7 @@ import {
   upsertBusinessProfile,
   uploadBusinessFile,
 } from "../../shared/api/business";
-import { getApiBaseUrl, getErrorMessage } from "../../shared/api/http";
+import { getErrorMessage } from "../../shared/api/http";
 import {
   getGoogleAuthorizationUrl,
   getMyIntegrationSafe,
@@ -60,6 +59,7 @@ import {
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
 } from "../../shared/lib/google-oauth-popup";
+import { buildAppEventStreamUrl } from "../../shared/lib/app-event-stream";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
 import {
@@ -991,14 +991,11 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     draftJobIds: string[],
     knowledgeJobId: string | null,
   ) => {
-    const accessToken = getAccessToken();
+    const streamUrl = buildAppEventStreamUrl();
 
-    if (!accessToken) {
+    if (!streamUrl) {
       throw new Error("인증 토큰이 없어 템플릿 생성 상태를 구독할 수 없습니다.");
     }
-
-    const apiBaseUrl = getApiBaseUrl().replace(/\/$/, "");
-    const streamUrl = `${apiBaseUrl}/api/mail/stream?access_token=${encodeURIComponent(accessToken)}`;
 
     clearGenerationEventSource();
     onboardingDraftJobIdsRef.current = draftJobIds;
