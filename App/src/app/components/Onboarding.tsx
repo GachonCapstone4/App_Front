@@ -198,14 +198,14 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const [currentMainStep, setCurrentMainStep] = useState(1);
   const [currentSubStep, setCurrentSubStep] = useState(0);
 
-  // Email connection state
+  // 이메일 연동 상태
   const initialConnectedEmail =
     session.connectedEmails[session.connectedEmails.length - 1] ?? session.connectedEmail;
   const [emailConnected, setEmailConnected] = useState(Boolean(initialConnectedEmail));
   const [connectedEmail, setConnectedEmail] = useState(initialConnectedEmail);
   const [checkingIntegration, setCheckingIntegration] = useState(false);
 
-  // Onboarding states
+  // 온보딩 입력 상태
   const [tone, setTone] = useState("neutral");
   const [businessType, setBusinessType] = useState("");
   const [description, setDescription] = useState("");
@@ -227,7 +227,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const [generatedTemplateCount, setGeneratedTemplateCount] = useState(0);
   const [completingOnboarding, setCompletingOnboarding] = useState(false);
 
-  // Template generation states
+  // 템플릿 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [templateProgress, setTemplateProgress] = useState(0);
@@ -751,7 +751,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
             return;
           }
         } catch {
-          // Ignore polling failures and let the user retry.
+          // 폴링 실패는 즉시 중단하지 않고 사용자가 다시 시도할 수 있게 둔다.
         }
 
         if (attempts >= maxAttempts) {
@@ -1561,7 +1561,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                       {checkingIntegration ? "연결 상태 확인 중..." : "Google 계정으로 로그인"}
                     </button>
 
-                    {/* Security Notice */}
+                    {/* 보안 안내 */}
                     <div className="mt-8 flex items-center justify-center gap-2 text-[#94A3B8]">
                       <Lock className="w-3.5 h-3.5" />
                       <p className="text-[12px]">
@@ -1570,7 +1570,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                     </div>
                   </>
                 ) : (
-                  /* Connected State */
+                  /* 연결 완료 상태 */
                   <div className="text-center py-6">
                     <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-[#2DD4BF]/10 flex items-center justify-center">
                       <CheckCircle2 className="w-10 h-10 text-[#2DD4BF]" />
