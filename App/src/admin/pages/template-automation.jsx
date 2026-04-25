@@ -602,7 +602,9 @@ export function TemplateAutomationPage() {
                       <tr key={template.id}>
                         <td>
                           <strong>{template.title}</strong>
-                          <div className="admin-table-subcopy">{template.id}</div>
+                          <div className="admin-table-subcopy">
+                            사용자 {template.userId} 템플릿 #{template.userTemplateNo ?? template.id}
+                          </div>
                         </td>
                         <td>{template.category}</td>
                         <td>{userIndustryOptions.find((item) => item.value === template.industry)?.label}</td>

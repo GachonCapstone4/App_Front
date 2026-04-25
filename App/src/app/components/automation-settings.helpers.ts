@@ -11,11 +11,13 @@ export type AutomationTemplateCatalogItem = {
   categoryName: string;
   color: string | null;
   templateId: number;
+  userTemplateNo?: number | null;
   title: string;
 };
 
 export type AutomationTemplateRow = {
   templateId: number | null;
+  userTemplateNo: number | null;
   title: string;
   ruleId: number | null;
   autoSend: boolean;
@@ -32,6 +34,7 @@ export type AutomationCategoryGroup = {
 
 export type AutomationDialogTemplateDraft = {
   templateId: number;
+  userTemplateNo: number | null;
   title: string;
   selected: boolean;
   autoSend: boolean;
@@ -89,6 +92,7 @@ export function buildAutomationCategoryGroups(
     if (rule.templateId === null) {
       group.templates.set(`rule:${rule.ruleId}`, {
         templateId: null,
+        userTemplateNo: null,
         title: rule.templateTitle ?? "지정되지 않은 템플릿",
         ruleId: rule.ruleId,
         autoSend: rule.autoSendEnabled,
@@ -99,6 +103,7 @@ export function buildAutomationCategoryGroups(
 
     group.templates.set(`template:${rule.templateId}`, {
       templateId: rule.templateId,
+      userTemplateNo: rule.userTemplateNo ?? null,
       title: rule.templateTitle ?? `템플릿 ${rule.templateId}`,
       ruleId: rule.ruleId,
       autoSend: rule.autoSendEnabled,
@@ -183,6 +188,7 @@ export function buildAutomationDialogTemplateDrafts(
 
       return {
         templateId: template.templateId,
+        userTemplateNo: template.userTemplateNo ?? null,
         title: template.title,
         selected: Boolean(existingTemplate),
         autoSend: existingTemplate?.autoSend ?? false,

@@ -9,6 +9,7 @@ type AutomationRuleApiResponse = {
   };
   template: {
     template_id: number;
+    user_template_no?: number | null;
     title: string;
   } | null;
   auto_send_enabled: boolean;
@@ -25,6 +26,7 @@ export type AutomationRuleSnapshot = {
   categoryName: string;
   color: string | null;
   templateId: number | null;
+  userTemplateNo?: number | null;
   templateTitle: string | null;
   autoSendEnabled: boolean;
   autoCalendarEnabled: boolean;
@@ -46,6 +48,7 @@ function mapAutomationRuleSnapshot(
     categoryName: response.category.name,
     color: response.category.color,
     templateId: response.template?.template_id ?? null,
+    userTemplateNo: response.template?.user_template_no ?? null,
     templateTitle: response.template?.title ?? null,
     autoSendEnabled: response.auto_send_enabled,
     autoCalendarEnabled: response.auto_calendar_enabled,

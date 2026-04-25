@@ -285,6 +285,7 @@ function mapTemplateCatalog(
     categoryName: template.categoryName,
     color: colorByCategoryId.get(template.categoryId) ?? null,
     templateId: template.templateId,
+    userTemplateNo: template.userTemplateNo,
     title: template.title,
   }));
 }
@@ -329,9 +330,24 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       : "",
   );
 
+  const rulesWithTemplateNumbers = useMemo(() => {
+    const userTemplateNoByTemplateId = new Map(
+      templateCatalog.map((template) => [template.templateId, template.userTemplateNo]),
+    );
+
+    return rules.map((rule) => ({
+      ...rule,
+      userTemplateNo:
+        rule.userTemplateNo ??
+        (rule.templateId === null
+          ? null
+          : userTemplateNoByTemplateId.get(rule.templateId) ?? null),
+    }));
+  }, [rules, templateCatalog]);
+
   const groups = useMemo(
-    () => buildAutomationCategoryGroups(rules),
-    [rules],
+    () => buildAutomationCategoryGroups(rulesWithTemplateNumbers),
+    [rulesWithTemplateNumbers],
   );
 
   const availableCategories = useMemo(
@@ -1036,7 +1052,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                                     <span className="rounded-md bg-[#EEF2FF] px-2 py-1 text-[11px] font-medium text-[#4F46E5] dark:bg-[#1E1B4B] dark:text-[#C7D2FE]">
                                       {template.templateId === null
                                         ? "ID 미지정"
-                                        : `ID ${template.templateId}`}
+                                        : `ID ${template.userTemplateNo ?? template.templateId}`}
                                     </span>
                                     <span className="text-[14px] text-[#1E2A3A] dark:text-foreground">
                                       {template.title}
@@ -1255,7 +1271,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                             <Check className="h-3.5 w-3.5" />
                           </button>
                           <span className="rounded-md bg-[#EEF2FF] px-2 py-1 text-[11px] font-medium text-[#4F46E5] dark:bg-[#1E1B4B] dark:text-[#C7D2FE]">
-                            ID {template.templateId}
+                            ID {template.userTemplateNo ?? template.templateId}
                           </span>
                           <span className="text-[13px] text-[#1E2A3A] dark:text-foreground">
                             {template.title}
