@@ -2,6 +2,7 @@ import { api } from "./http";
 
 type TemplateApiResponse = {
   template_id: number;
+  user_template_no?: number | null;
   category_id: number;
   category_name: string;
   title: string;
@@ -12,11 +13,12 @@ type TemplateApiResponse = {
 };
 
 type TemplateListApiResponse = {
-  templates: TemplateApiResponse[];
+  templates?: TemplateApiResponse[];
 };
 
 export type TemplateSnapshot = {
   templateId: number;
+  userTemplateNo: number | null;
   categoryId: number;
   categoryName: string;
   title: string;
@@ -29,6 +31,7 @@ export type TemplateSnapshot = {
 function mapTemplateSnapshot(template: TemplateApiResponse): TemplateSnapshot {
   return {
     templateId: template.template_id,
+    userTemplateNo: template.user_template_no ?? null,
     categoryId: template.category_id,
     categoryName: template.category_name,
     title: template.title,
@@ -41,7 +44,7 @@ function mapTemplateSnapshot(template: TemplateApiResponse): TemplateSnapshot {
 
 export async function getTemplateLibrary() {
   const response = await api.get<TemplateListApiResponse>("/api/templates");
-  return response.data.templates.map(mapTemplateSnapshot);
+  return (response.data.templates ?? []).map(mapTemplateSnapshot);
 }
 
 export async function createTemplate(payload: {

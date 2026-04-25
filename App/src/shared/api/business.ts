@@ -35,11 +35,12 @@ type FaqListApiResponse = {
 
 type TemplateApiResponse = {
   template_id: number;
+  user_template_no?: number | null;
   title: string;
 };
 
 type TemplateListApiResponse = {
-  templates: TemplateApiResponse[];
+  templates?: TemplateApiResponse[];
 };
 
 type CategoryApiResponse = {
@@ -79,6 +80,7 @@ export type FaqSnapshot = {
 
 export type TemplateSummarySnapshot = {
   templateId: number;
+  userTemplateNo: number | null;
   title: string;
 };
 
@@ -210,8 +212,9 @@ export async function deleteBusinessFaq(faqId: number) {
 export async function getTemplates() {
   const response = await api.get<TemplateListApiResponse>("/api/templates");
 
-  return response.data.templates.map((template) => ({
+  return (response.data.templates ?? []).map((template) => ({
     templateId: template.template_id,
+    userTemplateNo: template.user_template_no ?? null,
     title: template.title,
   })) satisfies TemplateSummarySnapshot[];
 }

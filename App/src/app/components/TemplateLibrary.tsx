@@ -64,6 +64,7 @@ import {
 interface Template {
   id: string;
   templateId?: number;
+  userTemplateNo?: number | null;
   title: string;
   subject: string;
   body: string;
@@ -212,6 +213,7 @@ function mapTemplateSnapshot(snapshot: TemplateSnapshot): Template {
   return {
     id: String(snapshot.templateId),
     templateId: snapshot.templateId,
+    userTemplateNo: snapshot.userTemplateNo,
     title: snapshot.title,
     subject: snapshot.subjectTemplate,
     body: snapshot.bodyTemplate,
@@ -891,7 +893,7 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex rounded-full bg-[#1E2A3A] px-2 py-0.5 text-[11px] text-white dark:bg-[#E2E8F0] dark:text-[#111827]">
-                        ID {template.id}
+                        ID {template.userTemplateNo ?? template.id}
                       </span>
                       <span className="inline-flex rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground">
                         {template.category}
@@ -984,7 +986,7 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
           <DialogHeader>
             <DialogTitle>{previewTemplate?.title}</DialogTitle>
             <DialogDescription>
-              ID {previewTemplate?.id} · {previewTemplate?.category} · {previewTemplate?.confidence}% 정확도
+              ID {previewTemplate?.userTemplateNo ?? previewTemplate?.id} · {previewTemplate?.category} · {previewTemplate?.confidence}% 정확도
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
