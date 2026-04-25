@@ -8,6 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../app/components/ui/select";
+import {
+  deleteAdminUserIntegration,
+  getAdminUserDetail,
+  getAdminUsers,
+  updateAdminUserStatus,
+} from "../../shared/api/admin";
+import { getErrorMessage } from "../../shared/api/http";
 import { adminUsers, userIndustryOptions } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -26,28 +33,167 @@ export function UsersPage() {
   const actionErrorScenario = scenarioId === "admin-users-action-error";
   const statusDialogScenario = scenarioId === "admin-users-status-dialog-normal";
   const googleDialogScenario = scenarioId === "admin-users-google-dialog-normal";
+  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
 
   const [search, setSearch] = useState("");
   const [industry, setIndustry] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [googleFilter, setGoogleFilter] = useState("all");
-  const [users, setUsers] = useState(emptyScenario ? [] : adminUsers);
+  const [users, setUsers] = useState(useDemoDataMode && !emptyScenario ? adminUsers : []);
   const [selectedUserId, setSelectedUserId] = useState(
-    (emptyScenario ? [] : adminUsers)[0]?.id ?? "",
+    (useDemoDataMode && !emptyScenario ? adminUsers : [])[0]?.id ?? "",
   );
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [dismissPresetModal, setDismissPresetModal] = useState(false);
+  const [loading, setLoading] = useState(!useDemoDataMode);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [actionErrorNotice, setActionErrorNotice] = useState(
+    actionErrorScenario
+      ? "계정 상태 변경 또는 Google 강제 해제 요청을 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+      : "",
+  );
 
   useEffect(() => {
-    if (emptyScenario) {
-      setUsers([]);
-      setSelectedUserId("");
+    if (useDemoDataMode) {
+      if (emptyScenario) {
+        setUsers([]);
+        setSelectedUserId("");
+        return;
+      }
+
+      setUsers(adminUsers);
+      setSelectedUserId((current) => current || adminUsers[0]?.id || "");
       return;
     }
 
-    setUsers(adminUsers);
-    setSelectedUserId((current) => current || adminUsers[0]?.id || "");
-  }, [emptyScenario]);
+    let mounted = true;
+    setLoading(true);
+    setLoadError("");
+
+    void getAdminUsers(100)
+      .then((nextUsers) => {
+        if (!mounted) {
+          return;
+        }
+
+        const mappedUsers = nextUsers.map((user) => ({
+          id: user.userId,
+          name: user.name,
+          email: user.email,
+          company: "상세 조회 후 표시",
+          industry: user.industryType ?? "",
+          industryLabel:
+            userIndustryOptions.find((option) => option.value === user.industryType)?.label ??
+            user.industryType ??
+            "미지정",
+          role: "사용자",
+          status: user.active ? "활성" : "비활성",
+          googleStatus: "확인 중",
+          googleEmail: null,
+          joinedAt: user.createdAt,
+          lastActive: "상세 조회 후 표시",
+          processedEmails: 0,
+          generatedDrafts: 0,
+          inquiryCount: 0,
+          recentInquiries: [],
+        }));
+
+        setUsers(mappedUsers);
+        setSelectedUserId((current) => current || mappedUsers[0]?.id || "");
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoadError(getErrorMessage(error, "사용자 목록을 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [emptyScenario, useDemoDataMode]);
+
+  useEffect(() => {
+    setActionErrorNotice(
+      actionErrorScenario
+        ? "계정 상태 변경 또는 Google 강제 해제 요청을 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        : "",
+    );
+  }, [actionErrorScenario]);
+
+  useEffect(() => {
+    if (useDemoDataMode || !selectedUserId) {
+      setSelectedUserDetail(null);
+      return;
+    }
+
+    let mounted = true;
+    setDetailLoading(true);
+    setActionErrorNotice("");
+
+    void getAdminUserDetail(selectedUserId)
+      .then((detail) => {
+        if (!mounted) {
+          return;
+        }
+
+        const mappedDetail = {
+          id: detail.userId,
+          name: detail.name,
+          email: detail.email,
+          company: detail.companyDesc || "회사 설명 미등록",
+          industry: detail.industryType ?? "",
+          industryLabel:
+            userIndustryOptions.find((option) => option.value === detail.industryType)?.label ??
+            detail.industryType ??
+            "미지정",
+          role: detail.role,
+          status: detail.active ? "활성" : "비활성",
+          googleStatus: detail.gmailConnected ? "연동 완료" : "미연동",
+          googleEmail: detail.integratedEmail,
+          joinedAt: "",
+          lastActive: detail.lastLoginAt ?? detail.lastSyncAt ?? "기록 없음",
+          processedEmails: detail.totalProcessedEmails,
+          generatedDrafts: detail.totalGeneratedDrafts,
+          inquiryCount: detail.recentTicketCount,
+          recentInquiries: [],
+        };
+
+        setSelectedUserDetail(mappedDetail);
+        setUsers((current) =>
+          current.map((user) => (user.id === mappedDetail.id ? { ...user, ...mappedDetail } : user)),
+        );
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setActionErrorNotice(getErrorMessage(error, "사용자 상세 정보를 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setDetailLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedUserId, useDemoDataMode]);
 
   const filteredUsers = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -80,7 +226,9 @@ export function UsersPage() {
   }, [filteredUsers, selectedUserId]);
 
   const selectedUser =
-    filteredUsers.find((user) => user.id === selectedUserId) ?? filteredUsers[0] ?? null;
+    selectedUserDetail?.id === selectedUserId
+      ? selectedUserDetail
+      : filteredUsers.find((user) => user.id === selectedUserId) ?? filteredUsers[0] ?? null;
   const presetConfirmAction =
     !dismissPresetModal &&
     selectedUser &&
@@ -129,36 +277,67 @@ export function UsersPage() {
       return;
     }
 
-    if (activeConfirmAction.type === "toggle-status") {
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === activeConfirmAction.user.id
-            ? {
-                ...user,
-                status: user.status === "활성" ? "비활성" : "활성",
-                lastActive: user.status === "활성" ? "방금 비활성화" : "방금 활성화",
-              }
-            : user,
-        ),
-      );
+    const applyLocalChange = () => {
+      if (activeConfirmAction.type === "toggle-status") {
+        setUsers((current) =>
+          current.map((user) =>
+            user.id === activeConfirmAction.user.id
+              ? {
+                  ...user,
+                  status: user.status === "활성" ? "비활성" : "활성",
+                  lastActive: user.status === "활성" ? "방금 비활성화" : "방금 활성화",
+                }
+              : user,
+          ),
+        );
+      }
+
+      if (activeConfirmAction.type === "unlink-google") {
+        setUsers((current) =>
+          current.map((user) =>
+            user.id === activeConfirmAction.user.id
+              ? {
+                  ...user,
+                  googleStatus: "미연동",
+                  googleEmail: null,
+                }
+              : user,
+          ),
+        );
+      }
+    };
+
+    if (useDemoDataMode) {
+      applyLocalChange();
+      setConfirmAction(null);
+      setDismissPresetModal(true);
+      return;
     }
 
-    if (activeConfirmAction.type === "unlink-google") {
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === activeConfirmAction.user.id
-            ? {
-                ...user,
-                googleStatus: "미연동",
-                googleEmail: null,
-              }
-            : user,
-        ),
-      );
-    }
+    setActionLoading(true);
+    setActionErrorNotice("");
 
-    setConfirmAction(null);
-    setDismissPresetModal(true);
+    const request =
+      activeConfirmAction.type === "toggle-status"
+        ? updateAdminUserStatus(
+            activeConfirmAction.user.id,
+            activeConfirmAction.user.status !== "활성",
+          )
+        : deleteAdminUserIntegration(activeConfirmAction.user.id);
+
+    void request
+      .then(() => {
+        applyLocalChange();
+        setSelectedUserDetail(null);
+        setConfirmAction(null);
+        setDismissPresetModal(true);
+      })
+      .catch((error) => {
+        setActionErrorNotice(getErrorMessage(error, "사용자 운영 액션을 처리하지 못했습니다."));
+      })
+      .finally(() => {
+        setActionLoading(false);
+      });
   };
 
   if (loadErrorScenario) {
@@ -166,6 +345,24 @@ export function UsersPage() {
       <AdminStatePage
         title="사용자 관리 화면을 불러오지 못했습니다"
         description="사용자 목록과 상세 운영 데이터를 가져오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+      />
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AdminStatePage
+        title="사용자 관리 화면을 불러오지 못했습니다"
+        description={loadError}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <AdminStatePage
+        title="사용자 관리 화면을 불러오는 중입니다"
+        description="사용자 목록과 연동 상태 데이터를 가져오고 있습니다."
       />
     );
   }
@@ -333,11 +530,20 @@ export function UsersPage() {
               </div>
 
               <div className="admin-stack admin-stack--lg">
-                {actionErrorScenario ? (
+                {actionErrorNotice ? (
                   <AdminStateNotice
                     title="사용자 운영 액션을 처리하지 못했습니다"
-                    description="계정 상태 변경 또는 Google 강제 해제 요청을 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                    description={actionErrorNotice}
                     tone="error"
+                  />
+                ) : null}
+
+                {detailLoading ? (
+                  <AdminStateNotice
+                    title="사용자 상세 정보를 불러오는 중입니다"
+                    description="선택한 사용자의 상세 정보와 Google 연동 상태를 확인하고 있습니다."
+                    tone="empty"
+                    compact
                   />
                 ) : null}
 
@@ -477,8 +683,8 @@ export function UsersPage() {
             >
               취소
             </button>
-            <button type="button" className="admin-button" onClick={executeConfirmAction}>
-              확인
+            <button type="button" className="admin-button" onClick={executeConfirmAction} disabled={actionLoading}>
+              {actionLoading ? "처리 중..." : "확인"}
             </button>
           </>
         }

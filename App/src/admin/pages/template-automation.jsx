@@ -15,6 +15,16 @@ import {
   templateSummary,
   userIndustryOptions,
 } from "../shared/mock/adminData";
+import {
+  createAdminAutomationRule,
+  deleteAdminAutomationRule,
+  getAdminAutomationRules,
+  getAdminTemplateCategoryStats,
+  getAdminTemplates,
+  getAdminTemplateSummary,
+  updateAdminAutomationRule,
+} from "../../shared/api/admin";
+import { getErrorMessage } from "../../shared/api/http";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminModal } from "../shared/ui/AdminModal";
@@ -23,19 +33,29 @@ import { AdminStatePage } from "../shared/ui/AdminStatePage";
 import { StatusBadge } from "../shared/ui/StatusBadge";
 
 const emptyRuleDraft = {
+  userId: "",
+  categoryId: "",
+  templateId: "",
   name: "",
   category: "견적 요청",
   trigger: "",
   action: "",
   status: "활성",
+  autoSendEnabled: false,
+  autoCalendarEnabled: false,
 };
 
 const presetRuleDraft = {
+  userId: "1",
+  categoryId: "1",
+  templateId: "",
   name: "계약 일정 우선 등록",
   category: "미팅/일정 조율",
   trigger: "메일 본문에 미팅 일정, 시간, 장소가 모두 포함되면",
   action: "캘린더 초안을 생성하고 담당자 검토 상태로 전환",
   status: "활성",
+  autoSendEnabled: false,
+  autoCalendarEnabled: true,
 };
 
 export function TemplateAutomationPage() {
@@ -50,14 +70,23 @@ export function TemplateAutomationPage() {
   const ruleDeleteDialogScenario =
     scenarioId === "admin-template-automation-rule-delete-dialog-normal";
   const ruleSaveErrorScenario = scenarioId === "admin-template-automation-rule-save-error";
+  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
   const activeTab = searchParams.get("tab") === "rules" ? "rules" : "templates";
 
   const [search, setSearch] = useState("");
   const [industry, setIndustry] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [templateItems] = useState(templatesEmptyScenario ? [] : generatedTemplates);
+  const [summaryItems, setSummaryItems] = useState(
+    useDemoDataMode ? templateSummary : [],
+  );
+  const [templateItems, setTemplateItems] = useState(
+    useDemoDataMode && !templatesEmptyScenario ? generatedTemplates : [],
+  );
+  const [categoryStats, setCategoryStats] = useState(
+    useDemoDataMode ? templateCategoryStats : [],
+  );
   const [ruleItems, setRuleItems] = useState(
-    rulesEmptyScenario ? [] : initialAutomationRules,
+    useDemoDataMode && !rulesEmptyScenario ? initialAutomationRules : [],
   );
   const [ruleDialogOpen, setRuleDialogOpen] = useState(
     ruleDialogScenario || ruleSaveErrorScenario,
@@ -74,10 +103,121 @@ export function TemplateAutomationPage() {
       ? "자동화 규칙 저장 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
       : "",
   );
+  const [loading, setLoading] = useState(!useDemoDataMode);
+  const [loadError, setLoadError] = useState("");
+  const [savingRule, setSavingRule] = useState(false);
+  const [deletingRule, setDeletingRule] = useState(false);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      setSummaryItems(templateSummary);
+      setTemplateItems(templatesEmptyScenario ? [] : generatedTemplates);
+      setCategoryStats(templateCategoryStats);
+      setRuleItems(rulesEmptyScenario ? [] : initialAutomationRules);
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    setLoadError("");
+
+    void Promise.all([
+      getAdminTemplateSummary(),
+      getAdminTemplates(100),
+      getAdminTemplateCategoryStats(),
+      getAdminAutomationRules(100),
+    ])
+      .then(([summary, templates, stats, rules]) => {
+        if (!mounted) {
+          return;
+        }
+
+        setSummaryItems([
+          {
+            label: "전체 생성 템플릿",
+            value: `${summary.total_templates}개`,
+            hint: "백엔드 저장 템플릿 기준",
+          },
+          {
+            label: "가장 많이 쓰인 카테고리",
+            value: summary.top_category ?? "없음",
+            hint: `총 ${summary.top_category_usage_count}회 사용`,
+          },
+          {
+            label: "활성 자동화 규칙",
+            value: `${summary.active_rule_count}개`,
+            hint: "현재 활성 상태 규칙",
+          },
+          {
+            label: "자동 발송 허용 규칙",
+            value: `${summary.auto_send_rule_count}개`,
+            hint: "검토 없는 자동 발송",
+          },
+        ]);
+        setTemplateItems(
+          templates.map((template) => ({
+            id: template.templateId,
+            title: template.title,
+            category: template.category,
+            industry: template.industry,
+            useCount: template.useCount,
+            userCount: template.userCount,
+            generatedAt: template.generatedAt,
+            quality: template.quality,
+            userId: template.userId,
+            userTemplateNo: template.userTemplateNo,
+          })),
+        );
+        setCategoryStats(
+          stats.map((stat, index) => ({
+            id: stat.categoryId,
+            category: stat.categoryName,
+            industryLabel: "전체 업종",
+            color: ["#3B82F6", "#14B8A6", "#F59E0B", "#EF4444", "#6366F1"][index % 5],
+            templateCount: stat.templateCount,
+            usageCount: stat.usageCount,
+          })),
+        );
+        setRuleItems(
+          rules.map((rule) => ({
+            id: rule.ruleId,
+            userId: rule.userId,
+            name: rule.name,
+            category: rule.category,
+            categoryId: "",
+            templateId: "",
+            trigger: rule.trigger,
+            action: rule.action,
+            status: rule.status,
+            autoSendEnabled: false,
+            autoCalendarEnabled: false,
+            updatedAt: rule.updatedAt,
+          })),
+        );
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoadError(getErrorMessage(error, "템플릿 / 자동화 데이터를 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [rulesEmptyScenario, templatesEmptyScenario, useDemoDataMode]);
 
   const categories = useMemo(
-    () => ["all", ...new Set(templateItems.map((item) => item.category))],
-    [templateItems],
+    () => ["all", ...new Set([...categoryStats.map((item) => item.category), ...templateItems.map((item) => item.category)])],
+    [categoryStats, templateItems],
   );
 
   const filteredTemplates = useMemo(() => {
@@ -97,7 +237,7 @@ export function TemplateAutomationPage() {
 
   const filteredCategoryStats = useMemo(
     () =>
-      templateCategoryStats.filter((item) => {
+      categoryStats.filter((item) => {
         const matchesIndustry =
           industry === "all" ||
           item.industryLabel ===
@@ -107,12 +247,17 @@ export function TemplateAutomationPage() {
 
         return matchesIndustry && matchesCategory;
       }),
-    [categoryFilter, industry],
+    [categoryFilter, categoryStats, industry],
   );
 
   const openCreateRule = () => {
     setEditingRuleId(null);
-    setRuleDraft(emptyRuleDraft);
+    const firstCategory = categoryStats[0];
+    setRuleDraft({
+      ...emptyRuleDraft,
+      categoryId: firstCategory?.id ?? "",
+      category: firstCategory?.category ?? emptyRuleDraft.category,
+    });
     setRuleErrorNotice("");
     setRuleDialogOpen(true);
   };
@@ -120,11 +265,19 @@ export function TemplateAutomationPage() {
   const openEditRule = (rule) => {
     setEditingRuleId(rule.id);
     setRuleDraft({
+      userId: rule.userId ?? "",
+      categoryId:
+        rule.categoryId ||
+        categoryStats.find((item) => item.category === rule.category)?.id ||
+        "",
+      templateId: rule.templateId ?? "",
       name: rule.name,
       category: rule.category,
       trigger: rule.trigger,
       action: rule.action,
       status: rule.status,
+      autoSendEnabled: Boolean(rule.autoSendEnabled),
+      autoCalendarEnabled: Boolean(rule.autoCalendarEnabled),
     });
     setRuleErrorNotice("");
     setRuleDialogOpen(true);
@@ -132,16 +285,73 @@ export function TemplateAutomationPage() {
 
   const handleSaveRule = () => {
     if (
+      !ruleDraft.userId.trim() ||
+      !ruleDraft.categoryId.trim() ||
       !ruleDraft.name.trim() ||
-      !ruleDraft.category.trim() ||
       !ruleDraft.trigger.trim() ||
       !ruleDraft.action.trim()
     ) {
+      setRuleErrorNotice("사용자 ID, 카테고리, 규칙명, 조건, 동작을 모두 입력해 주세요.");
       return;
     }
 
     if (ruleSaveErrorScenario) {
       setRuleErrorNotice("자동화 규칙 저장 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!useDemoDataMode) {
+      setSavingRule(true);
+      setRuleErrorNotice("");
+
+      const request = editingRuleId
+        ? updateAdminAutomationRule(editingRuleId, {
+            templateId: ruleDraft.templateId,
+            active: ruleDraft.status === "활성",
+            autoSendEnabled: ruleDraft.autoSendEnabled,
+            name: ruleDraft.name.trim(),
+            trigger: ruleDraft.trigger.trim(),
+            action: ruleDraft.action.trim(),
+          })
+        : createAdminAutomationRule({
+            userId: ruleDraft.userId.trim(),
+            categoryId: ruleDraft.categoryId.trim(),
+            templateId: ruleDraft.templateId.trim(),
+            autoSendEnabled: ruleDraft.autoSendEnabled,
+            autoCalendarEnabled: ruleDraft.autoCalendarEnabled,
+            name: ruleDraft.name.trim(),
+            trigger: ruleDraft.trigger.trim(),
+            action: ruleDraft.action.trim(),
+          });
+
+      void request
+        .then(async () => {
+          const rules = await getAdminAutomationRules(100);
+          setRuleItems(
+            rules.map((rule) => ({
+              id: rule.ruleId,
+              userId: rule.userId,
+              name: rule.name,
+              category: rule.category,
+              categoryId: "",
+              templateId: "",
+              trigger: rule.trigger,
+              action: rule.action,
+              status: rule.status,
+              autoSendEnabled: false,
+              autoCalendarEnabled: false,
+              updatedAt: rule.updatedAt,
+            })),
+          );
+          setRuleDialogOpen(false);
+        })
+        .catch((error) => {
+          setRuleErrorNotice(getErrorMessage(error, "자동화 규칙 저장 요청을 처리하지 못했습니다."));
+        })
+        .finally(() => {
+          setSavingRule(false);
+        });
+
       return;
     }
 
@@ -151,11 +361,16 @@ export function TemplateAutomationPage() {
           rule.id === editingRuleId
             ? {
                 ...rule,
+                userId: ruleDraft.userId.trim(),
+                categoryId: ruleDraft.categoryId.trim(),
+                templateId: ruleDraft.templateId.trim(),
                 name: ruleDraft.name.trim(),
                 category: ruleDraft.category,
                 trigger: ruleDraft.trigger.trim(),
                 action: ruleDraft.action.trim(),
                 status: ruleDraft.status,
+                autoSendEnabled: ruleDraft.autoSendEnabled,
+                autoCalendarEnabled: ruleDraft.autoCalendarEnabled,
                 updatedAt: "방금 전",
               }
             : rule,
@@ -165,11 +380,16 @@ export function TemplateAutomationPage() {
       setRuleItems((current) => [
         {
           id: `rule-${Date.now()}`,
+          userId: ruleDraft.userId.trim(),
+          categoryId: ruleDraft.categoryId.trim(),
+          templateId: ruleDraft.templateId.trim(),
           name: ruleDraft.name.trim(),
           category: ruleDraft.category,
           trigger: ruleDraft.trigger.trim(),
           action: ruleDraft.action.trim(),
           status: ruleDraft.status,
+          autoSendEnabled: ruleDraft.autoSendEnabled,
+          autoCalendarEnabled: ruleDraft.autoCalendarEnabled,
           updatedAt: "방금 전",
         },
         ...current,
@@ -182,6 +402,25 @@ export function TemplateAutomationPage() {
 
   const handleDeleteRule = () => {
     if (!deleteTarget) {
+      return;
+    }
+
+    if (!useDemoDataMode) {
+      setDeletingRule(true);
+      setRuleErrorNotice("");
+
+      void deleteAdminAutomationRule(deleteTarget.id)
+        .then(() => {
+          setRuleItems((current) => current.filter((rule) => rule.id !== deleteTarget.id));
+          setDeleteTarget(null);
+        })
+        .catch((error) => {
+          setRuleErrorNotice(getErrorMessage(error, "자동화 규칙 삭제 요청을 처리하지 못했습니다."));
+        })
+        .finally(() => {
+          setDeletingRule(false);
+        });
+
       return;
     }
 
@@ -204,6 +443,24 @@ export function TemplateAutomationPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <AdminStatePage
+        title="템플릿 / 자동화 관리 화면을 불러오지 못했습니다"
+        description={loadError}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <AdminStatePage
+        title="템플릿 / 자동화 관리 화면을 불러오는 중입니다"
+        description="생성 템플릿, 카테고리 통계, 자동화 규칙을 가져오고 있습니다."
+      />
+    );
+  }
+
   return (
     <section className="admin-page">
       <PageHeader
@@ -220,7 +477,7 @@ export function TemplateAutomationPage() {
       />
 
       <div className="admin-card-grid admin-card-grid--four">
-        {templateSummary.map((card) => (
+        {summaryItems.map((card) => (
           <MetricCard
             key={card.label}
             label={card.label}
@@ -500,8 +757,8 @@ export function TemplateAutomationPage() {
             >
               취소
             </button>
-            <button type="button" className="admin-button" onClick={handleSaveRule}>
-              저장
+            <button type="button" className="admin-button" onClick={handleSaveRule} disabled={savingRule}>
+              {savingRule ? "저장 중..." : "저장"}
             </button>
           </>
         }
@@ -518,6 +775,16 @@ export function TemplateAutomationPage() {
 
           <div className="admin-form-grid admin-form-grid--single">
             <label className="admin-field">
+              <span>사용자 ID</span>
+              <input
+                value={ruleDraft.userId}
+                onChange={(event) => setRuleDraft((current) => ({ ...current, userId: event.target.value }))}
+                className="admin-input app-form-input"
+                placeholder="예: 44"
+                disabled={Boolean(editingRuleId)}
+              />
+            </label>
+            <label className="admin-field">
               <span>규칙명</span>
               <input
                 value={ruleDraft.name}
@@ -530,7 +797,14 @@ export function TemplateAutomationPage() {
               <span>카테고리</span>
               <Select
                 value={ruleDraft.category}
-                onValueChange={(value) => setRuleDraft((current) => ({ ...current, category: value }))}
+                onValueChange={(value) => {
+                  const matchedCategory = categoryStats.find((item) => item.category === value);
+                  setRuleDraft((current) => ({
+                    ...current,
+                    category: value,
+                    categoryId: matchedCategory?.id ?? current.categoryId,
+                  }));
+                }}
               >
                 <SelectTrigger className="app-form-input h-11 w-full rounded-xl px-4 text-sm">
                   <SelectValue />
@@ -549,6 +823,15 @@ export function TemplateAutomationPage() {
                     ))}
                 </SelectContent>
               </Select>
+            </label>
+            <label className="admin-field">
+              <span>템플릿 ID 선택사항</span>
+              <input
+                value={ruleDraft.templateId}
+                onChange={(event) => setRuleDraft((current) => ({ ...current, templateId: event.target.value }))}
+                className="admin-input app-form-input"
+                placeholder="특정 템플릿에 연결할 때만 입력"
+              />
             </label>
             <label className="admin-field">
               <span>조건</span>
@@ -589,6 +872,37 @@ export function TemplateAutomationPage() {
                 </SelectContent>
               </Select>
             </label>
+            <label className="admin-field">
+              <span>자동화 옵션</span>
+              <div className="admin-button-row admin-button-row--spaced">
+                <label className="admin-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={ruleDraft.autoSendEnabled}
+                    onChange={(event) =>
+                      setRuleDraft((current) => ({
+                        ...current,
+                        autoSendEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                  자동 발송 허용
+                </label>
+                <label className="admin-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={ruleDraft.autoCalendarEnabled}
+                    onChange={(event) =>
+                      setRuleDraft((current) => ({
+                        ...current,
+                        autoCalendarEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                  캘린더 자동화 허용
+                </label>
+              </div>
+            </label>
           </div>
         </div>
       </AdminModal>
@@ -607,8 +921,8 @@ export function TemplateAutomationPage() {
             >
               취소
             </button>
-            <button type="button" className="admin-button" onClick={handleDeleteRule}>
-              삭제
+            <button type="button" className="admin-button" onClick={handleDeleteRule} disabled={deletingRule}>
+              {deletingRule ? "삭제 중..." : "삭제"}
             </button>
           </>
         }

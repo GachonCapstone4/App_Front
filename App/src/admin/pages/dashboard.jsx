@@ -333,17 +333,17 @@ export function DashboardPage() {
 
           <div className="admin-stack">
             {recentTickets.map((ticket) => (
-              <article key={ticket.ticket_id} className="admin-list-card">
+              <article key={ticket.ticketId} className="admin-list-card">
                 <div className="admin-list-card-row">
                   <div>
                     <h3>{ticket.title}</h3>
-                    <p>사용자 ID {ticket.user_id}</p>
+                    <p>사용자 ID {ticket.userId}</p>
                   </div>
                   <StatusBadge>{ticket.status}</StatusBadge>
                 </div>
                 <div className="admin-inline-stat-row">
-                  <span>문의 #{ticket.ticket_id}</span>
-                  <strong>{ticket.created_at}</strong>
+                  <span>문의 #{ticket.ticketId}</span>
+                  <strong>{ticket.createdAt}</strong>
                 </div>
               </article>
             ))}

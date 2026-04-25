@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router";
+import {
+  deleteAdminOperationJob,
+  getAdminOperationJobs,
+  getAdminOperationJobSummary,
+} from "../../shared/api/admin";
+import { getErrorMessage } from "../../shared/api/http";
 import { processingJobs } from "../shared/mock/adminData";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminModal } from "../shared/ui/AdminModal";
@@ -9,6 +15,23 @@ import { AdminStatePage } from "../shared/ui/AdminStatePage";
 import { StatusBadge } from "../shared/ui/StatusBadge";
 
 const deletableStatuses = new Set(["실패", "대기"]);
+const deletableApiStatuses = new Set(["FAILED", "READY", "실패", "대기"]);
+
+function mapJobStatus(status) {
+  if (status === "FAILED") {
+    return "실패";
+  }
+
+  if (status === "READY") {
+    return "대기";
+  }
+
+  if (status === "SUCCESS") {
+    return "성공";
+  }
+
+  return status;
+}
 
 export function MonitoringPage() {
   const [searchParams] = useSearchParams();
@@ -17,6 +40,7 @@ export function MonitoringPage() {
   const emptyScenario = scenarioId === "admin-monitoring-empty";
   const deleteDialogScenario = scenarioId === "admin-monitoring-delete-dialog-normal";
   const deleteErrorScenario = scenarioId === "admin-monitoring-delete-error";
+  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
 
   const availableJobs = useMemo(
     () => processingJobs.filter((job) => deletableStatuses.has(job.status)),
@@ -36,12 +60,74 @@ export function MonitoringPage() {
       ? "작업 강제 삭제 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
       : "",
   );
+  const [loading, setLoading] = useState(!useDemoDataMode);
+  const [loadError, setLoadError] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [deletingJob, setDeletingJob] = useState(false);
 
   useEffect(() => {
+    if (!useDemoDataMode) {
+      return;
+    }
+
     const nextJobs = emptyScenario ? [] : availableJobs;
     setJobs(nextJobs);
     setDeleteTarget((deleteDialogScenario || deleteErrorScenario) ? nextJobs[0] ?? null : null);
-  }, [availableJobs, deleteDialogScenario, deleteErrorScenario, emptyScenario]);
+  }, [availableJobs, deleteDialogScenario, deleteErrorScenario, emptyScenario, useDemoDataMode]);
+
+  useEffect(() => {
+    if (useDemoDataMode) {
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    setLoadError("");
+
+    void Promise.all([getAdminOperationJobs(100), getAdminOperationJobSummary()])
+      .then(([nextJobs, nextSummary]) => {
+        if (!mounted) {
+          return;
+        }
+
+        const mappedJobs = nextJobs
+          .filter((job) => deletableApiStatuses.has(job.status))
+          .map((job) => ({
+            id: job.outboxId,
+            userName: `이메일 #${job.emailId}`,
+            userEmail: "상세 조회 미연동",
+            emailDomain: "",
+            jobType: "메일 처리",
+            category: `outbox #${job.outboxId}`,
+            status: mapJobStatus(job.status),
+            createdAt: job.createdAt,
+            updatedAt: job.createdAt,
+            failureReason: job.status === "FAILED" ? "실패 상세 조회는 백엔드 오류 상세 API에서 확인 필요" : "",
+          }));
+
+        setJobs(mappedJobs);
+        setSummary(nextSummary);
+        setDeleteTarget(null);
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoadError(getErrorMessage(error, "삭제 대상 작업 목록을 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [useDemoDataMode]);
 
   const handleDeleteJob = () => {
     if (!deleteTarget) {
@@ -50,6 +136,25 @@ export function MonitoringPage() {
 
     if (deleteErrorScenario) {
       setDeleteErrorNotice("작업 강제 삭제 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!useDemoDataMode) {
+      setDeletingJob(true);
+      setDeleteErrorNotice("");
+
+      void deleteAdminOperationJob(deleteTarget.id)
+        .then(() => {
+          setJobs((current) => current.filter((job) => job.id !== deleteTarget.id));
+          setDeleteTarget(null);
+        })
+        .catch((error) => {
+          setDeleteErrorNotice(getErrorMessage(error, "작업 강제 삭제 요청을 처리하지 못했습니다."));
+        })
+        .finally(() => {
+          setDeletingJob(false);
+        });
+
       return;
     }
 
@@ -63,6 +168,24 @@ export function MonitoringPage() {
       <AdminStatePage
         title="삭제 대상 작업을 불러오지 못했습니다"
         description="실패 또는 대기 상태의 작업 목록을 가져오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+      />
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AdminStatePage
+        title="삭제 대상 작업을 불러오지 못했습니다"
+        description={loadError}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <AdminStatePage
+        title="삭제 대상 작업을 불러오는 중입니다"
+        description="실패 또는 대기 상태의 메일 처리 작업을 백엔드에서 가져오고 있습니다."
       />
     );
   }
@@ -82,7 +205,10 @@ export function MonitoringPage() {
               실패 또는 대기 상태의 작업만 표시됩니다.
             </p>
           </div>
-          <span className="admin-panel-note">{jobs.length}건</span>
+          <span className="admin-panel-note">
+            {jobs.length}건
+            {summary ? ` · 대기 ${summary.ready_count} / 실패 ${summary.failed_count}` : ""}
+          </span>
         </div>
 
         {deleteErrorNotice ? (
@@ -160,8 +286,8 @@ export function MonitoringPage() {
             >
               취소
             </button>
-            <button type="button" className="admin-button" onClick={handleDeleteJob}>
-              삭제
+            <button type="button" className="admin-button" onClick={handleDeleteJob} disabled={deletingJob}>
+              {deletingJob ? "삭제 중..." : "삭제"}
             </button>
           </>
         }

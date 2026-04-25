@@ -1,4 +1,4 @@
-import { api } from "./http";
+import { ApiError, api } from "./http";
 
 type AdminDashboardSummaryApiResponse = {
   total_users: number;
@@ -59,6 +59,114 @@ type AdminSupportTicketReplyApiResponse = {
   status: string;
 };
 
+type AdminUserListApiResponse = {
+  total_count: number;
+  users: Array<{
+    user_id: number;
+    email: string;
+    name: string;
+    industry_type: string | null;
+    is_active: boolean;
+    created_at: string;
+  }>;
+};
+
+type AdminUserDetailApiResponse = {
+  user_id: number;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  last_login_at: string | null;
+  industry_type: string | null;
+  email_tone: string | null;
+  company_desc: string | null;
+  total_processed_emails: number;
+  total_generated_drafts: number;
+  recent_ticket_count: number;
+};
+
+type AdminUserIntegrationApiResponse = {
+  is_gmail_connected: boolean | null;
+  is_calendar_connected: boolean;
+  integrated_email: string | null;
+  integrated_at: string | null;
+  last_sync_at: string | null;
+};
+
+type AdminTemplateListApiResponse = {
+  total_count: number;
+  templates: Array<{
+    template_id: number;
+    user_template_no?: number | null;
+    user_id: number;
+    title: string;
+    created_at: string;
+    category: string | null;
+    industry: string | null;
+    use_count: number | null;
+    user_count: number | null;
+    generated_at: string | null;
+    quality: string | null;
+  }>;
+};
+
+type AdminTemplateSummaryApiResponse = {
+  total_templates: number;
+  top_category: string | null;
+  top_category_usage_count: number;
+  active_rule_count: number;
+  auto_send_rule_count: number;
+};
+
+type AdminTemplateCategoryStatApiResponse = {
+  statistics: Array<{
+    category_id: number;
+    category_name: string;
+    template_count: number;
+    usage_count: number;
+  }>;
+};
+
+type AdminAutomationRuleListApiResponse = {
+  total_count: number;
+  rules: Array<{
+    rule_id: number;
+    user_id: number;
+    is_active: boolean;
+    name: string | null;
+    category: string | null;
+    trigger: string | null;
+    action: string | null;
+    status: string;
+    updated_at: string | null;
+  }>;
+};
+
+type AdminAutomationRuleCreateApiResponse = {
+  rule_id: number;
+};
+
+type AdminAutomationRuleUpdateApiResponse = {
+  rule_id: number;
+};
+
+type AdminJobListApiResponse = {
+  total_count: number;
+  jobs: Array<{
+    outbox_id: number;
+    email_id: number;
+    status: string;
+    created_at: string;
+  }>;
+};
+
+type AdminJobSummaryApiResponse = {
+  ready_count: number;
+  success_count: number;
+  failed_count: number;
+};
+
 export type AdminSupportTicketSummary = {
   ticketId: string;
   userId: string;
@@ -76,6 +184,70 @@ export type AdminSupportTicketDetail = {
   adminReply: string | null;
   repliedBy: string | null;
   repliedAt: string | null;
+  createdAt: string;
+};
+
+export type AdminUserSummary = {
+  userId: string;
+  email: string;
+  name: string;
+  industryType: string | null;
+  active: boolean;
+  createdAt: string;
+};
+
+export type AdminUserDetail = AdminUserSummary & {
+  role: string;
+  lastLoginAt: string | null;
+  emailTone: string | null;
+  companyDesc: string | null;
+  totalProcessedEmails: number;
+  totalGeneratedDrafts: number;
+  recentTicketCount: number;
+  gmailConnected: boolean;
+  calendarConnected: boolean;
+  integratedEmail: string | null;
+  integratedAt: string | null;
+  lastSyncAt: string | null;
+};
+
+export type AdminTemplateItem = {
+  templateId: string;
+  userTemplateNo: number | null;
+  userId: string;
+  title: string;
+  createdAt: string;
+  category: string;
+  industry: string;
+  useCount: number;
+  userCount: number;
+  generatedAt: string;
+  quality: string;
+};
+
+export type AdminTemplateCategoryStat = {
+  categoryId: string;
+  categoryName: string;
+  templateCount: number;
+  usageCount: number;
+};
+
+export type AdminAutomationRule = {
+  ruleId: string;
+  userId: string;
+  active: boolean;
+  name: string;
+  category: string;
+  trigger: string;
+  action: string;
+  status: string;
+  updatedAt: string;
+};
+
+export type AdminJobItem = {
+  outboxId: string;
+  emailId: string;
+  status: string;
   createdAt: string;
 };
 
@@ -159,4 +331,225 @@ export async function replyAdminSupportTicket(ticketId: string, adminReply: stri
     ticketId: String(response.data.ticket_id),
     status: response.data.status as "PENDING" | "ANSWERED",
   };
+}
+
+export async function getAdminUsers(size = 100, searchKeyword = "") {
+  const response = await api.get<AdminUserListApiResponse>("/api/admin/users", {
+    params: {
+      page: 1,
+      size,
+      ...(searchKeyword.trim()
+        ? {
+            search_type: "keyword",
+            search_keyword: searchKeyword.trim(),
+          }
+        : {}),
+    },
+  });
+
+  return response.data.users.map((user) => ({
+    userId: String(user.user_id),
+    email: user.email,
+    name: user.name,
+    industryType: user.industry_type,
+    active: user.is_active,
+    createdAt: user.created_at,
+  })) satisfies AdminUserSummary[];
+}
+
+export async function getAdminUserDetail(userId: string) {
+  const detailResponse = await api.get<AdminUserDetailApiResponse>(`/api/admin/users/${userId}`);
+  const integration = await api
+    .get<AdminUserIntegrationApiResponse>(`/api/admin/users/${userId}/integration`)
+    .then((response) => response.data)
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+
+      throw error;
+    });
+
+  return {
+    userId: String(detailResponse.data.user_id),
+    email: detailResponse.data.email,
+    name: detailResponse.data.name,
+    industryType: detailResponse.data.industry_type,
+    active: detailResponse.data.is_active,
+    createdAt: "",
+    role: detailResponse.data.role,
+    lastLoginAt: detailResponse.data.last_login_at,
+    emailTone: detailResponse.data.email_tone,
+    companyDesc: detailResponse.data.company_desc,
+    totalProcessedEmails: detailResponse.data.total_processed_emails,
+    totalGeneratedDrafts: detailResponse.data.total_generated_drafts,
+    recentTicketCount: detailResponse.data.recent_ticket_count,
+    gmailConnected: Boolean(integration?.is_gmail_connected),
+    calendarConnected: Boolean(integration?.is_calendar_connected),
+    integratedEmail: integration?.integrated_email ?? null,
+    integratedAt: integration?.integrated_at ?? null,
+    lastSyncAt: integration?.last_sync_at ?? null,
+  } satisfies AdminUserDetail;
+}
+
+export async function updateAdminUserStatus(userId: string, isActive: boolean) {
+  const response = await api.patch(`/api/admin/users/${userId}/status`, {
+    is_active: isActive,
+  });
+
+  return response.data;
+}
+
+export async function deleteAdminUserIntegration(userId: string) {
+  const response = await api.delete(`/api/admin/users/${userId}/integration`);
+  return response.data;
+}
+
+export async function getAdminTemplates(size = 100) {
+  const response = await api.get<AdminTemplateListApiResponse>("/api/admin/templates", {
+    params: {
+      page: 1,
+      size,
+    },
+  });
+
+  return response.data.templates.map((template) => ({
+    templateId: String(template.template_id),
+    userTemplateNo: template.user_template_no ?? null,
+    userId: String(template.user_id),
+    title: template.title,
+    createdAt: template.created_at,
+    category: template.category ?? "미분류",
+    industry: template.industry ?? "미지정",
+    useCount: template.use_count ?? 0,
+    userCount: template.user_count ?? 0,
+    generatedAt: template.generated_at ?? template.created_at,
+    quality: template.quality ?? "미평가",
+  })) satisfies AdminTemplateItem[];
+}
+
+export async function getAdminTemplateSummary() {
+  const response = await api.get<AdminTemplateSummaryApiResponse>("/api/admin/templates/summary");
+  return response.data;
+}
+
+export async function getAdminTemplateCategoryStats() {
+  const response = await api.get<AdminTemplateCategoryStatApiResponse>(
+    "/api/admin/templates/statistics/by-category",
+  );
+
+  return response.data.statistics.map((stat) => ({
+    categoryId: String(stat.category_id),
+    categoryName: stat.category_name,
+    templateCount: stat.template_count,
+    usageCount: stat.usage_count,
+  })) satisfies AdminTemplateCategoryStat[];
+}
+
+export async function getAdminAutomationRules(size = 100) {
+  const response = await api.get<AdminAutomationRuleListApiResponse>(
+    "/api/admin/automations/rules",
+    {
+      params: {
+        page: 1,
+        size,
+      },
+    },
+  );
+
+  return response.data.rules.map((rule) => ({
+    ruleId: String(rule.rule_id),
+    userId: String(rule.user_id),
+    active: rule.is_active,
+    name: rule.name ?? `자동화 규칙 #${rule.rule_id}`,
+    category: rule.category ?? "미분류",
+    trigger: rule.trigger ?? "",
+    action: rule.action ?? "",
+    status: rule.status,
+    updatedAt: rule.updated_at ?? "",
+  })) satisfies AdminAutomationRule[];
+}
+
+export async function createAdminAutomationRule(payload: {
+  userId: string;
+  categoryId: string;
+  templateId?: string;
+  autoSendEnabled: boolean;
+  autoCalendarEnabled: boolean;
+  name: string;
+  trigger: string;
+  action: string;
+}) {
+  const response = await api.post<AdminAutomationRuleCreateApiResponse>(
+    "/api/admin/automations/rules",
+    {
+      user_id: Number(payload.userId),
+      category_id: Number(payload.categoryId),
+      template_id: payload.templateId ? Number(payload.templateId) : null,
+      auto_send_enabled: payload.autoSendEnabled,
+      auto_calendar_enabled: payload.autoCalendarEnabled,
+      name: payload.name,
+      trigger_condition: payload.trigger,
+      action_description: payload.action,
+    },
+  );
+
+  return response.data;
+}
+
+export async function updateAdminAutomationRule(
+  ruleId: string,
+  payload: {
+    templateId?: string;
+    active: boolean;
+    autoSendEnabled: boolean;
+    name: string;
+    trigger: string;
+    action: string;
+  },
+) {
+  const response = await api.patch<AdminAutomationRuleUpdateApiResponse>(
+    `/api/admin/automations/rules/${ruleId}`,
+    {
+      template_id: payload.templateId ? Number(payload.templateId) : null,
+      is_active: payload.active,
+      auto_send_enabled: payload.autoSendEnabled,
+      name: payload.name,
+      trigger_condition: payload.trigger,
+      action_description: payload.action,
+    },
+  );
+
+  return response.data;
+}
+
+export async function deleteAdminAutomationRule(ruleId: string) {
+  const response = await api.delete(`/api/admin/automations/rules/${ruleId}`);
+  return response.data;
+}
+
+export async function getAdminOperationJobs(size = 100) {
+  const response = await api.get<AdminJobListApiResponse>("/api/admin/operations/jobs", {
+    params: {
+      page: 1,
+      size,
+    },
+  });
+
+  return response.data.jobs.map((job) => ({
+    outboxId: String(job.outbox_id),
+    emailId: String(job.email_id),
+    status: job.status,
+    createdAt: job.created_at,
+  })) satisfies AdminJobItem[];
+}
+
+export async function getAdminOperationJobSummary() {
+  const response = await api.get<AdminJobSummaryApiResponse>("/api/admin/operations/jobs/summary");
+  return response.data;
+}
+
+export async function deleteAdminOperationJob(jobId: string) {
+  const response = await api.delete(`/api/admin/operations/jobs/${jobId}`);
+  return response.data;
 }
