@@ -54,6 +54,7 @@ import {
 import {
   completeOnboarding as completeOnboardingRequest,
   generateInitialBusinessTemplates,
+  getTemplateGenerationJobs,
 } from "../../shared/api/onboarding";
 import {
   navigateGoogleOAuthPopup,
@@ -189,6 +190,8 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const generationTimeoutsRef = useRef<number[]>([]);
   const integrationPollingRef = useRef<number | null>(null);
   const generationEventSourceRef = useRef<EventSource | null>(null);
+  const generationStatusPollingRef = useRef<number | null>(null);
+  const generationStatusPollingFailureCountRef = useRef(0);
   const onboardingDraftJobIdsRef = useRef<string[]>([]);
   const onboardingDraftJobStatusRef = useRef<Record<string, string>>({});
   const onboardingKnowledgeJobIdRef = useRef<string | null>(null);
@@ -253,9 +256,19 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     generationTimeoutsRef.current = [];
   };
 
+  const clearGenerationStatusPolling = () => {
+    if (generationStatusPollingRef.current !== null) {
+      window.clearInterval(generationStatusPollingRef.current);
+      generationStatusPollingRef.current = null;
+    }
+
+    generationStatusPollingFailureCountRef.current = 0;
+  };
+
   const clearGenerationEventSource = () => {
     generationEventSourceRef.current?.close();
     generationEventSourceRef.current = null;
+    clearGenerationStatusPolling();
     onboardingDraftJobIdsRef.current = [];
     onboardingDraftJobStatusRef.current = {};
     onboardingKnowledgeJobIdRef.current = null;
@@ -993,6 +1006,74 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     setCurrentMainStep(4);
   };
 
+  const handleGenerationFailure = (message: string) => {
+    clearGenerationEventSource();
+    setIsGenerating(false);
+    setCurrentMainStep(3);
+    setTemplateGenerationStatus(null);
+    setTemplateGenerationMessage(message);
+    toast.error(message);
+  };
+
+  const pollTemplateGenerationJobs = async (draftJobIds: string[]) => {
+    if (finalizeOnboardingRef.current || draftJobIds.length === 0) {
+      return;
+    }
+
+    try {
+      const response = await getTemplateGenerationJobs(draftJobIds);
+      generationStatusPollingFailureCountRef.current = 0;
+
+      if (response.hasFailure) {
+        const failedJob = response.jobs.find((job) => job.status === "FAILED");
+        handleGenerationFailure(
+          failedJob?.errorMessage || "템플릿 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        return;
+      }
+
+      response.jobs.forEach((job) => {
+        onboardingDraftJobStatusRef.current[job.jobId] = job.status || "PROCESSING";
+      });
+
+      setTemplateGenerationMessage(null);
+      setGenerationStep(response.allCompleted ? 4 : 2);
+      setGeneratedTemplateCount(Math.max(draftJobIds.length, response.jobs.length));
+      setTemplateProgress(response.completedCount);
+      setTemplateGenerationStatus(
+        response.allCompleted
+          ? "맞춤 템플릿 구성이 완료되었습니다."
+          : response.completedCount > 0
+            ? `카테고리에 맞는 템플릿을 만드는 중입니다. (${response.completedCount}/${draftJobIds.length})`
+            : "카테고리에 맞는 템플릿을 만들고 있습니다.",
+      );
+
+      if (response.allCompleted) {
+        await completeOnboardingAfterGeneration();
+      }
+    } catch (error) {
+      generationStatusPollingFailureCountRef.current += 1;
+
+      if (generationStatusPollingFailureCountRef.current >= 3) {
+        setTemplateGenerationMessage(
+          getErrorMessage(
+            error,
+            "템플릿 생성 상태를 확인하지 못했습니다. 백엔드 로그에서 template-jobs 오류를 확인해 주세요.",
+          ),
+        );
+      }
+    }
+  };
+
+  const startTemplateGenerationPolling = (draftJobIds: string[]) => {
+    clearGenerationStatusPolling();
+    void pollTemplateGenerationJobs(draftJobIds);
+
+    generationStatusPollingRef.current = window.setInterval(() => {
+      void pollTemplateGenerationJobs(draftJobIds);
+    }, 5000);
+  };
+
   const startTemplateGenerationSse = (
     draftJobIds: string[],
     knowledgeJobId: string | null,
@@ -1000,7 +1081,10 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     const streamUrl = buildAppEventStreamUrl();
 
     if (!streamUrl) {
-      throw new Error("인증 토큰이 없어 템플릿 생성 상태를 구독할 수 없습니다.");
+      setTemplateGenerationMessage(
+        "실시간 연결을 시작하지 못해 주기적으로 생성 상태를 확인합니다.",
+      );
+      return;
     }
 
     clearGenerationEventSource();
@@ -1237,6 +1321,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
           : "카테고리에 맞는 템플릿 생성을 시작합니다.",
       );
       startTemplateGenerationSse(response.jobIds, response.knowledgeJobId);
+      startTemplateGenerationPolling(response.jobIds);
     } catch (error) {
       const message =
         error instanceof Error && error.message === "Network Error"
