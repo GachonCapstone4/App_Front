@@ -884,15 +884,21 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     }
   };
 
-  const handleCancelGeneration = () => {
+  const handleCancelGeneration = async () => {
     clearGenerationTimeouts();
     clearGenerationEventSource();
     setIsGenerating(false);
     setGenerationStep(0);
     setTemplateProgress(0);
     setTemplateGenerationStatus(null);
-    markOnboardingComplete();
-    toast.message("설정은 저장되지 않았지만 나중에 다시 진행할 수 있습니다.");
+
+    const completed = await finalizeOnboarding();
+    if (!completed) {
+      setCurrentMainStep(3);
+      return;
+    }
+
+    toast.message("템플릿 생성은 백그라운드에서 계속 진행됩니다. 나중에 템플릿 라이브러리에서 확인해 주세요.");
     navigate("/app");
   };
 
@@ -2267,10 +2273,13 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={handleCancelGeneration}
+                    onClick={() => {
+                      void handleCancelGeneration();
+                    }}
+                    disabled={completingOnboarding}
                     className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
                   >
-                    취소하고 나중에 설정하기
+                    {completingOnboarding ? "완료 상태 저장 중..." : "취소하고 나중에 설정하기"}
                   </button>
                 </div>
               </div>
