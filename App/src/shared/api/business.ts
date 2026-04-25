@@ -17,6 +17,11 @@ type BusinessResourceListApiResponse = {
   resources: BusinessResourceApiResponse[];
 };
 
+type PresignedUrlApiResponse = {
+  presigned_url: string;
+  s3_key: string;
+};
+
 type FaqApiResponse = {
   faq_id: number;
   question: string;
@@ -121,13 +126,27 @@ export async function getBusinessResources() {
 }
 
 export async function uploadBusinessFile(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
+  const contentType = file.type || "application/octet-stream";
+  const presignedResponse = await api.post<PresignedUrlApiResponse>("/api/business/resources/presigned-url", {
+    file_name: file.name,
+    content_type: contentType,
+  });
 
-  const response = await api.post<BusinessResourceApiResponse>("/api/business/resources/files", formData, {
+  const uploadResponse = await fetch(presignedResponse.data.presigned_url, {
+    method: "PUT",
     headers: {
-      "Content-Type": "multipart/form-data",
+      "Content-Type": contentType,
     },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`S3 업로드에 실패했습니다. status=${uploadResponse.status}`);
+  }
+
+  const response = await api.post<BusinessResourceApiResponse>("/api/business/resources/files", {
+    s3_key: presignedResponse.data.s3_key,
+    file_name: file.name,
   });
 
   return {
