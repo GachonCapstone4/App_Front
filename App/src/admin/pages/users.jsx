@@ -462,7 +462,7 @@ export function UsersPage() {
             </div>
           </div>
 
-          <div className="admin-stack admin-master-list-scroll">
+          <div className="admin-stack admin-master-list-scroll admin-user-list-scroll">
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
                 const isSelected = user.id === selectedUser?.id;

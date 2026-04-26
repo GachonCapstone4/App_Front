@@ -762,6 +762,10 @@
   padding-right: 4px;
 }
 
+.admin-user-list-scroll {
+  min-height: 390px;
+}
+
 .admin-master-item {
   width: 100%;
   border: 1px solid var(--line);

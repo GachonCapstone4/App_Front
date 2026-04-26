@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router";
+import { recommendedCategoryOptions } from "../../shared/config/onboarding-options";
 import {
   Select,
   SelectContent,
@@ -58,8 +59,28 @@ const presetRuleDraft = {
   autoCalendarEnabled: true,
 };
 
-function mergeCategoryStatsByName(stats) {
+const categoryColorMap = new Map(
+  recommendedCategoryOptions.map((category) => [category.name, category.color]),
+);
+
+const recommendedCategoryStats = recommendedCategoryOptions.map((category) => ({
+  id: category.id,
+  category: category.name,
+  industryLabel:
+    userIndustryOptions.find((option) => option.value === category.domain)?.label ?? category.domain,
+  color: category.color,
+  templateCount: 0,
+  usageCount: 0,
+}));
+
+function mergeCategoryStatsByName(stats, includeRecommendedBase = false) {
   const statMap = new Map();
+
+  if (includeRecommendedBase) {
+    recommendedCategoryStats.forEach((stat) => {
+      statMap.set(stat.category, stat);
+    });
+  }
 
   stats.forEach((stat) => {
     const key = stat.category || "미분류";
@@ -70,12 +91,14 @@ function mergeCategoryStatsByName(stats) {
         ...stat,
         id: key,
         category: key,
+        color: stat.color || categoryColorMap.get(key) || "#64748B",
       });
       return;
     }
 
     statMap.set(key, {
       ...previous,
+      color: previous.color || stat.color || categoryColorMap.get(key) || "#64748B",
       templateCount: previous.templateCount + stat.templateCount,
       usageCount: previous.usageCount + stat.usageCount,
     });
@@ -109,7 +132,7 @@ export function TemplateAutomationPage() {
     useDemoDataMode && !templatesEmptyScenario ? generatedTemplates : [],
   );
   const [categoryStats, setCategoryStats] = useState(
-    useDemoDataMode ? mergeCategoryStatsByName(templateCategoryStats) : [],
+    useDemoDataMode ? mergeCategoryStatsByName(templateCategoryStats, true) : [],
   );
   const [ruleItems, setRuleItems] = useState(
     useDemoDataMode && !rulesEmptyScenario ? initialAutomationRules : [],
@@ -138,7 +161,7 @@ export function TemplateAutomationPage() {
     if (useDemoDataMode) {
       setSummaryItems(templateSummary);
       setTemplateItems(templatesEmptyScenario ? [] : generatedTemplates);
-      setCategoryStats(mergeCategoryStatsByName(templateCategoryStats));
+      setCategoryStats(mergeCategoryStatsByName(templateCategoryStats, true));
       setRuleItems(rulesEmptyScenario ? [] : initialAutomationRules);
       return;
     }
@@ -199,11 +222,16 @@ export function TemplateAutomationPage() {
             stats.map((stat, index) => ({
               id: stat.categoryId,
               category: stat.categoryName,
-              industryLabel: "전체 업종",
-              color: ["#3B82F6", "#14B8A6", "#F59E0B", "#EF4444", "#6366F1"][index % 5],
+              industryLabel:
+                recommendedCategoryStats.find((item) => item.category === stat.categoryName)
+                  ?.industryLabel ?? "전체 업종",
+              color:
+                categoryColorMap.get(stat.categoryName) ??
+                ["#3B82F6", "#14B8A6", "#F59E0B", "#EF4444", "#6366F1"][index % 5],
               templateCount: stat.templateCount,
               usageCount: stat.usageCount,
             })),
+            true,
           ),
         );
         setRuleItems(
