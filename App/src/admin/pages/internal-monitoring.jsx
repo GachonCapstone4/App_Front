@@ -197,6 +197,12 @@ export function InternalMonitoringPage() {
 
       <div className="admin-internal-monitoring-layout">
         <section className="admin-panel admin-internal-monitoring-controls">
+          <aside className="admin-request-help">
+            <span>요청 설명</span>
+            <strong>{focusedButton.label}</strong>
+            <p>{focusedButton.description}</p>
+          </aside>
+
           <button
             type="button"
             className="admin-button admin-button--ghost admin-log-clear-button"
@@ -246,12 +252,6 @@ export function InternalMonitoringPage() {
                 .map(renderRequestButton)}
             </div>
           </div>
-
-          <aside className="admin-request-help">
-            <span>요청 설명</span>
-            <strong>{focusedButton.label}</strong>
-            <p>{focusedButton.description}</p>
-          </aside>
         </section>
 
         <section className="admin-panel admin-log-panel">
