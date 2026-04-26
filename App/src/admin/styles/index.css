@@ -534,6 +534,7 @@
 
 .admin-internal-monitoring-job-field {
   padding-top: 4px;
+  margin-bottom: 8px;
 }
 
 .admin-request-card {
@@ -541,9 +542,7 @@
   min-height: 72px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--teal-soft) 70%, transparent 30%), transparent 46%),
-    var(--surface-soft);
+  background: var(--surface-soft);
   color: var(--text);
   padding: 11px;
   display: flex;
@@ -552,13 +551,12 @@
   gap: 9px;
   text-align: center;
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
 }
 
 .admin-request-card:hover:not(:disabled) {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--teal) 45%, var(--line) 55%);
-  box-shadow: 0 14px 32px rgba(26, 43, 61, 0.12);
+  background: var(--surface);
 }
 
 .admin-request-card:disabled {
@@ -578,12 +576,11 @@
 .admin-request-card strong {
   font-size: 14px;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .admin-request-card--accent {
-  background:
-    radial-gradient(circle at top right, rgba(199, 131, 45, 0.18), transparent 48%),
-    var(--surface-soft);
+  background: var(--surface-soft);
 }
 
 .admin-request-card--accent svg {
