@@ -1054,8 +1054,32 @@
 .admin-color-dot {
   width: 14px;
   height: 14px;
+  flex: 0 0 auto;
   border-radius: 999px;
   box-shadow: inset 0 0 0 1px rgba(24, 33, 43, 0.08);
+}
+
+.admin-color-cell,
+.admin-color-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-color-cell span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-color-input {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  padding: 4px;
+  cursor: pointer;
 }
 
 .admin-icon-button {
@@ -1075,6 +1099,15 @@
   border-color: rgba(45, 143, 125, 0.3);
   background: var(--surface-hover);
   color: var(--teal);
+}
+
+.admin-icon-button[disabled],
+.admin-icon-button[disabled]:hover {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .admin-icon-button--danger:hover {

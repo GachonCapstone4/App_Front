@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { recommendedCategoryOptions } from "../../shared/config/onboarding-options";
 import {
@@ -67,6 +67,36 @@ const demoCategoryKeywordItems = templateCategoryStats.map((category) => ({
   userCount: 3,
 }));
 
+function buildCategoryKeywordRows(categoryKeywords, includeRecommendedBase = true) {
+  const categoryMap = new Map();
+
+  if (includeRecommendedBase) {
+    recommendedCategoryOptions.forEach((category) => {
+      categoryMap.set(category.name, {
+        id: category.name,
+        categoryName: category.name,
+        color: category.color,
+        keywords: [],
+        categoryCount: 0,
+        userCount: 0,
+      });
+    });
+  }
+
+  categoryKeywords.forEach((category) => {
+    categoryMap.set(category.categoryName, {
+      id: category.categoryKey ?? category.categoryName,
+      categoryName: category.categoryName,
+      color: category.color || categoryColorMap.get(category.categoryName) || "#64748B",
+      keywords: category.keywords ?? [],
+      categoryCount: category.categoryCount ?? 0,
+      userCount: category.userCount ?? 0,
+    });
+  });
+
+  return Array.from(categoryMap.values());
+}
+
 function parseKeywords(value) {
   return Array.from(
     new Set(
@@ -132,6 +162,8 @@ export function TemplateAutomationPage() {
   const activeTab = searchParams.get("tab") === "rules" ? "rules" : "templates";
 
   const [search, setSearch] = useState("");
+  const [ruleSearch, setRuleSearch] = useState("");
+  const [showEmptyRulesOnly, setShowEmptyRulesOnly] = useState(false);
   const [industry, setIndustry] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [summaryItems, setSummaryItems] = useState(
@@ -144,7 +176,7 @@ export function TemplateAutomationPage() {
     useDemoDataMode ? mergeCategoryStatsByName(templateCategoryStats, true) : [],
   );
   const [ruleItems, setRuleItems] = useState(
-    useDemoDataMode && !rulesEmptyScenario ? demoCategoryKeywordItems : [],
+    useDemoDataMode && !rulesEmptyScenario ? buildCategoryKeywordRows(demoCategoryKeywordItems) : [],
   );
   const [ruleDialogOpen, setRuleDialogOpen] = useState(
     ruleDialogScenario || ruleSaveErrorScenario,
@@ -171,7 +203,7 @@ export function TemplateAutomationPage() {
       setSummaryItems(templateSummary);
       setTemplateItems(templatesEmptyScenario ? [] : generatedTemplates);
       setCategoryStats(mergeCategoryStatsByName(templateCategoryStats, true));
-      setRuleItems(rulesEmptyScenario ? [] : demoCategoryKeywordItems);
+      setRuleItems(rulesEmptyScenario ? [] : buildCategoryKeywordRows(demoCategoryKeywordItems));
       return;
     }
 
@@ -203,13 +235,13 @@ export function TemplateAutomationPage() {
           },
           {
             label: "운영 카테고리",
-            value: `${categoryKeywords.length}개`,
-            hint: "운영 규칙 관리 대상",
+            value: `${recommendedCategoryOptions.length}개`,
+            hint: "전체 카테고리 기준",
           },
           {
-            label: "등록 검색 키워드",
+            label: "등록 검색용 키워드",
             value: `${categoryKeywords.reduce((sum, category) => sum + category.keywords.length, 0)}개`,
-            hint: "카테고리별 검색 키워드 합계",
+            hint: "카테고리별 검색 보조어 합계",
           },
         ]);
         setTemplateItems(
@@ -244,14 +276,7 @@ export function TemplateAutomationPage() {
           ),
         );
         setRuleItems(
-          categoryKeywords.map((category) => ({
-            id: category.categoryKey,
-            categoryName: category.categoryName,
-            color: category.color,
-            keywords: category.keywords,
-            categoryCount: category.categoryCount,
-            userCount: category.userCount,
-          })),
+          buildCategoryKeywordRows(categoryKeywords),
         );
       })
       .catch((error) => {
@@ -309,14 +334,26 @@ export function TemplateAutomationPage() {
     [categoryFilter, categoryStats, industry],
   );
 
-  const openCreateRule = () => {
-    setEditingRuleId(null);
-    setRuleDraft({
-      ...emptyRuleDraft,
+  const filteredRuleItems = useMemo(() => {
+    const keyword = ruleSearch.trim().toLowerCase();
+
+    return ruleItems.filter((rule) => {
+      const matchesKeyword =
+        keyword.length === 0 ||
+        [rule.categoryName, rule.color, ...(rule.keywords ?? [])]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+      const matchesEmptyFilter = !showEmptyRulesOnly || rule.keywords.length === 0;
+
+      return matchesKeyword && matchesEmptyFilter;
     });
-    setRuleErrorNotice("");
-    setRuleDialogOpen(true);
-  };
+  }, [ruleItems, ruleSearch, showEmptyRulesOnly]);
+
+  const emptyKeywordCount = useMemo(
+    () => ruleItems.filter((rule) => rule.keywords.length === 0).length,
+    [ruleItems],
+  );
 
   const openEditRule = (rule) => {
     setEditingRuleId(rule.id);
@@ -360,16 +397,7 @@ export function TemplateAutomationPage() {
       void request
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
-          setRuleItems(
-            categories.map((category) => ({
-              id: category.categoryKey,
-              categoryName: category.categoryName,
-              color: category.color,
-              keywords: category.keywords,
-              categoryCount: category.categoryCount,
-              userCount: category.userCount,
-            })),
-          );
+          setRuleItems(buildCategoryKeywordRows(categories));
           setRuleDialogOpen(false);
         })
         .catch((error) => {
@@ -425,16 +453,7 @@ export function TemplateAutomationPage() {
       void deleteAdminCategoryKeyword(deleteTarget.id)
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
-          setRuleItems(
-            categories.map((category) => ({
-              id: category.categoryKey,
-              categoryName: category.categoryName,
-              color: category.color,
-              keywords: category.keywords,
-              categoryCount: category.categoryCount,
-              userCount: category.userCount,
-            })),
-          );
+          setRuleItems(buildCategoryKeywordRows(categories));
           setDeleteTarget(null);
         })
         .catch((error) => {
@@ -497,15 +516,7 @@ export function TemplateAutomationPage() {
     <section className="admin-page">
       <PageHeader
         title="템플릿 / 운영 규칙 관리"
-        description="생성된 템플릿 사용 현황과 카테고리별 검색 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
-        actions={
-          activeTab === "rules" ? (
-            <button type="button" className="admin-button" onClick={openCreateRule}>
-              <Plus size={14} />
-              운영 규칙 등록
-            </button>
-          ) : null
-        }
+        description="생성된 템플릿 사용 현황과 전체 카테고리의 검색용 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
       />
 
       <div className="admin-card-grid admin-card-grid--four">
@@ -703,10 +714,36 @@ export function TemplateAutomationPage() {
             <div>
               <h2>운영 규칙 목록</h2>
               <p className="admin-panel-subtitle">
-                카테고리별 검색 키워드를 조회하고 수정합니다.
+                전체 카테고리의 검색용 키워드를 조회하고 수정합니다.
               </p>
             </div>
-            <span className="admin-panel-note">{ruleItems.length}개 카테고리</span>
+            <span className="admin-panel-note">
+              {filteredRuleItems.length}개 표시 / 미등록 {emptyKeywordCount}개
+            </span>
+          </div>
+
+          <div className="admin-toolbar">
+            <div className="admin-toolbar-group">
+              <div className="admin-input-wrap app-input-shell">
+                <Search size={14} />
+                <input
+                  value={ruleSearch}
+                  onChange={(event) => setRuleSearch(event.target.value)}
+                  className="admin-input admin-input--compact bg-transparent text-sm placeholder:text-muted-foreground"
+                  placeholder="카테고리명 / 키워드 / 색상 검색"
+                />
+              </div>
+              <button
+                type="button"
+                className={showEmptyRulesOnly ? "admin-chip admin-chip--active" : "admin-chip"}
+                onClick={() => setShowEmptyRulesOnly((current) => !current)}
+              >
+                키워드 미등록만
+              </button>
+            </div>
+            <span className="admin-toolbar-note">
+              검색용 키워드는 메일 내용과 카테고리를 연결할 때 참고하는 보조어입니다.
+            </span>
           </div>
 
           {ruleErrorNotice ? (
@@ -718,32 +755,23 @@ export function TemplateAutomationPage() {
             />
           ) : null}
 
-          {ruleItems.length > 0 ? (
+          {filteredRuleItems.length > 0 ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>
                     <th>카테고리</th>
+                    <th>검색용 키워드</th>
                     <th>색상</th>
-                    <th>검색 키워드</th>
-                    <th>키워드 수</th>
-                    <th>적용 범위</th>
                     <th>작업</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ruleItems.map((rule) => (
+                  {filteredRuleItems.map((rule) => (
                     <tr key={rule.id}>
                       <td>
                         <strong>{rule.categoryName}</strong>
-                        <div className="admin-table-subcopy">카테고리 검색 기준</div>
-                      </td>
-                      <td>
-                        <span
-                          aria-hidden="true"
-                          className="admin-color-dot"
-                          style={{ background: rule.color || "#64748B" }}
-                        />
+                        <div className="admin-table-subcopy">운영 규칙 기준</div>
                       </td>
                       <td>
                         <div className="admin-button-row">
@@ -752,15 +780,19 @@ export function TemplateAutomationPage() {
                               <StatusBadge key={keyword}>{keyword}</StatusBadge>
                             ))
                           ) : (
-                            <span className="admin-table-subcopy">등록된 키워드 없음</span>
+                            <span className="admin-table-subcopy">등록된 검색용 키워드 없음</span>
                           )}
                         </div>
+                        <div className="admin-table-subcopy">{rule.keywords.length}개 등록</div>
                       </td>
-                      <td>{rule.keywords.length}개</td>
                       <td>
-                        <span>{rule.userCount ?? 0}명</span>
-                        <div className="admin-table-subcopy">
-                          카테고리 행 {rule.categoryCount ?? 0}개에 반영
+                        <div className="admin-color-cell">
+                          <span
+                            aria-hidden="true"
+                            className="admin-color-dot"
+                            style={{ background: rule.color || "#64748B" }}
+                          />
+                          <span>{rule.color || "#64748B"}</span>
                         </div>
                       </td>
                       <td>
@@ -770,6 +802,8 @@ export function TemplateAutomationPage() {
                             className="admin-icon-button"
                             onClick={() => openEditRule(rule)}
                             aria-label={`${rule.categoryName} 수정`}
+                            disabled={rule.categoryCount === 0}
+                            title={rule.categoryCount === 0 ? "아직 저장 대상 카테고리가 없습니다" : undefined}
                           >
                             <Pencil size={14} />
                           </button>
@@ -778,6 +812,8 @@ export function TemplateAutomationPage() {
                             className="admin-icon-button admin-icon-button--danger"
                             onClick={() => setDeleteTarget(rule)}
                             aria-label={`${rule.categoryName} 키워드 초기화`}
+                            disabled={rule.categoryCount === 0 || rule.keywords.length === 0}
+                            title={rule.categoryCount === 0 ? "아직 저장 대상 카테고리가 없습니다" : undefined}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -790,8 +826,12 @@ export function TemplateAutomationPage() {
             </div>
           ) : (
             <AdminStateNotice
-              title="등록된 운영 규칙이 없습니다"
-              description="카테고리별 검색 키워드가 아직 등록되지 않았습니다."
+              title={ruleItems.length ? "조건에 맞는 운영 규칙이 없습니다" : "등록된 운영 규칙이 없습니다"}
+              description={
+                ruleItems.length
+                  ? "검색어나 미등록 필터를 조정하면 다른 카테고리 키워드를 확인할 수 있습니다."
+                  : "카테고리별 검색용 키워드가 아직 등록되지 않았습니다."
+              }
               tone="empty"
             />
           )}
@@ -800,8 +840,8 @@ export function TemplateAutomationPage() {
 
       <AdminModal
         open={ruleDialogOpen}
-        title={editingRuleId ? "운영 규칙 수정" : "운영 규칙 등록"}
-        description="같은 카테고리명을 가진 사용자 카테고리 행에 공통 키워드가 반영됩니다."
+        title="검색용 키워드 편집"
+        description="저장한 키워드는 같은 카테고리명에 공통으로 반영됩니다."
         onClose={() => setRuleDialogOpen(false)}
         width={680}
         footer={
@@ -842,15 +882,24 @@ export function TemplateAutomationPage() {
             </label>
             <label className="admin-field">
               <span>색상</span>
-              <input
-                value={ruleDraft.color}
-                onChange={(event) => setRuleDraft((current) => ({ ...current, color: event.target.value }))}
-                className="admin-input app-form-input"
-                placeholder="#14B8A6"
-              />
+              <div className="admin-color-input-row">
+                <input
+                  type="color"
+                  value={ruleDraft.color || "#14B8A6"}
+                  onChange={(event) => setRuleDraft((current) => ({ ...current, color: event.target.value }))}
+                  className="admin-color-input"
+                  aria-label="운영 규칙 색상 선택"
+                />
+                <input
+                  value={ruleDraft.color}
+                  onChange={(event) => setRuleDraft((current) => ({ ...current, color: event.target.value }))}
+                  className="admin-input app-form-input"
+                  placeholder="#14B8A6"
+                />
+              </div>
             </label>
             <label className="admin-field">
-              <span>검색 키워드</span>
+              <span>검색용 키워드</span>
               <textarea
                 value={ruleDraft.keywordsText}
                 onChange={(event) => setRuleDraft((current) => ({ ...current, keywordsText: event.target.value }))}
@@ -865,8 +914,8 @@ export function TemplateAutomationPage() {
 
       <AdminModal
         open={Boolean(deleteTarget)}
-        title="운영 규칙 키워드를 초기화할까요?"
-        description="카테고리 자체는 삭제하지 않고, 같은 카테고리명에 저장된 검색 키워드만 비웁니다."
+        title="검색용 키워드를 초기화할까요?"
+        description="카테고리 자체는 삭제하지 않고, 같은 카테고리명에 저장된 검색용 키워드만 비웁니다."
         onClose={() => setDeleteTarget(null)}
         footer={
           <>
@@ -886,9 +935,9 @@ export function TemplateAutomationPage() {
         {deleteTarget ? (
           <div className="admin-list-card">
             <h3>{deleteTarget.categoryName}</h3>
-            <p>{deleteTarget.userCount ?? 0}명 사용자 카테고리에 반영된 키워드</p>
+            <p>이 카테고리에 등록된 검색용 키워드</p>
             <p className="admin-inline-note">
-              {(deleteTarget.keywords ?? []).join(", ") || "등록된 키워드 없음"}
+              {(deleteTarget.keywords ?? []).join(", ") || "등록된 검색용 키워드 없음"}
             </p>
           </div>
         ) : null}
