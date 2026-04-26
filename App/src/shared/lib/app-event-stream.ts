@@ -33,11 +33,21 @@ export type TemplateMatchUpdatedEventPayload = {
 export type NetworkTestEventPayload = {
   user_id?: number | string | null;
   sse_type?: "network_test" | string;
+  data?: string | {
+    message?: string;
+    raw_output?: string;
+    module?: string;
+    node_ip?: string;
+    stage?: string;
+    status?: string;
+    timestamp?: string;
+  };
   module?: string;
   node_ip?: string;
   stage?: string;
   status?: string;
   message?: string;
+  raw_output?: string;
   timestamp?: string;
 };
 

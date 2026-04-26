@@ -76,26 +76,67 @@ function createLogEntry({ title, endpoint, method, startedAt, status, data, erro
   };
 }
 
+function parseNetworkEventPayload(payload) {
+  if (typeof payload === "string") {
+    return {
+      message: payload,
+      metadata: {},
+    };
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return {
+      message: "",
+      metadata: {},
+    };
+  }
+
+  const nestedData = payload.data;
+
+  if (typeof nestedData === "string") {
+    return {
+      message: nestedData,
+      metadata: payload,
+    };
+  }
+
+  if (nestedData && typeof nestedData === "object") {
+    return {
+      message: [nestedData.message, nestedData.raw_output].filter(Boolean).join("\n"),
+      metadata: {
+        ...payload,
+        ...nestedData,
+      },
+    };
+  }
+
+  return {
+    message: [payload.message, payload.raw_output].filter(Boolean).join("\n"),
+    metadata: payload,
+  };
+}
+
 function createNetworkTestLogEntry(payload) {
   const receivedAt = new Date().toISOString();
-  const eventTime = payload.timestamp ?? receivedAt;
-  const message = payload.message?.trim() || "network_test 메시지 본문이 비어 있습니다.";
+  const { message: rawMessage, metadata: normalizedMetadata } = parseNetworkEventPayload(payload);
+  const eventTime = normalizedMetadata.timestamp ?? receivedAt;
+  const message = rawMessage.trim() || "network_test 메시지 본문이 비어 있습니다.";
   const metadata = {
-    sse_type: payload.sse_type ?? "network_test",
-    module: payload.module,
-    node_ip: payload.node_ip,
-    stage: payload.stage,
-    status: payload.status,
-    timestamp: payload.timestamp,
-    user_id: payload.user_id,
+    sse_type: normalizedMetadata.sse_type ?? "network_test",
+    module: normalizedMetadata.module,
+    node_ip: normalizedMetadata.node_ip,
+    stage: normalizedMetadata.stage,
+    status: normalizedMetadata.status,
+    timestamp: normalizedMetadata.timestamp,
+    user_id: normalizedMetadata.user_id,
   };
 
   return {
-    id: `${eventTime}-network_test-${payload.node_ip ?? "unknown"}-${payload.stage ?? "event"}`,
-    title: `network_test ${payload.node_ip ?? "unknown"} ${payload.stage ?? "event"}`,
+    id: `${eventTime}-network_test-${metadata.node_ip ?? "unknown"}-${metadata.stage ?? "event"}`,
+    title: `network_test ${metadata.node_ip ?? "unknown"} ${metadata.stage ?? "event"}`,
     endpoint: "event: network_test",
     method: "SSE",
-    status: payload.status === "error" || payload.status === "failed" ? "ERROR" : "SUCCESS",
+    status: metadata.status === "error" || metadata.status === "failed" ? "ERROR" : "SUCCESS",
     requestedAt: eventTime,
     receivedAt,
     output: `${message}\n\n--- event metadata ---\n${JSON.stringify(metadata, null, 2)}`,
