@@ -749,6 +749,19 @@
   align-items: start;
 }
 
+.admin-master-list-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(76vh, 760px);
+}
+
+.admin-master-list-scroll {
+  flex: 1;
+  min-height: 260px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .admin-master-item {
   width: 100%;
   border: 1px solid var(--line);
@@ -1119,6 +1132,25 @@
 
 .admin-table-wrap {
   overflow-x: auto;
+}
+
+.admin-template-list-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(76vh, 760px);
+}
+
+.admin-template-table-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 280px;
+}
+
+.admin-template-table-scroll .admin-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
 }
 
 .admin-table {

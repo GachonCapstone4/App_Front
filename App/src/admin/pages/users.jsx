@@ -386,7 +386,7 @@ export function UsersPage() {
       </div>
 
       <div className="admin-master-detail">
-        <section className="admin-panel">
+        <section className="admin-panel admin-master-list-panel">
           <div className="admin-panel-head">
             <div>
               <h2>사용자 목록</h2>
@@ -462,7 +462,7 @@ export function UsersPage() {
             </div>
           </div>
 
-          <div className="admin-stack">
+          <div className="admin-stack admin-master-list-scroll">
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
                 const isSelected = user.id === selectedUser?.id;

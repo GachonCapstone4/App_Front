@@ -58,6 +58,32 @@ const presetRuleDraft = {
   autoCalendarEnabled: true,
 };
 
+function mergeCategoryStatsByName(stats) {
+  const statMap = new Map();
+
+  stats.forEach((stat) => {
+    const key = stat.category || "미분류";
+    const previous = statMap.get(key);
+
+    if (!previous) {
+      statMap.set(key, {
+        ...stat,
+        id: key,
+        category: key,
+      });
+      return;
+    }
+
+    statMap.set(key, {
+      ...previous,
+      templateCount: previous.templateCount + stat.templateCount,
+      usageCount: previous.usageCount + stat.usageCount,
+    });
+  });
+
+  return Array.from(statMap.values());
+}
+
 export function TemplateAutomationPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const scenarioId = searchParams.get("scenario");
@@ -83,7 +109,7 @@ export function TemplateAutomationPage() {
     useDemoDataMode && !templatesEmptyScenario ? generatedTemplates : [],
   );
   const [categoryStats, setCategoryStats] = useState(
-    useDemoDataMode ? templateCategoryStats : [],
+    useDemoDataMode ? mergeCategoryStatsByName(templateCategoryStats) : [],
   );
   const [ruleItems, setRuleItems] = useState(
     useDemoDataMode && !rulesEmptyScenario ? initialAutomationRules : [],
@@ -112,7 +138,7 @@ export function TemplateAutomationPage() {
     if (useDemoDataMode) {
       setSummaryItems(templateSummary);
       setTemplateItems(templatesEmptyScenario ? [] : generatedTemplates);
-      setCategoryStats(templateCategoryStats);
+      setCategoryStats(mergeCategoryStatsByName(templateCategoryStats));
       setRuleItems(rulesEmptyScenario ? [] : initialAutomationRules);
       return;
     }
@@ -169,14 +195,16 @@ export function TemplateAutomationPage() {
           })),
         );
         setCategoryStats(
-          stats.map((stat, index) => ({
-            id: stat.categoryId,
-            category: stat.categoryName,
-            industryLabel: "전체 업종",
-            color: ["#3B82F6", "#14B8A6", "#F59E0B", "#EF4444", "#6366F1"][index % 5],
-            templateCount: stat.templateCount,
-            usageCount: stat.usageCount,
-          })),
+          mergeCategoryStatsByName(
+            stats.map((stat, index) => ({
+              id: stat.categoryId,
+              category: stat.categoryName,
+              industryLabel: "전체 업종",
+              color: ["#3B82F6", "#14B8A6", "#F59E0B", "#EF4444", "#6366F1"][index % 5],
+              templateCount: stat.templateCount,
+              usageCount: stat.usageCount,
+            })),
+          ),
         );
         setRuleItems(
           rules.map((rule) => ({
@@ -506,7 +534,7 @@ export function TemplateAutomationPage() {
 
       {activeTab === "templates" ? (
         <>
-          <section className="admin-panel">
+          <section className="admin-panel admin-template-list-panel">
             <div className="admin-panel-head">
               <div>
                 <h2>생성 템플릿 목록</h2>
@@ -584,7 +612,7 @@ export function TemplateAutomationPage() {
             ) : null}
 
             {filteredTemplates.length > 0 ? (
-              <div className="admin-table-wrap">
+              <div className="admin-table-wrap admin-template-table-scroll">
                 <table className="admin-table">
                   <thead>
                     <tr>
