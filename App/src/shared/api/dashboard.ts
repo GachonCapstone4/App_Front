@@ -27,6 +27,9 @@ type DashboardScheduleApiResponse = {
     source: string;
     status: string;
     is_calendar_added: boolean;
+    email_id?: number | null;
+    email_sender_name?: string | null;
+    email_subject?: string | null;
   }>;
 };
 

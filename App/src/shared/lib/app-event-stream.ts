@@ -111,7 +111,34 @@ function parseEventPayload<T>(event: Event): T | null {
   }
 
   try {
-    return JSON.parse(messageEvent.data) as T;
+    const parsed = JSON.parse(messageEvent.data) as unknown;
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "sse_type" in parsed &&
+      "data" in parsed
+    ) {
+      const envelope = parsed as { data?: unknown };
+
+      if (typeof envelope.data === "string") {
+        const trimmedData = envelope.data.trim();
+
+        if (!trimmedData) {
+          return null;
+        }
+
+        try {
+          return JSON.parse(trimmedData) as T;
+        } catch {
+          return { data: envelope.data } as T;
+        }
+      }
+
+      return envelope.data as T;
+    }
+
+    return parsed as T;
   } catch (error) {
     console.error("SSE payload parse error", error);
     return null;

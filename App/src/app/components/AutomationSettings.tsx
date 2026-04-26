@@ -44,6 +44,7 @@ import {
   createAutomationRule,
   deleteAutomationRule,
   getAutomationRules,
+  setAutomationRuleAutoCalendar,
   setAutomationRuleAutoSend,
   type AutomationRuleSnapshot,
 } from "../../shared/api/automations";
@@ -569,6 +570,35 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     }));
   };
 
+  const handleDialogTemplateAutoCalendarToggle = (templateId: number) => {
+    setDialogState((current) => ({
+      ...current,
+      templates: current.templates.map((template) =>
+        template.templateId === templateId
+          ? { ...template, autoCalendar: !template.autoCalendar }
+          : template,
+      ),
+    }));
+  };
+
+  const createAutomationRuleWithCalendar = async (
+    category: AutomationCategoryCatalogItem,
+    template: AutomationDialogTemplateDraft,
+  ) => {
+    const createdRule = await createAutomationRule({
+      categoryName: category.categoryName,
+      color: category.color,
+      templateId: template.templateId,
+      autoSendEnabled: template.autoSend,
+    });
+
+    if (!template.autoCalendar) {
+      return createdRule;
+    }
+
+    return setAutomationRuleAutoCalendar(createdRule.ruleId, true);
+  };
+
   const handleSaveRuleGroup = async () => {
     if (!selectedDialogCategory) {
       toast.error("카테고리를 선택해 주세요.");
@@ -605,7 +635,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             templateId: template.templateId,
             templateTitle: template.title,
             autoSendEnabled: template.autoSend,
-            autoCalendarEnabled: false,
+            autoCalendarEnabled: template.autoCalendar,
           })) satisfies AutomationRuleSnapshot[];
 
           setRules((current) => [...current, ...createdRules]);
@@ -637,7 +667,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                   templateId: template.templateId,
                   templateTitle: template.title,
                   autoSendEnabled: template.autoSend,
-                  autoCalendarEnabled: existingTemplate?.autoCalendar ?? false,
+                  autoCalendarEnabled: template.autoCalendar,
                 } satisfies AutomationRuleSnapshot;
               }),
             );
@@ -653,12 +683,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       if (dialogState.mode === "create") {
         const createdRules = await Promise.all(
           selectedTemplates.map((template) =>
-            createAutomationRule({
-              categoryName: selectedDialogCategory.categoryName,
-              color: selectedDialogCategory.color,
-              templateId: template.templateId,
-              autoSendEnabled: template.autoSend,
-            }),
+            createAutomationRuleWithCalendar(selectedDialogCategory, template),
           ),
         );
 
@@ -707,14 +732,31 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           );
 
           if (existingTemplate?.ruleId) {
-            if (existingTemplate.autoSend === template.autoSend) {
+            if (
+              existingTemplate.autoSend === template.autoSend &&
+              existingTemplate.autoCalendar === template.autoCalendar
+            ) {
               continue;
             }
 
-            const updatedRule = await setAutomationRuleAutoSend(
-              existingTemplate.ruleId,
-              template.autoSend,
-            );
+            let updatedRule: AutomationRuleSnapshot | null = null;
+            if (existingTemplate.autoSend !== template.autoSend) {
+              updatedRule = await setAutomationRuleAutoSend(
+                existingTemplate.ruleId,
+                template.autoSend,
+              );
+            }
+            if (existingTemplate.autoCalendar !== template.autoCalendar) {
+              updatedRule = await setAutomationRuleAutoCalendar(
+                existingTemplate.ruleId,
+                template.autoCalendar,
+              );
+            }
+
+            if (!updatedRule) {
+              continue;
+            }
+
             const ruleIndex = nextRules.findIndex(
               (rule) => rule.ruleId === updatedRule.ruleId,
             );
@@ -725,12 +767,10 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             continue;
           }
 
-          const createdRule = await createAutomationRule({
-            categoryName: selectedDialogCategory.categoryName,
-            color: selectedDialogCategory.color,
-            templateId: template.templateId,
-            autoSendEnabled: template.autoSend,
-          });
+          const createdRule = await createAutomationRuleWithCalendar(
+            selectedDialogCategory,
+            template,
+          );
 
           nextRules.push(createdRule);
         }
@@ -800,7 +840,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     }
 
     const nextAutoSend = !targetTemplate.autoSend;
-    const busyKey = `${group.key}:${templateId}`;
+    const busyKey = `${group.key}:${templateId}:send`;
     setBusyTemplateKey(busyKey);
 
     try {
@@ -840,6 +880,68 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       toast.success("새 템플릿 자동발송 규칙을 추가했습니다.");
     } catch (error) {
       toast.error(getErrorMessage(error, "자동 발송 상태를 변경하지 못했습니다."));
+    } finally {
+      setBusyTemplateKey(null);
+    }
+  };
+
+  const handleAutoCalendarToggle = async (
+    group: AutomationCategoryGroup,
+    templateId: number,
+  ) => {
+    const targetTemplate = group.templates.find(
+      (template) => template.templateId === templateId,
+    );
+
+    if (!targetTemplate || !group.categoryId) {
+      return;
+    }
+
+    const nextAutoCalendar = !targetTemplate.autoCalendar;
+    const busyKey = `${group.key}:${templateId}:calendar`;
+    setBusyTemplateKey(busyKey);
+
+    try {
+      if (scenarioMode) {
+        setRules((current) =>
+          current.map((rule) =>
+            rule.ruleId === targetTemplate.ruleId
+              ? { ...rule, autoCalendarEnabled: nextAutoCalendar }
+              : rule,
+          ),
+        );
+        return;
+      }
+
+      if (targetTemplate.ruleId) {
+        const updatedRule = await setAutomationRuleAutoCalendar(
+          targetTemplate.ruleId,
+          nextAutoCalendar,
+        );
+
+        setRules((current) =>
+          current.map((rule) =>
+            rule.ruleId === updatedRule.ruleId ? updatedRule : rule,
+          ),
+        );
+        return;
+      }
+
+      const createdRule = await createAutomationRule({
+        categoryName: group.categoryName,
+        color: group.color,
+        templateId,
+        autoSendEnabled: targetTemplate.autoSend,
+      });
+      const updatedRule = await setAutomationRuleAutoCalendar(
+        createdRule.ruleId,
+        nextAutoCalendar,
+      );
+
+      setRules((current) => [...current, updatedRule]);
+      toast.success("새 템플릿 캘린더 자동화 규칙을 추가했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "캘린더 자동 등록 상태를 변경하지 못했습니다."));
     } finally {
       setBusyTemplateKey(null);
     }
@@ -1040,7 +1142,16 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                               template.templateId === null
                                 ? `${group.key}:unknown`
                                 : `${group.key}:${template.templateId}`;
-                            const isBusy = busyTemplateKey === templateKey;
+                            const sendBusyKey =
+                              template.templateId === null
+                                ? `${templateKey}:send`
+                                : `${group.key}:${template.templateId}:send`;
+                            const calendarBusyKey =
+                              template.templateId === null
+                                ? `${templateKey}:calendar`
+                                : `${group.key}:${template.templateId}:calendar`;
+                            const isSendBusy = busyTemplateKey === sendBusyKey;
+                            const isCalendarBusy = busyTemplateKey === calendarBusyKey;
 
                             return (
                               <div
@@ -1060,30 +1171,64 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                                   </div>
                                 </div>
 
-                                <button
-                                  onClick={() =>
-                                    template.templateId !== null
-                                      ? handleAutoSendToggle(group, template.templateId)
-                                      : undefined
-                                  }
-                                  disabled={isBusy || template.templateId === null}
-                                  className={`relative h-5.5 w-10 rounded-full transition-colors ${
-                                    template.autoSend
-                                      ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
-                                      : "bg-[#CBD5E1] dark:bg-[#334155]"
-                                  } disabled:cursor-not-allowed disabled:opacity-60`}
-                                  aria-label={`${group.categoryName} ${template.title} 자동 발송`}
-                                >
-                                  {isBusy ? (
-                                    <Loader2 className="absolute left-3 top-1 h-3.5 w-3.5 animate-spin text-white" />
-                                  ) : (
-                                    <span
-                                      className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
-                                        template.autoSend ? "left-5" : "left-0.5"
-                                      }`}
-                                    />
-                                  )}
-                                </button>
+                                <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                  <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
+                                    <span>자동 발송</span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        template.templateId !== null
+                                          ? handleAutoSendToggle(group, template.templateId)
+                                          : undefined
+                                      }
+                                      disabled={isSendBusy || template.templateId === null}
+                                      className={`relative h-5.5 w-10 rounded-full transition-colors ${
+                                        template.autoSend
+                                          ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
+                                          : "bg-[#CBD5E1] dark:bg-[#334155]"
+                                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                                      aria-label={`${group.categoryName} ${template.title} 자동 발송`}
+                                    >
+                                      {isSendBusy ? (
+                                        <Loader2 className="absolute left-3 top-1 h-3.5 w-3.5 animate-spin text-white" />
+                                      ) : (
+                                        <span
+                                          className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
+                                            template.autoSend ? "left-5" : "left-0.5"
+                                          }`}
+                                        />
+                                      )}
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
+                                    <span>캘린더</span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        template.templateId !== null
+                                          ? handleAutoCalendarToggle(group, template.templateId)
+                                          : undefined
+                                      }
+                                      disabled={isCalendarBusy || template.templateId === null}
+                                      className={`relative h-5.5 w-10 rounded-full transition-colors ${
+                                        template.autoCalendar
+                                          ? "bg-[#8B5CF6] dark:bg-[#6D28D9]"
+                                          : "bg-[#CBD5E1] dark:bg-[#334155]"
+                                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                                      aria-label={`${group.categoryName} ${template.title} 캘린더 자동 등록`}
+                                    >
+                                      {isCalendarBusy ? (
+                                        <Loader2 className="absolute left-3 top-1 h-3.5 w-3.5 animate-spin text-white" />
+                                      ) : (
+                                        <span
+                                          className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
+                                            template.autoCalendar ? "left-5" : "left-0.5"
+                                          }`}
+                                        />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             );
                           })}
@@ -1279,27 +1424,56 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          template.selected
-                            ? handleDialogTemplateAutoSendToggle(template.templateId)
-                            : undefined
-                        }
-                        disabled={!template.selected}
-                        className={`relative h-5.5 w-10 rounded-full transition-colors ${
-                          template.autoSend
-                            ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
-                            : "bg-[#CBD5E1] dark:bg-[#334155]"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                        aria-label={`${template.title} 자동 발송`}
-                      >
-                        <span
-                          className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
-                            template.autoSend ? "left-5" : "left-0.5"
-                          }`}
-                        />
-                      </button>
+                      <div className="flex shrink-0 flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
+                          <span>자동 발송</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              template.selected
+                                ? handleDialogTemplateAutoSendToggle(template.templateId)
+                                : undefined
+                            }
+                            disabled={!template.selected}
+                            className={`relative h-5.5 w-10 rounded-full transition-colors ${
+                              template.autoSend
+                                ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
+                                : "bg-[#CBD5E1] dark:bg-[#334155]"
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                            aria-label={`${template.title} 자동 발송`}
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
+                                template.autoSend ? "left-5" : "left-0.5"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
+                          <span>캘린더</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              template.selected
+                                ? handleDialogTemplateAutoCalendarToggle(template.templateId)
+                                : undefined
+                            }
+                            disabled={!template.selected}
+                            className={`relative h-5.5 w-10 rounded-full transition-colors ${
+                              template.autoCalendar
+                                ? "bg-[#8B5CF6] dark:bg-[#6D28D9]"
+                                : "bg-[#CBD5E1] dark:bg-[#334155]"
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                            aria-label={`${template.title} 캘린더 자동 등록`}
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${
+                                template.autoCalendar ? "left-5" : "left-0.5"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}

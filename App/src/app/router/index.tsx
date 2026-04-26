@@ -178,6 +178,13 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "inbox/:emailId",
+        lazy: async () => {
+          const module = await import("../../pages/inbox");
+          return { Component: module.InboxPage };
+        },
+      },
+      {
         path: "calendar",
         lazy: async () => {
           const module = await import("../../pages/calendar");

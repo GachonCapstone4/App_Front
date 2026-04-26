@@ -212,8 +212,8 @@ export const adminUsers = rawUsers.map((user) => ({
 export const templateSummary = [
   { label: "전체 생성 템플릿", value: "84개", hint: "최근 30일 생성 기준" },
   { label: "가장 많이 쓰인 카테고리", value: "견적 요청", hint: "총 126회 사용" },
-  { label: "활성 자동화 규칙", value: "9개", hint: "자동 초안 생성 기준 포함" },
-  { label: "자동 발송 허용 규칙", value: "3개", hint: "검토 없는 자동 발송" },
+  { label: "운영 카테고리", value: "8개", hint: "검색 키워드 관리 대상" },
+  { label: "등록 검색 키워드", value: "24개", hint: "카테고리별 keyword 합계" },
 ];
 
 export const generatedTemplates = [

@@ -77,6 +77,7 @@ describe("automation-settings helpers", () => {
     expect(groups[0]?.templates).toEqual([
       {
         templateId: 1,
+        userTemplateNo: null,
         title: "가격 안내 템플릿",
         ruleId: 10,
         autoSend: true,
@@ -114,16 +115,20 @@ describe("automation-settings helpers", () => {
     expect(drafts).toEqual([
       {
         templateId: 1,
+        userTemplateNo: null,
         title: "가격 안내 템플릿",
         selected: true,
         autoSend: true,
+        autoCalendar: false,
         ruleId: 10,
       },
       {
         templateId: 2,
+        userTemplateNo: null,
         title: "할인 안내 템플릿",
         selected: false,
         autoSend: false,
+        autoCalendar: false,
         ruleId: null,
       },
     ]);

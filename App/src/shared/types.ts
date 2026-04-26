@@ -72,6 +72,7 @@ export interface EmailItem {
   time: string;
   receivedDate: string;
   category: string;
+  businessDomain?: string;
   confidence: number;
   status: EmailStatus;
   sentTime: string;

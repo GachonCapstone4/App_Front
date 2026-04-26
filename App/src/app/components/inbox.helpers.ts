@@ -245,6 +245,8 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
   const aiAnalysis = detail.ai_analysis;
   const draftReply = detail.draft_reply;
   const emailInfo = detail.email_info;
+  const aiDomain = aiAnalysis?.domain?.trim() || undefined;
+  const aiIntent = aiAnalysis?.intent?.trim() || undefined;
   const attachments: EmailAttachment[] = Array.isArray(emailInfo.attachments)
     ? emailInfo.attachments.map((attachment) => ({
         attachmentId: attachment.attachment_id,
@@ -267,10 +269,8 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
       typeof aiAnalysis?.entities?.matching_text === "string"
         ? aiAnalysis.entities.matching_text
         : undefined,
-    category:
-      current.category && current.category !== "분석 대기" && current.category !== "미분류"
-        ? current.category
-        : aiAnalysis?.intent || "분석 대기",
+    category: aiIntent || current.category || "분석 대기",
+    businessDomain: aiDomain || current.businessDomain,
     confidence: aiAnalysis?.confidence_score ? Number(aiAnalysis.confidence_score) : 0,
     schedule: buildSchedule(aiAnalysis?.entities ?? null, aiAnalysis?.schedule_detected === true),
     draft: draftReply?.body ?? "",

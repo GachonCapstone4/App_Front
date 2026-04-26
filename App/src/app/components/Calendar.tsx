@@ -250,6 +250,10 @@ function formatDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function getInboxDetailPath(emailId: string | number) {
+  return `/app/inbox/${emailId}`;
+}
+
 function draftFromEvent(event: CalendarEvent): CalendarEventDraft {
   return {
     title: event.title,
@@ -1062,6 +1066,10 @@ export function Calendar({ scenarioId }: CalendarProps) {
     );
   };
 
+  const openLinkedEmail = (emailId: string | number) => {
+    navigate(getInboxDetailPath(emailId));
+  };
+
   if (loadErrorScenario) {
     return (
       <AppStatePage
@@ -1301,7 +1309,21 @@ export function Calendar({ scenarioId }: CalendarProps) {
                       </span>
                     )}
                   </div>
-                  <h2 className="mb-1 text-[#1E2A3A] dark:text-foreground">{selectedEvent.title}</h2>
+                  {selectedEvent.fromEmail ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedEvent.fromEmail) {
+                          openLinkedEmail(selectedEvent.fromEmail.id);
+                        }
+                      }}
+                      className="mb-1 block max-w-full text-left text-[#1E2A3A] underline-offset-4 hover:underline dark:text-foreground"
+                    >
+                      {selectedEvent.title}
+                    </button>
+                  ) : (
+                    <h2 className="mb-1 text-[#1E2A3A] dark:text-foreground">{selectedEvent.title}</h2>
+                  )}
                 </div>
 
                 <div className="app-soft-surface flex items-center gap-3 rounded-lg p-3">
@@ -1349,7 +1371,11 @@ export function Calendar({ scenarioId }: CalendarProps) {
                     </p>
                     <button
                       type="button"
-                      onClick={() => navigate("/app/inbox")}
+                      onClick={() => {
+                        if (selectedEvent.fromEmail) {
+                          openLinkedEmail(selectedEvent.fromEmail.id);
+                        }
+                      }}
                       className="app-accent-text mt-2 text-[11px] underline-offset-4 hover:underline"
                     >
                       원본 이메일 보기

@@ -14,6 +14,16 @@ const metaByStatus = emailStatusMeta as Record<
   { label: string; tone: StatusBadgeTone; banner: string }
 >;
 
+function getAnalysisBadgeLabel(prefix: string, value?: string) {
+  const normalized = value?.trim();
+
+  if (!normalized || normalized === "분석 대기" || normalized === "미분류") {
+    return null;
+  }
+
+  return `${prefix}: ${normalized}`;
+}
+
 interface EmailThreadPanelProps {
   email: EmailItem | null;
 }
@@ -52,10 +62,15 @@ export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
     }
   };
 
+  const domainBadgeLabel = getAnalysisBadgeLabel("업종", email.businessDomain);
+  const categoryBadgeLabel = getAnalysisBadgeLabel("카테고리", email.category);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge label={metaByStatus[email.status].label} tone={metaByStatus[email.status].tone} />
+        {domainBadgeLabel ? <StatusBadge label={domainBadgeLabel} tone="neutral" /> : null}
+        {categoryBadgeLabel ? <StatusBadge label={categoryBadgeLabel} tone="teal" /> : null}
       </div>
 
       <div className="flex flex-wrap items-start justify-between gap-4">

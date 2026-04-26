@@ -38,6 +38,7 @@ export type AutomationDialogTemplateDraft = {
   title: string;
   selected: boolean;
   autoSend: boolean;
+  autoCalendar: boolean;
   ruleId: number | null;
 };
 
@@ -192,6 +193,7 @@ export function buildAutomationDialogTemplateDrafts(
         title: template.title,
         selected: Boolean(existingTemplate),
         autoSend: existingTemplate?.autoSend ?? false,
+        autoCalendar: existingTemplate?.autoCalendar ?? false,
         ruleId: existingTemplate?.ruleId ?? null,
       } satisfies AutomationDialogTemplateDraft;
     });

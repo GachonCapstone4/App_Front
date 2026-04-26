@@ -410,7 +410,16 @@ export function DashboardPage() {
                     <div className="h-12 w-1 rounded-full bg-[#2DD4BF]" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-[#1E2A3A]">{event.title}</p>
+                        {event.email_id ? (
+                          <Link
+                            to={`/app/inbox/${event.email_id}`}
+                            className="text-sm font-medium text-[#1E2A3A] underline-offset-4 hover:underline"
+                          >
+                            {event.title}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-medium text-[#1E2A3A]">{event.title}</p>
+                        )}
                         {event.status !== "CONFIRMED" ? (
                           <StatusBadge label="등록 대기" tone="warning" />
                         ) : null}

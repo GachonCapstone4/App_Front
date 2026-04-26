@@ -47,11 +47,11 @@
   {
     "scenarioId": "admin-template-automation-load-error",
     "route": "/admin/template-automation?scenario=admin-template-automation-load-error",
-    "screenTitle": "템플릿 자동화 관리 로드 실패",
+    "screenTitle": "템플릿 운영 규칙 관리 로드 실패",
     "stateType": "load-error",
     "outputFile": "screenshots/admin/admin-template-automation-load-error.png",
     "viewport": { "width": 1440, "height": 1024 },
-    "description": "생성 템플릿 통계와 자동화 규칙을 불러오지 못한 상태"
+    "description": "생성 템플릿 통계와 운영 규칙을 불러오지 못한 상태"
   },
   {
     "scenarioId": "admin-template-automation-templates-empty",
@@ -65,20 +65,20 @@
   {
     "scenarioId": "admin-template-automation-rules-empty",
     "route": "/admin/template-automation?tab=rules&scenario=admin-template-automation-rules-empty",
-    "screenTitle": "자동화 규칙 빈 상태",
+    "screenTitle": "운영 규칙 빈 상태",
     "stateType": "empty",
     "outputFile": "screenshots/admin/admin-template-automation-rules-empty.png",
     "viewport": { "width": 1440, "height": 1024 },
-    "description": "등록된 자동화 규칙이 없는 상태"
+    "description": "등록된 운영 규칙이 없는 상태"
   },
   {
     "scenarioId": "admin-template-automation-rule-save-error",
     "route": "/admin/template-automation?tab=rules&scenario=admin-template-automation-rule-save-error",
-    "screenTitle": "자동화 규칙 저장 실패",
+    "screenTitle": "운영 규칙 저장 실패",
     "stateType": "action-error",
     "outputFile": "screenshots/admin/admin-template-automation-rule-save-error.png",
     "viewport": { "width": 1440, "height": 1024 },
-    "description": "자동화 규칙 저장 요청이 실패한 상태"
+    "description": "운영 규칙 저장 요청이 실패한 상태"
   },
   {
     "scenarioId": "admin-inquiries-load-error",

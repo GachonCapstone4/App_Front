@@ -12,6 +12,16 @@ function getTone(status: EmailStatus): StatusBadgeTone {
   return metaByStatus[status]?.tone || "neutral";
 }
 
+function getAnalysisBadgeLabel(prefix: string, value?: string) {
+  const normalized = value?.trim();
+
+  if (!normalized || normalized === "분석 대기" || normalized === "미분류") {
+    return null;
+  }
+
+  return `${prefix}: ${normalized}`;
+}
+
 interface EmailListPanelProps {
   emails: EmailItem[];
   selectedEmailId?: string;
@@ -31,6 +41,8 @@ export function EmailListPanel({
     <div className="space-y-2">
       {emails.map((email: EmailItem) => {
         const selected = selectedEmailId === email.id;
+        const domainBadgeLabel = getAnalysisBadgeLabel("업종", email.businessDomain);
+        const categoryBadgeLabel = getAnalysisBadgeLabel("카테고리", email.category);
 
         return (
           <button
@@ -64,6 +76,8 @@ export function EmailListPanel({
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <StatusBadge label={metaByStatus[email.status].label} tone={getTone(email.status)} />
+                  {domainBadgeLabel ? <StatusBadge label={domainBadgeLabel} tone="neutral" /> : null}
+                  {categoryBadgeLabel ? <StatusBadge label={categoryBadgeLabel} tone="teal" /> : null}
                   {email.schedule?.detected ? <StatusBadge label="일정 감지" tone="teal" /> : null}
                 </div>
               </div>

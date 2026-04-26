@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { AlertTriangle, CheckCircle2, FileText, PencilLine, Send, SkipForward } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Loader2, PencilLine, Send, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import type { EmailItem, EmailStatus } from "../../../shared/types";
@@ -125,6 +125,28 @@ function StatusBanner({ status, sentTime }: StatusBannerProps) {
   }
 
   return null;
+}
+
+interface TemplateMatchingPanelProps {
+  title: string;
+  description: string;
+  className?: string;
+}
+
+function TemplateMatchingPanel({ title, description, className = "" }: TemplateMatchingPanelProps) {
+  return (
+    <div
+      className={`flex min-h-[220px] items-center justify-center rounded-2xl border border-[#99F6E4] bg-[#F0FDFA] px-6 py-10 text-center dark:border-[#134E4A] dark:bg-[#0B2728] ${className}`.trim()}
+    >
+      <div className="max-w-[380px]">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/80 text-[#0F766E] shadow-sm dark:bg-black/10 dark:text-[#5EEAD4]">
+          <Loader2 className="h-7 w-7 animate-spin" />
+        </div>
+        <p className="mt-4 text-base font-semibold text-[#0F766E] dark:text-[#5EEAD4]">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-[#0F766E] dark:text-[#B7F4EF]">{description}</p>
+      </div>
+    </div>
+  );
 }
 
 interface DraftPanelProps {
@@ -262,10 +284,9 @@ export function DraftPanel({
 
       {showDraftFallbackState ? (
         recommendationState === "loading" || recommendationState === "idle" ? (
-          <StatePanel
-            title="RAG 추천을 불러오는 중입니다"
-            description="실제 템플릿 매칭 결과가 준비되면 이 영역에 표시됩니다."
-            tone="neutral"
+          <TemplateMatchingPanel
+            title="템플릿을 매칭 중입니다"
+            description="AI 분석과 RAG 인덱스 결과가 준비되면 추천 템플릿을 자동으로 표시합니다."
             className="mt-4 min-h-[280px]"
           />
         ) : recommendationState === "error" ? (
@@ -276,10 +297,9 @@ export function DraftPanel({
             className="mt-4 min-h-[280px]"
           />
         ) : recommendationState === "empty" ? (
-          <StatePanel
-            title="매칭된 템플릿이 없습니다"
-            description="현재 메일과 일치하는 템플릿을 찾지 못했습니다. 템플릿 라이브러리와 RAG 인덱스를 확인해 주세요."
-            tone="empty"
+          <TemplateMatchingPanel
+            title="템플릿 매칭을 계속 확인하고 있습니다"
+            description="아직 일치 템플릿이 도착하지 않았습니다. 결과가 들어오면 이 영역이 자동으로 갱신됩니다."
             className="mt-4 min-h-[280px]"
           />
         ) : null

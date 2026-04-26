@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft } from "lucide-react";
-import { useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { EmailListPanel } from "../../features/inbox/ui/EmailListPanel";
 import { InboxStatusTabs } from "../../features/inbox/ui/InboxStatusTabs";
@@ -43,6 +43,7 @@ function getCurrentTimeLabel() {
 }
 
 export function InboxPage() {
+  const { emailId: routeEmailId } = useParams();
   const [searchParams] = useSearchParams();
   const scenarioId = resolveDemoScenarioId(searchParams.get("scenario"), "inbox-demo");
   const emptyScenario = scenarioId === "inbox-empty";
@@ -56,6 +57,10 @@ export function InboxPage() {
   const useDemoDataMode = Boolean(scenarioId?.startsWith("inbox-"));
 
   const getInitialStatus = (): InboxStatus => {
+    if (routeEmailId) {
+      return "all";
+    }
+
     if (completedNormalScenario) {
       return "completed";
     }
@@ -67,6 +72,10 @@ export function InboxPage() {
   };
 
   const getInitialSelectedEmailId = () => {
+    if (routeEmailId) {
+      return routeEmailId;
+    }
+
     if (!useDemoDataMode) {
       return "";
     }
@@ -97,6 +106,16 @@ export function InboxPage() {
   const [listLoadError, setListLoadError] = useState<string | null>(null);
   const [isHydratingDetails, setIsHydratingDetails] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    if (!routeEmailId) {
+      return;
+    }
+
+    setActiveStatus("all");
+    setSelectedEmailId(routeEmailId);
+    setMobileDetailOpen(true);
+  }, [routeEmailId]);
 
   const refreshEmailDetail = async (emailId: string) => {
     try {
@@ -384,6 +403,43 @@ export function InboxPage() {
   ]);
 
   useEffect(() => {
+    if (
+      useDemoDataMode ||
+      !selectedEmailId ||
+      !selectedEmail ||
+      !selectedAnalysisReady ||
+      selectedEmail.status !== "pending" ||
+      selectedRecommendationState !== "empty"
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setEmails((current) =>
+        current.map((item) =>
+          item.id === selectedEmailId && item.recommendationState === "empty" && !item.recommendations?.length
+            ? {
+                ...item,
+                recommendationState: "loading",
+                recommendationError: undefined,
+              }
+            : item,
+        ),
+      );
+    }, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    selectedAnalysisReady,
+    selectedEmail,
+    selectedEmailId,
+    selectedRecommendationState,
+    useDemoDataMode,
+  ]);
+
+  useEffect(() => {
     if (!shouldPollSelectedEmail || !selectedEmailId) {
       return;
     }
@@ -463,6 +519,20 @@ export function InboxPage() {
 
     const unsubscribeTemplateMatch = subscribeAppEvent("template-match-updated", (payload) => {
       const eventEmailId = payload.email_id == null ? "" : String(payload.email_id).trim();
+      if (eventEmailId && emails.some((item) => item.id === eventEmailId)) {
+        setEmails((current) =>
+          current.map((item) =>
+            item.id === eventEmailId
+              ? {
+                  ...item,
+                  recommendations: [],
+                  recommendationState: "loading",
+                  recommendationError: undefined,
+                }
+              : item,
+          ),
+        );
+      }
       handleEmailRefresh(eventEmailId);
     });
 

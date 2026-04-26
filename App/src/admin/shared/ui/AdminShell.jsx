@@ -7,7 +7,7 @@ import { clearAppSession, getAppSession } from "../../../shared/lib/app-session"
 const navItems = [
   { to: "/admin", label: "운영 대시보드", icon: LayoutGrid },
   { to: "/admin/users", label: "사용자 관리", icon: Users },
-  { to: "/admin/template-automation", label: "템플릿 / 자동화 관리", icon: Bot },
+  { to: "/admin/template-automation", label: "템플릿 / 운영 규칙 관리", icon: Bot },
   { to: "/admin/inquiries", label: "사용자 문의 대응", icon: MessageSquare },
   { to: "/admin/monitoring", label: "시스템 운영 모니터링", icon: Activity },
   { to: "/admin/internal-monitoring", label: "시스템 내부 모니터링", icon: Terminal },

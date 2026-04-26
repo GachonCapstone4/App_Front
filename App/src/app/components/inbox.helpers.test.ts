@@ -95,6 +95,7 @@ describe("inbox helpers", () => {
     );
 
     expect(merged.sender).toBe("박민수");
+    expect(merged.businessDomain).toBe("세일즈");
     expect(merged.category).toBe("가격문의");
     expect(merged.templateName).toBe("가격 안내 템플릿");
     expect(merged.schedule.detected).toBe(true);
