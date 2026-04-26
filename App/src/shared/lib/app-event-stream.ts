@@ -30,11 +30,23 @@ export type TemplateMatchUpdatedEventPayload = {
   recommendation_count?: number | null;
 };
 
+export type NetworkTestEventPayload = {
+  user_id?: number | string | null;
+  sse_type?: "network_test" | string;
+  module?: string;
+  node_ip?: string;
+  stage?: string;
+  status?: string;
+  message?: string;
+  timestamp?: string;
+};
+
 type AppEventPayloadMap = {
   "classify-complete": ClassifyCompleteEventPayload;
   "rag-job-updated": RagJobUpdatedEventPayload;
   "support-ticket-updated": SupportTicketUpdatedEventPayload;
   "template-match-updated": TemplateMatchUpdatedEventPayload;
+  network_test: NetworkTestEventPayload;
 };
 
 type AppEventName = keyof AppEventPayloadMap;
@@ -47,6 +59,7 @@ const listeners: {
   "rag-job-updated": new Set(),
   "support-ticket-updated": new Set(),
   "template-match-updated": new Set(),
+  network_test: new Set(),
 };
 
 let eventSource: EventSource | null = null;
@@ -131,6 +144,7 @@ function ensureEventSource() {
   bindEventListener(source, "rag-job-updated");
   bindEventListener(source, "support-ticket-updated");
   bindEventListener(source, "template-match-updated");
+  bindEventListener(source, "network_test");
 
   source.onerror = () => {
     if (eventSource?.readyState === EventSource.CLOSED) {
