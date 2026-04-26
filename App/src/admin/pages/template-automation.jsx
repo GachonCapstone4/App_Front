@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { recommendedCategoryOptions } from "../../shared/config/onboarding-options";
 import {
@@ -67,7 +67,7 @@ const demoCategoryKeywordItems = templateCategoryStats.map((category) => ({
   userCount: 3,
 }));
 
-function buildCategoryKeywordRows(categoryKeywords, includeRecommendedBase = true) {
+function buildCategoryKeywordRows(categoryKeywords, includeRecommendedBase = false) {
   const categoryMap = new Map();
 
   if (includeRecommendedBase) {
@@ -355,6 +355,11 @@ export function TemplateAutomationPage() {
     [ruleItems],
   );
 
+  const ruleCategoryNames = useMemo(
+    () => ruleItems.map((rule) => rule.categoryName).sort((first, second) => first.localeCompare(second, "ko")),
+    [ruleItems],
+  );
+
   const openEditRule = (rule) => {
     setEditingRuleId(rule.id);
     setRuleDraft({
@@ -366,9 +371,23 @@ export function TemplateAutomationPage() {
     setRuleDialogOpen(true);
   };
 
+  const openCreateRule = () => {
+    setEditingRuleId(null);
+    setRuleDraft(emptyRuleDraft);
+    setRuleErrorNotice("");
+    setRuleDialogOpen(true);
+  };
+
   const handleSaveRule = () => {
-    if (!ruleDraft.categoryName.trim()) {
+    const categoryName = ruleDraft.categoryName.trim();
+
+    if (!categoryName) {
       setRuleErrorNotice("카테고리명을 입력해 주세요.");
+      return;
+    }
+
+    if (!editingRuleId && !ruleCategoryNames.includes(categoryName)) {
+      setRuleErrorNotice("현재 DB에 존재하는 카테고리명만 검색용 키워드를 등록할 수 있습니다.");
       return;
     }
 
@@ -384,12 +403,12 @@ export function TemplateAutomationPage() {
       setRuleErrorNotice("");
 
       const request = editingRuleId
-        ? updateAdminCategoryKeyword(ruleDraft.categoryName.trim(), {
+        ? updateAdminCategoryKeyword(categoryName, {
             color: ruleDraft.color.trim() || null,
             keywords,
           })
         : createAdminCategoryKeyword({
-            categoryName: ruleDraft.categoryName.trim(),
+            categoryName,
             color: ruleDraft.color.trim() || null,
             keywords,
           });
@@ -416,7 +435,7 @@ export function TemplateAutomationPage() {
           rule.id === editingRuleId
             ? {
                 ...rule,
-                categoryName: ruleDraft.categoryName.trim(),
+                categoryName,
                 color: ruleDraft.color.trim() || null,
                 keywords,
               }
@@ -427,7 +446,7 @@ export function TemplateAutomationPage() {
       setRuleItems((current) => [
         {
           id: ruleDraft.categoryName.trim(),
-          categoryName: ruleDraft.categoryName.trim(),
+          categoryName,
           color: ruleDraft.color.trim() || null,
           keywords,
           categoryCount: 1,
@@ -517,6 +536,14 @@ export function TemplateAutomationPage() {
       <PageHeader
         title="템플릿 / 운영 규칙 관리"
         description="생성된 템플릿 사용 현황과 전체 카테고리의 검색용 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
+        actions={
+          activeTab === "rules" ? (
+            <button type="button" className="admin-button" onClick={openCreateRule}>
+              <Plus size={16} />
+              키워드 등록
+            </button>
+          ) : null
+        }
       />
 
       <div className="admin-card-grid admin-card-grid--four">
@@ -802,8 +829,7 @@ export function TemplateAutomationPage() {
                             className="admin-icon-button"
                             onClick={() => openEditRule(rule)}
                             aria-label={`${rule.categoryName} 수정`}
-                            disabled={rule.categoryCount === 0}
-                            title={rule.categoryCount === 0 ? "아직 저장 대상 카테고리가 없습니다" : undefined}
+                            title="검색용 키워드 수정"
                           >
                             <Pencil size={14} />
                           </button>
@@ -812,8 +838,8 @@ export function TemplateAutomationPage() {
                             className="admin-icon-button admin-icon-button--danger"
                             onClick={() => setDeleteTarget(rule)}
                             aria-label={`${rule.categoryName} 키워드 초기화`}
-                            disabled={rule.categoryCount === 0 || rule.keywords.length === 0}
-                            title={rule.categoryCount === 0 ? "아직 저장 대상 카테고리가 없습니다" : undefined}
+                            disabled={rule.keywords.length === 0}
+                            title={rule.keywords.length === 0 ? "초기화할 검색용 키워드가 없습니다" : "검색용 키워드 초기화"}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -830,7 +856,7 @@ export function TemplateAutomationPage() {
               description={
                 ruleItems.length
                   ? "검색어나 미등록 필터를 조정하면 다른 카테고리 키워드를 확인할 수 있습니다."
-                  : "카테고리별 검색용 키워드가 아직 등록되지 않았습니다."
+                  : "키워드 등록 버튼으로 카테고리별 검색용 키워드를 추가할 수 있습니다."
               }
               tone="empty"
             />
@@ -877,8 +903,21 @@ export function TemplateAutomationPage() {
                 onChange={(event) => setRuleDraft((current) => ({ ...current, categoryName: event.target.value }))}
                 className="admin-input app-form-input"
                 placeholder="예: 견적 요청"
+                list={editingRuleId ? undefined : "admin-rule-category-options"}
                 disabled={Boolean(editingRuleId)}
               />
+              {!editingRuleId ? (
+                <datalist id="admin-rule-category-options">
+                  {ruleCategoryNames.map((categoryName) => (
+                    <option key={categoryName} value={categoryName} />
+                  ))}
+                </datalist>
+              ) : null}
+              {!editingRuleId ? (
+                <span className="admin-field-help">
+                  실제 사용자 카테고리로 DB에 존재하는 이름만 선택할 수 있습니다.
+                </span>
+              ) : null}
             </label>
             <label className="admin-field">
               <span>색상</span>

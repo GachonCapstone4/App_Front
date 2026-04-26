@@ -1173,6 +1173,12 @@
   color: #506173;
 }
 
+.admin-field .admin-field-help {
+  font-weight: 500;
+  line-height: 1.5;
+  color: #7a8a9b;
+}
+
 .admin-field--full {
   grid-column: 1 / -1;
 }
