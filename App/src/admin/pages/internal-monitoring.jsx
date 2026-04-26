@@ -41,8 +41,8 @@ const requestButtons = [
   },
   {
     id: "network-dict",
-    label: "네트워크 사전 Job 실행",
-    description: "Kubernetes 네트워크 사전 Job을 실행합니다. 실행 결과로 들어오는 network_test 이벤트는 로그창에 자동 표시됩니다.",
+    label: "클러스터 네트워크 진단 실행",
+    description: "각 서버 노드의 게이트웨이 및 외부 인터넷 연결 상태를 점검합니다.",
     icon: Play,
     dangerous: true,
   },
@@ -106,6 +106,7 @@ export function InternalMonitoringPage() {
   const [jobId, setJobId] = useState("");
   const [activeRequestId, setActiveRequestId] = useState("");
   const [focusedButtonId, setFocusedButtonId] = useState("summary");
+  const [networkEventLogEnabled, setNetworkEventLogEnabled] = useState(true);
   const [logs, setLogs] = useState([]);
   const focusedButton =
     requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
@@ -133,13 +134,17 @@ export function InternalMonitoringPage() {
   );
 
   useEffect(() => {
+    if (!networkEventLogEnabled) {
+      return undefined;
+    }
+
     return subscribeAppEvent("network_test", (payload) => {
       setLogs((current) => [
         createNetworkTestLogEntry(payload),
         ...current,
       ].slice(0, 20));
     });
-  }, []);
+  }, [networkEventLogEnabled]);
 
   const runRequest = async (button) => {
     if (button.needsJobId && !jobId.trim()) {
@@ -277,7 +282,16 @@ export function InternalMonitoringPage() {
           </div>
 
           <div className="admin-request-section">
-            <span className="admin-request-section-label">진단 Job</span>
+            <span className="admin-request-section-label">클러스터 네트워크 진단</span>
+            <label className="admin-event-log-toggle">
+              <input
+                type="checkbox"
+                checked={networkEventLogEnabled}
+                onChange={(event) => setNetworkEventLogEnabled(event.target.checked)}
+              />
+              <span>실시간 진단 로그 수신</span>
+              <strong>{networkEventLogEnabled ? "ON" : "OFF"}</strong>
+            </label>
             <div className="admin-internal-monitoring-actions">
               {requestButtons
                 .filter((button) => button.id === "network-dict")
@@ -300,7 +314,7 @@ export function InternalMonitoringPage() {
           {logs.length === 0 ? (
             <AdminStateNotice
               title="아직 출력된 로그가 없습니다"
-              description="네트워크 사전 Job을 실행하면 API 응답과 network_test SSE 결과가 이 영역에 표시됩니다."
+              description="왼쪽의 요청 버튼을 클릭하면 응답 또는 이벤트 로그가 이 영역에 표시됩니다."
               tone="empty"
               compact
             />
