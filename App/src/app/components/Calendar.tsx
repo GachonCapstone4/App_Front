@@ -648,12 +648,13 @@ export function Calendar({ scenarioId }: CalendarProps) {
           title: prefillDraft.title,
           startDatetime: toCalendarApiDateTime(prefillDraft.date, prefillDraft.startTime),
           endDatetime: toCalendarApiDateTime(prefillDraft.date, prefillDraft.endTime),
+          eventType: prefillDraft.type,
+          location: prefillDraft.location,
+          notes: prefillDraft.notes,
         });
         const mappedEvent = {
           ...mapSnapshotToEvent(createdEvent),
-          location: prefillDraft.location,
           attendees: buildAttendees(prefillDraft.attendeesText),
-          notes: prefillDraft.notes,
           fromEmail: state.prefillEvent?.fromEmail,
         };
 
@@ -915,12 +916,13 @@ export function Calendar({ scenarioId }: CalendarProps) {
             title: draft.title.trim(),
             startDatetime: toCalendarApiDateTime(draft.date, draft.startTime),
             endDatetime: toCalendarApiDateTime(draft.date, draft.endTime),
+            eventType: draft.type,
+            location: draft.location,
+            notes: draft.notes,
           });
           const mappedEvent = {
             ...mapSnapshotToEvent(updatedEvent),
-            location: selectedEvent.location,
             attendees: selectedEvent.attendees,
-            notes: selectedEvent.notes,
             fromEmail: selectedEvent.fromEmail,
           };
 
@@ -951,12 +953,13 @@ export function Calendar({ scenarioId }: CalendarProps) {
           title: draft.title.trim(),
           startDatetime: toCalendarApiDateTime(draft.date, draft.startTime),
           endDatetime: toCalendarApiDateTime(draft.date, draft.endTime),
+          eventType: draft.type,
+          location: draft.location,
+          notes: draft.notes,
         });
         const mappedEvent = {
           ...mapSnapshotToEvent(createdEvent),
-          location: draft.location,
           attendees: buildAttendees(draft.attendeesText),
-          notes: draft.notes,
         };
 
         setEvents((current) => [mappedEvent, ...current]);
@@ -1095,15 +1098,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
               title="데모 데이터 모드"
               description="시나리오용 목업 일정을 유지하고 있습니다. 실제 백엔드 연결 상태는 일반 진입 경로에서 확인할 수 있습니다."
               tone="info"
-              className="mb-5"
-            />
-          ) : null}
-
-          {!useDemoDataMode ? (
-            <StateBanner
-              title="현재 연결된 캘린더 범위"
-              description="실제 백엔드에는 제목, 시작 시간, 종료 시간, 확정 상태만 저장됩니다. 장소, 참석자, 메모는 현재 화면 보조 정보이며 아직 서버에는 저장되지 않습니다."
-              tone="warning"
               className="mb-5"
             />
           ) : null}
@@ -1572,14 +1566,6 @@ export function Calendar({ scenarioId }: CalendarProps) {
             />
           ) : null}
 
-          {!useDemoDataMode ? (
-            <StateBanner
-              title="지금 저장되는 항목"
-              description="실제 백엔드에는 제목, 날짜, 시작 시간, 종료 시간만 저장됩니다. 장소와 메모는 문서화된 미구현 항목으로 남겨두고 있습니다."
-              tone="warning"
-            />
-          ) : null}
-
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm text-foreground">
               <span>제목</span>
@@ -1631,8 +1617,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, location: event.target.value }))
                 }
-                disabled={!useDemoDataMode}
-                className="app-form-input h-11 w-full rounded-xl px-4 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                className="app-form-input h-11 w-full rounded-xl px-4 text-sm"
               />
             </label>
 
@@ -1644,8 +1629,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, notes: event.target.value }))
                 }
-                disabled={!useDemoDataMode}
-                className="app-form-input w-full rounded-xl px-4 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                className="app-form-input w-full rounded-xl px-4 py-3 text-sm"
               />
             </label>
           </div>

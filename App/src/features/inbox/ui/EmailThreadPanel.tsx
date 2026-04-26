@@ -14,18 +14,6 @@ const metaByStatus = emailStatusMeta as Record<
   { label: string; tone: StatusBadgeTone; banner: string }
 >;
 
-function getConfidenceTone(confidence: number): StatusBadgeTone {
-  if (confidence >= 95) {
-    return "success";
-  }
-
-  if (confidence >= 90) {
-    return "teal";
-  }
-
-  return "warning";
-}
-
 interface EmailThreadPanelProps {
   email: EmailItem | null;
 }
@@ -67,7 +55,6 @@ export function EmailThreadPanel({ email }: EmailThreadPanelProps) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge label={`신뢰도 ${email.confidence}%`} tone={getConfidenceTone(email.confidence)} />
         <StatusBadge label={metaByStatus[email.status].label} tone={metaByStatus[email.status].tone} />
       </div>
 

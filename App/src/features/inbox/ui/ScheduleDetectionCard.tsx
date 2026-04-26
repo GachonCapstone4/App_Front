@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Clock3, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { addInboxCalendarEvent, ignoreInboxCalendarEvent } from "../../../shared/api/inbox";
+import { getErrorMessage } from "../../../shared/api/http";
 import type { DetectedSchedule, EmailSchedule } from "../../../shared/types";
 
 interface ScheduleDetectionCardProps {
@@ -17,6 +19,7 @@ export function ScheduleDetectionCard({
 }: ScheduleDetectionCardProps) {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(false);
+  const [processingAction, setProcessingAction] = useState<"add" | "ignore" | null>(null);
 
   if (dismissed) {
     return null;
@@ -40,6 +43,32 @@ export function ScheduleDetectionCard({
       sender: detectedSchedule.attendees[0] || "고객",
       subject: emailSubject,
     },
+  };
+
+  const handleAddToCalendar = async () => {
+    try {
+      setProcessingAction("add");
+      const response = await addInboxCalendarEvent(Number(emailId));
+      setDismissed(true);
+      toast.success(response.message || "일정을 캘린더에 추가했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "일정을 캘린더에 추가하지 못했습니다."));
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleIgnoreSchedule = async () => {
+    try {
+      setProcessingAction("ignore");
+      const response = await ignoreInboxCalendarEvent(Number(emailId));
+      setDismissed(true);
+      toast.success(response.message || "이 이메일의 일정 감지를 무시했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "일정 감지 상태를 변경하지 못했습니다."));
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
   return (
@@ -70,16 +99,10 @@ export function ScheduleDetectionCard({
         <button
           type="button"
           className="rounded-xl bg-[#8B5CF6] px-4 py-2 text-xs font-medium text-white transition hover:bg-[#7C3AED] dark:bg-[#46306B] dark:text-[#F5F3FF] dark:hover:bg-[#523A7C]"
-          onClick={() => {
-            navigate("/app/calendar", {
-              state: {
-                prefillEvent,
-                autoSubmit: true,
-              },
-            });
-          }}
+          onClick={() => void handleAddToCalendar()}
+          disabled={processingAction !== null}
         >
-          캘린더에 추가
+          {processingAction === "add" ? "추가 중..." : "캘린더에 추가"}
         </button>
         <button
           type="button"
@@ -92,18 +115,17 @@ export function ScheduleDetectionCard({
               },
             });
           }}
+          disabled={processingAction !== null}
         >
           내용 수정 후 추가
         </button>
         <button
           type="button"
           className="rounded-xl px-1 py-2 text-xs font-medium text-[#94A3B8] transition hover:text-[#64748B] dark:text-muted-foreground dark:hover:text-foreground"
-          onClick={() => {
-            setDismissed(true);
-            toast("이 이메일의 일정 감지를 무시했습니다.");
-          }}
+          onClick={() => void handleIgnoreSchedule()}
+          disabled={processingAction !== null}
         >
-          이 이메일에서 무시
+          {processingAction === "ignore" ? "무시 처리 중..." : "이 이메일에서 무시"}
         </button>
       </div>
     </div>

@@ -15,7 +15,6 @@ import {
   getInboxDetail,
   getInboxList,
   getInboxRecommendations,
-  seedInboxTestEmail,
   sendInboxReply,
   skipInboxReply,
 } from "../../shared/api/inbox";
@@ -97,7 +96,6 @@ export function InboxPage() {
   const [isLoadingList, setIsLoadingList] = useState(!useDemoDataMode);
   const [listLoadError, setListLoadError] = useState<string | null>(null);
   const [isHydratingDetails, setIsHydratingDetails] = useState(false);
-  const [isSeedingTestEmail, setIsSeedingTestEmail] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
   const refreshEmailDetail = async (emailId: string) => {
@@ -585,47 +583,6 @@ export function InboxPage() {
     }
   };
 
-  const handleSeedTestEmail = async () => {
-    if (useDemoDataMode || isSeedingTestEmail) {
-      return;
-    }
-
-    try {
-      setIsSeedingTestEmail(true);
-      const response = await seedInboxTestEmail();
-      setActiveStatus("pending");
-      setSelectedEmailId(String(response.email_id));
-      setReloadToken((current) => current + 1);
-      toast.success(response.message || "테스트 메일을 추가했습니다.");
-    } catch (error) {
-      toast.error(getErrorMessage(error, "테스트 메일을 추가하지 못했습니다."));
-    } finally {
-      setIsSeedingTestEmail(false);
-    }
-  };
-
-  const emptyInboxAction = !useDemoDataMode ? (
-    <button
-      type="button"
-      className="app-cta-accent inline-flex min-w-[180px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium"
-      onClick={() => void handleSeedTestEmail()}
-      disabled={isSeedingTestEmail}
-    >
-      {isSeedingTestEmail ? "테스트 메일 추가 중..." : "테스트 메일 추가"}
-    </button>
-  ) : null;
-
-  const seedTestEmailAction = !useDemoDataMode ? (
-    <button
-      type="button"
-      className="app-secondary-button inline-flex min-w-[140px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium"
-      onClick={() => void handleSeedTestEmail()}
-      disabled={isSeedingTestEmail}
-    >
-      {isSeedingTestEmail ? "추가 중..." : "테스트 메일 추가"}
-    </button>
-  ) : null;
-
   const draftBanner =
     draftSendErrorScenario
       ? {
@@ -639,13 +596,7 @@ export function InboxPage() {
             description: "이 메일의 일정 후보를 해석하지 못했습니다. 캘린더 화면에서 수동으로 일정을 추가할 수 있습니다.",
             tone: "warning" as const,
           }
-        : !useDemoDataMode
-          ? {
-              title: "현재 수신함 연결 범위",
-              description: "미발송 상태는 백엔드 draft_status를 우선 사용하며, 추천 템플릿은 RAG 매칭 결과를 기준으로 순차 로드합니다.",
-              tone: "neutral" as const,
-            }
-          : null;
+        : null;
 
   const renderThreadContent = () => {
     if (threadErrorScenario) {
@@ -716,7 +667,6 @@ export function InboxPage() {
                 unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
-              {seedTestEmailAction}
             </div>
 
             <div className="px-2 py-2">
@@ -736,9 +686,8 @@ export function InboxPage() {
               ) : visibleEmails.length === 0 ? (
                 <StatePanel
                   title="표시할 이메일이 없습니다"
-                  description="현재 필터 조건에 맞는 메일이 없습니다. 로컬 테스트용 메일을 추가하거나 다른 상태 탭을 선택해 보세요."
+                  description="현재 필터 조건에 맞는 메일이 없습니다. Gmail 연동 후 새 메일이 처리되면 이 목록에 표시됩니다."
                   tone="empty"
-                  action={emptyInboxAction}
                   className="min-h-[320px]"
                 />
               ) : (
@@ -763,7 +712,6 @@ export function InboxPage() {
                 unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
-              {seedTestEmailAction}
             </div>
           </div>
 
@@ -785,9 +733,8 @@ export function InboxPage() {
               ) : visibleEmails.length === 0 ? (
                 <StatePanel
                   title="선택한 상태에 메일이 없습니다"
-                  description="검토할 메일이 모두 처리되었거나 필터 조건에 맞는 항목이 없습니다. 로컬 테스트용 메일을 추가해 바로 확인할 수 있습니다."
+                  description="검토할 메일이 모두 처리되었거나 필터 조건에 맞는 항목이 없습니다. 새 Gmail 수신 메일이 처리되면 이 목록에 표시됩니다."
                   tone="empty"
-                  action={emptyInboxAction}
                   className="min-h-[520px]"
                 />
               ) : (

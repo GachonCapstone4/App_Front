@@ -83,11 +83,17 @@ export async function createCalendarEvent(payload: {
   title: string;
   startDatetime: string;
   endDatetime: string;
+  eventType?: string;
+  location?: string;
+  notes?: string;
 }) {
   const response = await api.post<CalendarEventApiResponse>("/api/calendar/events", {
     title: payload.title,
     startDatetime: payload.startDatetime,
     endDatetime: payload.endDatetime,
+    eventType: payload.eventType,
+    location: payload.location,
+    notes: payload.notes,
   });
 
   return mapCalendarSnapshot(response.data);
@@ -99,12 +105,18 @@ export async function updateCalendarEvent(
     title: string;
     startDatetime: string;
     endDatetime: string;
+    eventType?: string;
+    location?: string;
+    notes?: string;
   },
 ) {
   const response = await api.put<CalendarEventApiResponse>(`/api/calendar/events/${eventId}`, {
     title: payload.title,
     startDatetime: payload.startDatetime,
     endDatetime: payload.endDatetime,
+    eventType: payload.eventType,
+    location: payload.location,
+    notes: payload.notes,
   });
 
   return mapCalendarSnapshot(response.data);

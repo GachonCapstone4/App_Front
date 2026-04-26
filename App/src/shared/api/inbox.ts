@@ -66,11 +66,6 @@ type InboxActionApiResponse = {
   message: string;
 };
 
-type InboxSeedApiResponse = {
-  message: string;
-  email_id: number;
-};
-
 type InboxRecommendationApiItem = {
   draft_id: number;
   template_title?: string | null;
@@ -198,7 +193,16 @@ export async function skipInboxReply(emailId: number) {
   return response.data;
 }
 
-export async function seedInboxTestEmail() {
-  const response = await api.post<InboxSeedApiResponse>("/api/inbox/test-seed");
+export async function addInboxCalendarEvent(emailId: number) {
+  const response = await api.post<InboxActionApiResponse>(`/api/inbox/${emailId}/calendar`, {
+    action: "ADD",
+  });
+  return response.data;
+}
+
+export async function ignoreInboxCalendarEvent(emailId: number) {
+  const response = await api.post<InboxActionApiResponse>(`/api/inbox/${emailId}/calendar`, {
+    action: "IGNORE",
+  });
   return response.data;
 }
