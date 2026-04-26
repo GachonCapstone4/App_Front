@@ -110,7 +110,7 @@ export function InboxPage() {
 
           const merged = mergeInboxDetail(item, detail);
           const shouldReloadRecommendations =
-            Boolean(merged.matchingText) &&
+            Boolean(merged.summary.trim() || merged.matchingText?.trim()) &&
             !merged.recommendations?.length &&
             merged.recommendationState === "error";
 
@@ -249,13 +249,15 @@ export function InboxPage() {
     visibleEmails[0] ||
     null;
   const selectedRecommendationState = selectedEmail?.recommendationState;
-  const selectedMatchingText = selectedEmail?.matchingText?.trim() ?? "";
+  const selectedAnalysisReady = Boolean(
+    selectedEmail?.summary.trim() || selectedEmail?.matchingText?.trim(),
+  );
 
   const shouldPollSelectedEmail =
     !useDemoDataMode &&
     selectedEmail != null &&
     selectedEmail.status === "pending" &&
-    (!selectedEmail.summary.trim() || !selectedEmail.matchingText);
+    !selectedAnalysisReady;
 
   const selectedEmailLoading =
     !useDemoDataMode &&
@@ -294,7 +296,7 @@ export function InboxPage() {
       return;
     }
 
-    if (!selectedMatchingText) {
+    if (!selectedAnalysisReady) {
       return;
     }
 
@@ -310,7 +312,7 @@ export function InboxPage() {
       ),
     );
   }, [
-    selectedMatchingText,
+    selectedAnalysisReady,
     selectedRecommendationState,
     selectedEmailId,
     useDemoDataMode,
@@ -321,7 +323,7 @@ export function InboxPage() {
       return;
     }
 
-    if (!selectedMatchingText || selectedRecommendationState !== "loading") {
+    if (!selectedAnalysisReady || selectedRecommendationState !== "loading") {
       return;
     }
 
@@ -375,7 +377,7 @@ export function InboxPage() {
       cancelled = true;
     };
   }, [
-    selectedMatchingText,
+    selectedAnalysisReady,
     selectedRecommendationState,
     selectedEmailId,
     useDemoDataMode,
@@ -403,7 +405,7 @@ export function InboxPage() {
 
             const merged = mergeInboxDetail(item, detail);
             const shouldReloadRecommendations =
-              Boolean(merged.matchingText) &&
+              Boolean(merged.summary.trim() || merged.matchingText?.trim()) &&
               !merged.recommendations?.length &&
               merged.recommendationState === "error";
 
