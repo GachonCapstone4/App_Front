@@ -254,6 +254,13 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "internal-monitoring",
+        lazy: async () => {
+          const module = await import("../../admin/pages/internal-monitoring");
+          return { Component: module.InternalMonitoringPage };
+        },
+      },
+      {
         path: "*",
         lazy: async () => {
           const module = await import("../../admin/pages/not-found");

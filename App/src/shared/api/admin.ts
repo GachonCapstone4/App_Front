@@ -167,6 +167,31 @@ type AdminJobSummaryApiResponse = {
   failed_count: number;
 };
 
+type AdminJobDetailApiResponse = {
+  outbox_id: number;
+  email_id: number;
+  status: string;
+  payload: string;
+  retry_count: number;
+  max_retry: number;
+  created_at: string;
+  sent_at: string | null;
+  finished_at: string | null;
+};
+
+type AdminJobErrorApiResponse = {
+  outbox_id: number;
+  fail_reason: string | null;
+};
+
+type AdminKubernetesJobApiResponse = {
+  job_name: string;
+  namespace: string;
+  uid: string;
+  yaml_path: string;
+  created_at: string;
+};
+
 export type AdminSupportTicketSummary = {
   ticketId: string;
   userId: string;
@@ -549,7 +574,28 @@ export async function getAdminOperationJobSummary() {
   return response.data;
 }
 
+export async function getAdminOperationJobDetail(jobId: string) {
+  const response = await api.get<AdminJobDetailApiResponse>(
+    `/api/admin/operations/jobs/${jobId}`,
+  );
+  return response.data;
+}
+
+export async function getAdminOperationJobError(jobId: string) {
+  const response = await api.get<AdminJobErrorApiResponse>(
+    `/api/admin/operations/jobs/${jobId}/error`,
+  );
+  return response.data;
+}
+
 export async function deleteAdminOperationJob(jobId: string) {
   const response = await api.delete(`/api/admin/operations/jobs/${jobId}`);
+  return response.data;
+}
+
+export async function executeAdminNetworkDictJob() {
+  const response = await api.post<AdminKubernetesJobApiResponse>(
+    "/api/admin/k8s/jobs/network-dict",
+  );
   return response.data;
 }

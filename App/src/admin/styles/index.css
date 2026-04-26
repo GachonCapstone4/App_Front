@@ -468,6 +468,121 @@
   color: var(--text);
 }
 
+.admin-field-label {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-internal-monitoring-page {
+  min-height: calc(100vh - 72px);
+}
+
+.admin-internal-monitoring-controls {
+  flex-shrink: 0;
+}
+
+.admin-internal-monitoring-toolbar {
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+
+.admin-internal-monitoring-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.admin-request-card {
+  min-height: 118px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--teal-soft) 70%, transparent 30%), transparent 46%),
+    var(--surface-soft);
+  color: var(--text);
+  padding: 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-request-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--teal) 45%, var(--line) 55%);
+  box-shadow: 0 14px 32px rgba(26, 43, 61, 0.12);
+}
+
+.admin-request-card:disabled {
+  opacity: 0.68;
+  cursor: wait;
+}
+
+.admin-request-card svg {
+  flex-shrink: 0;
+  color: var(--teal);
+}
+
+.admin-request-card strong,
+.admin-request-card small {
+  display: block;
+}
+
+.admin-request-card strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-request-card small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-request-card--accent {
+  background:
+    radial-gradient(circle at top right, rgba(199, 131, 45, 0.18), transparent 48%),
+    var(--surface-soft);
+}
+
+.admin-request-card--accent svg {
+  color: #c7832d;
+}
+
+.admin-log-panel {
+  flex: 1;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-log-output {
+  flex: 1;
+  min-height: 440px;
+  max-height: min(72vh, 760px);
+  overflow: auto;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--navy) 18%, var(--line) 82%);
+  border-radius: 18px;
+  background: #0d1722;
+  color: #d7f7ef;
+  padding: 20px;
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 .admin-chip {
   padding: 8px 12px;
   font-weight: 500;
@@ -1192,7 +1307,8 @@
   .admin-stage-grid,
   .admin-master-detail,
   .admin-meta-grid,
-  .admin-form-grid {
+  .admin-form-grid,
+  .admin-internal-monitoring-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1220,9 +1336,18 @@
   .admin-stage-grid,
   .admin-meta-grid,
   .admin-form-grid,
+  .admin-internal-monitoring-actions,
   .admin-inline-stat-grid,
   .admin-mini-chart {
     grid-template-columns: 1fr;
+  }
+
+  .admin-log-panel {
+    min-height: 420px;
+  }
+
+  .admin-log-output {
+    min-height: 340px;
   }
 
   .admin-input,

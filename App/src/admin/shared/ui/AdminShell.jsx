@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
-import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Users } from "lucide-react";
+import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Terminal, Users } from "lucide-react";
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/admin/template-automation", label: "템플릿 / 자동화 관리", icon: Bot },
   { to: "/admin/inquiries", label: "사용자 문의 대응", icon: MessageSquare },
   { to: "/admin/monitoring", label: "시스템 운영 모니터링", icon: Activity },
+  { to: "/admin/internal-monitoring", label: "시스템 내부 모니터링", icon: Terminal },
 ];
 
 export function AdminShell() {
