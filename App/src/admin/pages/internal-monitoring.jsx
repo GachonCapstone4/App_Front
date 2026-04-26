@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Activity, FileSearch, ListChecks, Play, Search } from "lucide-react";
 import {
   executeAdminNetworkDictJob,
@@ -78,16 +78,36 @@ function createLogEntry({ title, endpoint, method, startedAt, status, data, erro
 export function InternalMonitoringPage() {
   const [jobId, setJobId] = useState("");
   const [activeRequestId, setActiveRequestId] = useState("");
+  const [focusedButtonId, setFocusedButtonId] = useState("summary");
   const [logs, setLogs] = useState([]);
-
-  const activeRequest = useMemo(
-    () => requestButtons.find((button) => button.id === activeRequestId),
-    [activeRequestId],
-  );
+  const focusedButton =
+    requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
 
   const appendLog = (entry) => {
     setLogs((current) => [entry, ...current].slice(0, 20));
   };
+
+  const renderRequestButton = (button) => (
+    <button
+      key={button.id}
+      type="button"
+      className={
+        button.dangerous
+          ? "admin-request-card admin-request-card--accent"
+          : "admin-request-card"
+      }
+      onClick={() => void runRequest(button)}
+      onFocus={() => setFocusedButtonId(button.id)}
+      onMouseEnter={() => setFocusedButtonId(button.id)}
+      disabled={Boolean(activeRequestId)}
+      title={button.description}
+    >
+      <button.icon size={18} />
+      <span>
+        <strong>{button.label}</strong>
+      </span>
+    </button>
+  );
 
   const runRequest = async (button) => {
     if (button.needsJobId && !jobId.trim()) {
@@ -177,62 +197,53 @@ export function InternalMonitoringPage() {
 
       <div className="admin-internal-monitoring-layout">
         <section className="admin-panel admin-internal-monitoring-controls">
-          <div className="admin-panel-head">
-            <div>
-              <h2>내부 요청 실행</h2>
-              <p className="admin-panel-subtitle">
-                버튼을 누르면 해당 요청 결과가 오른쪽 로그 출력창에 누적됩니다.
-              </p>
-            </div>
-            <span className="admin-panel-note">
-              {activeRequest ? `${activeRequest.label} 실행 중` : "대기 중"}
-            </span>
+          <button
+            type="button"
+            className="admin-button admin-button--ghost admin-log-clear-button"
+            onClick={() => setLogs([])}
+            disabled={logs.length === 0 || Boolean(activeRequestId)}
+          >
+            로그 비우기
+          </button>
+
+          <div className="admin-internal-monitoring-actions">
+            {requestButtons
+              .filter((button) => button.id === "summary" || button.id === "recent-jobs")
+              .map(renderRequestButton)}
           </div>
 
-          <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
-            outbox ID
-          </label>
-          <div className="admin-toolbar admin-internal-monitoring-toolbar">
+          <div className="admin-internal-monitoring-job-field">
+            <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
+              outbox ID
+            </label>
             <input
               id="internal-monitoring-job-id"
               className="admin-input"
               type="text"
               inputMode="numeric"
-              placeholder="작업 상세/실패 원인 조회 시 입력"
+              placeholder="outbox ID 입력"
               value={jobId}
               onChange={(event) => setJobId(event.target.value)}
             />
-            <button
-              type="button"
-              className="admin-button admin-button--ghost"
-              onClick={() => setLogs([])}
-              disabled={logs.length === 0 || Boolean(activeRequestId)}
-            >
-              로그 비우기
-            </button>
           </div>
 
           <div className="admin-internal-monitoring-actions">
-            {requestButtons.map((button) => (
-              <button
-                key={button.id}
-                type="button"
-                className={
-                  button.dangerous
-                    ? "admin-request-card admin-request-card--accent"
-                    : "admin-request-card"
-                }
-                onClick={() => void runRequest(button)}
-                disabled={Boolean(activeRequestId)}
-              >
-                <button.icon size={18} />
-                <span>
-                  <strong>{button.label}</strong>
-                  <small>{button.description}</small>
-                </span>
-              </button>
-            ))}
+            {requestButtons
+              .filter((button) => button.id === "job-detail" || button.id === "job-error")
+              .map(renderRequestButton)}
           </div>
+
+          <div className="admin-internal-monitoring-actions">
+            {requestButtons
+              .filter((button) => button.id === "network-dict")
+              .map(renderRequestButton)}
+          </div>
+
+          <aside className="admin-request-help">
+            <span>요청 설명</span>
+            <strong>{focusedButton.label}</strong>
+            <p>{focusedButton.description}</p>
+          </aside>
         </section>
 
         <section className="admin-panel admin-log-panel">
