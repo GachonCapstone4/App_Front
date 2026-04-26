@@ -42,16 +42,9 @@ const requestButtons = [
   {
     id: "network-dict",
     label: "네트워크 사전 Job 실행",
-    description: "Kubernetes 네트워크 사전 Job을 실행합니다. 실제 점검 결과는 network_test SSE 이벤트로 수신합니다.",
+    description: "Kubernetes 네트워크 사전 Job을 실행합니다. 실행 결과로 들어오는 network_test 이벤트는 로그창에 자동 표시됩니다.",
     icon: Play,
     dangerous: true,
-  },
-  {
-    id: "network-test-stream",
-    label: "SSE 네트워크 로그 수신 시작",
-    description: "RabbitMQ에서 SSE Pod를 거쳐 전달되는 network_test 이벤트를 로그창에 실시간으로 표시합니다.",
-    icon: Activity,
-    togglesStream: true,
   },
 ];
 
@@ -83,11 +76,36 @@ function createLogEntry({ title, endpoint, method, startedAt, status, data, erro
   };
 }
 
+function createNetworkTestLogEntry(payload) {
+  const receivedAt = new Date().toISOString();
+  const eventTime = payload.timestamp ?? receivedAt;
+  const message = payload.message?.trim() || "network_test 메시지 본문이 비어 있습니다.";
+  const metadata = {
+    sse_type: payload.sse_type ?? "network_test",
+    module: payload.module,
+    node_ip: payload.node_ip,
+    stage: payload.stage,
+    status: payload.status,
+    timestamp: payload.timestamp,
+    user_id: payload.user_id,
+  };
+
+  return {
+    id: `${eventTime}-network_test-${payload.node_ip ?? "unknown"}-${payload.stage ?? "event"}`,
+    title: `network_test ${payload.node_ip ?? "unknown"} ${payload.stage ?? "event"}`,
+    endpoint: "event: network_test",
+    method: "SSE",
+    status: payload.status === "error" || payload.status === "failed" ? "ERROR" : "SUCCESS",
+    requestedAt: eventTime,
+    receivedAt,
+    output: `${message}\n\n--- event metadata ---\n${JSON.stringify(metadata, null, 2)}`,
+  };
+}
+
 export function InternalMonitoringPage() {
   const [jobId, setJobId] = useState("");
   const [activeRequestId, setActiveRequestId] = useState("");
   const [focusedButtonId, setFocusedButtonId] = useState("summary");
-  const [networkStreamEnabled, setNetworkStreamEnabled] = useState(false);
   const [logs, setLogs] = useState([]);
   const focusedButton =
     requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
@@ -100,72 +118,30 @@ export function InternalMonitoringPage() {
     <button
       key={button.id}
       type="button"
-      className={
-        button.dangerous || (button.id === "network-test-stream" && networkStreamEnabled)
-          ? "admin-request-card admin-request-card--accent"
-          : "admin-request-card"
-      }
+      className={button.dangerous ? "admin-request-card admin-request-card--accent" : "admin-request-card"}
       onClick={() => void runRequest(button)}
       onFocus={() => setFocusedButtonId(button.id)}
       onMouseEnter={() => setFocusedButtonId(button.id)}
-      disabled={Boolean(activeRequestId) && button.id !== "network-test-stream"}
+      disabled={Boolean(activeRequestId)}
       title={button.description}
     >
       <button.icon size={18} />
       <span>
-        <strong>
-          {button.id === "network-test-stream" && networkStreamEnabled
-            ? "SSE 네트워크 로그 수신 중지"
-            : button.label}
-        </strong>
+        <strong>{button.label}</strong>
       </span>
     </button>
   );
 
   useEffect(() => {
-    if (!networkStreamEnabled) {
-      return undefined;
-    }
-
     return subscribeAppEvent("network_test", (payload) => {
-      const receivedAt = new Date().toISOString();
       setLogs((current) => [
-        createLogEntry({
-          title: `network_test ${payload.stage ?? "event"}`,
-          endpoint: "event: network_test",
-          method: "SSE",
-          startedAt: payload.timestamp ?? receivedAt,
-          status: "SUCCESS",
-          data: payload,
-          error: null,
-        }),
+        createNetworkTestLogEntry(payload),
         ...current,
       ].slice(0, 20));
     });
-  }, [networkStreamEnabled]);
+  }, []);
 
   const runRequest = async (button) => {
-    if (button.id === "network-test-stream") {
-      const nextEnabled = !networkStreamEnabled;
-      const startedAt = new Date().toISOString();
-      setNetworkStreamEnabled(nextEnabled);
-      appendLog(
-        createLogEntry({
-          title: nextEnabled ? "SSE 네트워크 로그 수신 시작" : "SSE 네트워크 로그 수신 중지",
-          endpoint: "event: network_test",
-          method: "SSE",
-          startedAt,
-          status: nextEnabled ? "SUCCESS" : "SKIPPED",
-          data: {
-            event: "network_test",
-            enabled: nextEnabled,
-          },
-          error: null,
-        }),
-      );
-      return;
-    }
-
     if (button.needsJobId && !jobId.trim()) {
       appendLog(
         createLogEntry({
@@ -304,7 +280,7 @@ export function InternalMonitoringPage() {
             <span className="admin-request-section-label">진단 Job</span>
             <div className="admin-internal-monitoring-actions">
               {requestButtons
-                .filter((button) => button.id === "network-dict" || button.id === "network-test-stream")
+                .filter((button) => button.id === "network-dict")
                 .map(renderRequestButton)}
             </div>
           </div>
@@ -324,7 +300,7 @@ export function InternalMonitoringPage() {
           {logs.length === 0 ? (
             <AdminStateNotice
               title="아직 출력된 로그가 없습니다"
-              description="왼쪽의 요청 버튼을 클릭하면 API 응답 또는 에러가 이 영역에 크게 표시됩니다."
+              description="네트워크 사전 Job을 실행하면 API 응답과 network_test SSE 결과가 이 영역에 표시됩니다."
               tone="empty"
               compact
             />
