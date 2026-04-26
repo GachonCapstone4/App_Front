@@ -47,7 +47,7 @@ const requestButtons = [
   },
 ];
 
-function buildLogEntry({ title, endpoint, method, startedAt, status, data, error }) {
+function createLogEntry({ title, endpoint, method, startedAt, status, data, error }) {
   const body = {
     title,
     request: {
@@ -63,7 +63,16 @@ function buildLogEntry({ title, endpoint, method, startedAt, status, data, error
     },
   };
 
-  return JSON.stringify(body, null, 2);
+  return {
+    id: `${startedAt}-${title}-${status}`,
+    title,
+    endpoint,
+    method,
+    status,
+    requestedAt: startedAt,
+    receivedAt: body.response.received_at,
+    output: JSON.stringify(body, null, 2),
+  };
 }
 
 export function InternalMonitoringPage() {
@@ -83,7 +92,7 @@ export function InternalMonitoringPage() {
   const runRequest = async (button) => {
     if (button.needsJobId && !jobId.trim()) {
       appendLog(
-        buildLogEntry({
+        createLogEntry({
           title: button.label,
           endpoint: "/api/admin/operations/jobs/{job_id}",
           method: "GET",
@@ -132,7 +141,7 @@ export function InternalMonitoringPage() {
       }
 
       appendLog(
-        buildLogEntry({
+        createLogEntry({
           title: button.label,
           endpoint,
           method,
@@ -144,7 +153,7 @@ export function InternalMonitoringPage() {
       );
     } catch (error) {
       appendLog(
-        buildLogEntry({
+        createLogEntry({
           title: button.label,
           endpoint,
           method,
@@ -163,90 +172,115 @@ export function InternalMonitoringPage() {
     <section className="admin-page admin-internal-monitoring-page">
       <PageHeader
         title="시스템 내부 모니터링"
-        description="Admin_Server의 운영 API를 직접 호출하고, 요청별 응답과 실패 원인을 로그 형태로 확인합니다."
+        description="시스템 내부 요청별 응답과 실패 원인을 로그 형태로 확인합니다."
       />
 
-      <section className="admin-panel admin-internal-monitoring-controls">
-        <div className="admin-panel-head">
-          <div>
-            <h2>내부 요청 실행</h2>
-            <p className="admin-panel-subtitle">
-              버튼을 누르면 해당 API 요청 결과가 아래 로그 출력창에 누적됩니다.
-            </p>
+      <div className="admin-internal-monitoring-layout">
+        <section className="admin-panel admin-internal-monitoring-controls">
+          <div className="admin-panel-head">
+            <div>
+              <h2>내부 요청 실행</h2>
+              <p className="admin-panel-subtitle">
+                버튼을 누르면 해당 요청 결과가 오른쪽 로그 출력창에 누적됩니다.
+              </p>
+            </div>
+            <span className="admin-panel-note">
+              {activeRequest ? `${activeRequest.label} 실행 중` : "대기 중"}
+            </span>
           </div>
-          <span className="admin-panel-note">
-            {activeRequest ? `${activeRequest.label} 실행 중` : "대기 중"}
-          </span>
-        </div>
 
-        <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
-          outbox ID
-        </label>
-        <div className="admin-toolbar admin-internal-monitoring-toolbar">
-          <input
-            id="internal-monitoring-job-id"
-            className="admin-input"
-            type="text"
-            inputMode="numeric"
-            placeholder="작업 상세/실패 원인 조회 시 입력"
-            value={jobId}
-            onChange={(event) => setJobId(event.target.value)}
-          />
-          <button
-            type="button"
-            className="admin-button admin-button--ghost"
-            onClick={() => setLogs([])}
-            disabled={logs.length === 0 || Boolean(activeRequestId)}
-          >
-            로그 비우기
-          </button>
-        </div>
-
-        <div className="admin-internal-monitoring-actions">
-          {requestButtons.map((button) => (
+          <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
+            outbox ID
+          </label>
+          <div className="admin-toolbar admin-internal-monitoring-toolbar">
+            <input
+              id="internal-monitoring-job-id"
+              className="admin-input"
+              type="text"
+              inputMode="numeric"
+              placeholder="작업 상세/실패 원인 조회 시 입력"
+              value={jobId}
+              onChange={(event) => setJobId(event.target.value)}
+            />
             <button
-              key={button.id}
               type="button"
-              className={
-                button.dangerous
-                  ? "admin-request-card admin-request-card--accent"
-                  : "admin-request-card"
-              }
-              onClick={() => void runRequest(button)}
-              disabled={Boolean(activeRequestId)}
+              className="admin-button admin-button--ghost"
+              onClick={() => setLogs([])}
+              disabled={logs.length === 0 || Boolean(activeRequestId)}
             >
-              <button.icon size={18} />
-              <span>
-                <strong>{button.label}</strong>
-                <small>{button.description}</small>
-              </span>
+              로그 비우기
             </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="admin-panel admin-log-panel">
-        <div className="admin-panel-head">
-          <div>
-            <h2>로그 출력창</h2>
-            <p className="admin-panel-subtitle">
-              최신 요청이 가장 위에 표시됩니다. 실제 장애 확인 시 이 내용을 백엔드 로그와 함께 대조하면 됩니다.
-            </p>
           </div>
-          <span className="admin-panel-note">{logs.length}개 요청 기록</span>
-        </div>
 
-        {logs.length === 0 ? (
-          <AdminStateNotice
-            title="아직 출력된 로그가 없습니다"
-            description="위의 요청 버튼을 클릭하면 API 응답 또는 에러가 이 영역에 크게 표시됩니다."
-            tone="empty"
-            compact
-          />
-        ) : (
-          <pre className="admin-log-output">{logs.join("\n\n---\n\n")}</pre>
-        )}
-      </section>
+          <div className="admin-internal-monitoring-actions">
+            {requestButtons.map((button) => (
+              <button
+                key={button.id}
+                type="button"
+                className={
+                  button.dangerous
+                    ? "admin-request-card admin-request-card--accent"
+                    : "admin-request-card"
+                }
+                onClick={() => void runRequest(button)}
+                disabled={Boolean(activeRequestId)}
+              >
+                <button.icon size={18} />
+                <span>
+                  <strong>{button.label}</strong>
+                  <small>{button.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="admin-panel admin-log-panel">
+          <div className="admin-panel-head">
+            <div>
+              <h2>로그 출력창</h2>
+              <p className="admin-panel-subtitle">
+                최신 요청이 가장 위에 표시됩니다. 실제 장애 확인 시 이 내용을 백엔드 로그와 함께 대조하면 됩니다.
+              </p>
+            </div>
+            <span className="admin-panel-note">{logs.length}개 요청 기록</span>
+          </div>
+
+          {logs.length === 0 ? (
+            <AdminStateNotice
+              title="아직 출력된 로그가 없습니다"
+              description="왼쪽의 요청 버튼을 클릭하면 API 응답 또는 에러가 이 영역에 크게 표시됩니다."
+              tone="empty"
+              compact
+            />
+          ) : (
+            <div className="admin-log-output">
+              {logs.map((log, index) => (
+                <article key={`${log.id}-${index}`} className="admin-log-entry">
+                  <div className="admin-log-entry-head">
+                    <div>
+                      <p className="admin-log-entry-kicker">#{logs.length - index}</p>
+                      <h3>{log.title}</h3>
+                    </div>
+                    <span className={`admin-log-status admin-log-status--${log.status.toLowerCase()}`}>
+                      {log.status}
+                    </span>
+                  </div>
+
+                  <div className="admin-log-meta">
+                    <span>{log.method}</span>
+                    <span>{log.endpoint}</span>
+                    <span>요청 {log.requestedAt}</span>
+                    <span>응답 {log.receivedAt}</span>
+                  </div>
+
+                  <pre>{log.output}</pre>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </section>
   );
 }
