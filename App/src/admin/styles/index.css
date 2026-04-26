@@ -484,41 +484,42 @@
 
 .admin-internal-monitoring-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(210px, 2fr) minmax(0, 8fr);
   gap: 20px;
   align-items: stretch;
 }
 
 .admin-internal-monitoring-controls {
   flex-shrink: 0;
+  padding: 18px;
 }
 
 .admin-internal-monitoring-toolbar {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .admin-internal-monitoring-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .admin-request-card {
   width: 100%;
-  min-height: 96px;
+  min-height: 72px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 14px;
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--teal-soft) 70%, transparent 30%), transparent 46%),
     var(--surface-soft);
   color: var(--text);
-  padding: 15px;
+  padding: 11px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 9px;
   text-align: left;
   cursor: pointer;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -546,14 +547,14 @@
 }
 
 .admin-request-card strong {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
 .admin-request-card small {
-  margin-top: 8px;
+  margin-top: 5px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -568,15 +569,15 @@
 }
 
 .admin-log-panel {
-  min-height: 680px;
+  min-height: 720px;
   display: flex;
   flex-direction: column;
 }
 
 .admin-log-output {
   flex: 1;
-  min-height: 590px;
-  max-height: min(78vh, 900px);
+  min-height: 630px;
+  max-height: min(80vh, 960px);
   overflow: auto;
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--navy) 18%, var(--line) 82%);
