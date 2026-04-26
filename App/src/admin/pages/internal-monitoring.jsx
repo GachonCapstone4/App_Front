@@ -206,37 +206,45 @@ export function InternalMonitoringPage() {
             로그 비우기
           </button>
 
-          <div className="admin-internal-monitoring-actions">
-            {requestButtons
-              .filter((button) => button.id === "summary" || button.id === "recent-jobs")
-              .map(renderRequestButton)}
+          <div className="admin-request-section">
+            <span className="admin-request-section-label">작업 현황 조회</span>
+            <div className="admin-internal-monitoring-actions">
+              {requestButtons
+                .filter((button) => button.id === "summary" || button.id === "recent-jobs")
+                .map(renderRequestButton)}
+            </div>
           </div>
 
-          <div className="admin-internal-monitoring-job-field">
-            <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
-              outbox ID
-            </label>
-            <input
-              id="internal-monitoring-job-id"
-              className="admin-input"
-              type="text"
-              inputMode="numeric"
-              placeholder="outbox ID 입력"
-              value={jobId}
-              onChange={(event) => setJobId(event.target.value)}
-            />
+          <div className="admin-request-section">
+            <span className="admin-request-section-label">outbox 기반 조회</span>
+            <div className="admin-internal-monitoring-job-field">
+              <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
+                outbox ID
+              </label>
+              <input
+                id="internal-monitoring-job-id"
+                className="admin-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="outbox ID 입력"
+                value={jobId}
+                onChange={(event) => setJobId(event.target.value)}
+              />
+            </div>
+            <div className="admin-internal-monitoring-actions">
+              {requestButtons
+                .filter((button) => button.id === "job-detail" || button.id === "job-error")
+                .map(renderRequestButton)}
+            </div>
           </div>
 
-          <div className="admin-internal-monitoring-actions">
-            {requestButtons
-              .filter((button) => button.id === "job-detail" || button.id === "job-error")
-              .map(renderRequestButton)}
-          </div>
-
-          <div className="admin-internal-monitoring-actions">
-            {requestButtons
-              .filter((button) => button.id === "network-dict")
-              .map(renderRequestButton)}
+          <div className="admin-request-section">
+            <span className="admin-request-section-label">진단 Job</span>
+            <div className="admin-internal-monitoring-actions">
+              {requestButtons
+                .filter((button) => button.id === "network-dict")
+                .map(renderRequestButton)}
+            </div>
           </div>
 
           <aside className="admin-request-help">
