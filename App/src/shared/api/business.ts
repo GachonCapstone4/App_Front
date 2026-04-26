@@ -47,7 +47,6 @@ type CategoryApiResponse = {
   category_id: number;
   category_name: string;
   color: string | null;
-  keywords?: string[] | null;
 };
 
 type CategoryListApiResponse = {
@@ -89,7 +88,6 @@ export type BusinessCategorySnapshot = {
   categoryId: number;
   categoryName: string;
   color: string | null;
-  keywords: string[];
 };
 
 export async function getBusinessProfile() {
@@ -228,26 +226,22 @@ export async function getBusinessCategories() {
     categoryId: category.category_id,
     categoryName: category.category_name,
     color: category.color,
-    keywords: Array.isArray(category.keywords) ? category.keywords : [],
   })) satisfies BusinessCategorySnapshot[];
 }
 
 export async function createBusinessCategory(payload: {
   categoryName: string;
   color?: string | null;
-  keywords?: string[];
 }) {
   const response = await api.post<CategoryApiResponse>("/api/business/categories", {
     category_name: payload.categoryName,
     color: payload.color ?? null,
-    keywords: payload.keywords ?? [],
   });
 
   return {
     categoryId: response.data.category_id,
     categoryName: response.data.category_name,
     color: response.data.color,
-    keywords: Array.isArray(response.data.keywords) ? response.data.keywords : [],
   } satisfies BusinessCategorySnapshot;
 }
 
