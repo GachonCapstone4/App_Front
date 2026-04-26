@@ -539,7 +539,7 @@
 
 .admin-event-log-toggle {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
@@ -601,14 +601,6 @@
   min-width: 0;
   line-height: 1.35;
   word-break: keep-all;
-}
-
-.admin-event-log-toggle strong {
-  border-radius: 999px;
-  background: var(--teal-soft);
-  padding: 4px 8px;
-  color: #155346;
-  font-size: 11px;
 }
 
 .admin-request-card {

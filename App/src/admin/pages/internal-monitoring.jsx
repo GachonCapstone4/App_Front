@@ -297,7 +297,6 @@ export function InternalMonitoringPage() {
                 <br />
                 로그 수신
               </span>
-              <strong>{networkEventLogEnabled ? "ON" : "OFF"}</strong>
             </label>
             <div className="admin-internal-monitoring-actions">
               {requestButtons
