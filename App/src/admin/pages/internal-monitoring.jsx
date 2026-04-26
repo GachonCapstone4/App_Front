@@ -289,7 +289,14 @@ export function InternalMonitoringPage() {
                 checked={networkEventLogEnabled}
                 onChange={(event) => setNetworkEventLogEnabled(event.target.checked)}
               />
-              <span>실시간 진단 로그 수신</span>
+              <span className="admin-event-log-toggle-control" aria-hidden="true">
+                <span />
+              </span>
+              <span className="admin-event-log-toggle-label">
+                실시간 진단
+                <br />
+                로그 수신
+              </span>
               <strong>{networkEventLogEnabled ? "ON" : "OFF"}</strong>
             </label>
             <div className="admin-internal-monitoring-actions">
