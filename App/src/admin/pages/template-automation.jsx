@@ -235,8 +235,8 @@ export function TemplateAutomationPage() {
           },
           {
             label: "운영 카테고리",
-            value: `${recommendedCategoryOptions.length}개`,
-            hint: "전체 카테고리 기준",
+            value: `${categoryKeywords.length}개`,
+            hint: "운영 규칙 DB 기준",
           },
           {
             label: "등록 검색용 키워드",
@@ -272,7 +272,7 @@ export function TemplateAutomationPage() {
               templateCount: stat.templateCount,
               usageCount: stat.usageCount,
             })),
-            true,
+            false,
           ),
         );
         setRuleItems(
@@ -898,24 +898,37 @@ export function TemplateAutomationPage() {
           <div className="admin-form-grid admin-form-grid--single">
             <label className="admin-field">
               <span>카테고리명</span>
-              <input
-                value={ruleDraft.categoryName}
-                onChange={(event) => setRuleDraft((current) => ({ ...current, categoryName: event.target.value }))}
-                className="admin-input app-form-input"
-                placeholder="예: 견적 요청"
-                list={editingRuleId ? undefined : "admin-rule-category-options"}
-                disabled={Boolean(editingRuleId)}
-              />
-              {!editingRuleId ? (
-                <datalist id="admin-rule-category-options">
+              {editingRuleId ? (
+                <input
+                  value={ruleDraft.categoryName}
+                  className="admin-input app-form-input"
+                  disabled
+                />
+              ) : (
+                <Select
+                  value={ruleDraft.categoryName}
+                  onValueChange={(value) => setRuleDraft((current) => ({ ...current, categoryName: value }))}
+                  disabled={ruleCategoryNames.length === 0}
+                >
+                  <SelectTrigger className="app-form-input h-11 w-full rounded-xl px-4 text-sm">
+                    <SelectValue placeholder="카테고리를 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent className="app-select-content max-h-72 rounded-2xl p-1">
                   {ruleCategoryNames.map((categoryName) => (
-                    <option key={categoryName} value={categoryName} />
+                    <SelectItem
+                      key={categoryName}
+                      value={categoryName}
+                      className="app-select-item rounded-xl px-3 py-2.5 text-sm"
+                    >
+                      {categoryName}
+                    </SelectItem>
                   ))}
-                </datalist>
-              ) : null}
+                  </SelectContent>
+                </Select>
+              )}
               {!editingRuleId ? (
                 <span className="admin-field-help">
-                  운영 규칙 또는 사용자 카테고리로 등록된 이름만 선택할 수 있습니다.
+                  운영 규칙 DB에 등록된 카테고리만 선택할 수 있습니다.
                 </span>
               ) : null}
             </label>
