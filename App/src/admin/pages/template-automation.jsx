@@ -276,7 +276,7 @@ export function TemplateAutomationPage() {
           ),
         );
         setRuleItems(
-          buildCategoryKeywordRows(categoryKeywords, true),
+          buildCategoryKeywordRows(categoryKeywords),
         );
       })
       .catch((error) => {
@@ -386,6 +386,11 @@ export function TemplateAutomationPage() {
       return;
     }
 
+    if (!editingRuleId && !ruleCategoryNames.includes(categoryName)) {
+      setRuleErrorNotice("현재 운영 규칙 또는 사용자 카테고리로 등록된 이름만 선택할 수 있습니다.");
+      return;
+    }
+
     const keywords = parseKeywords(ruleDraft.keywordsText);
 
     if (ruleSaveErrorScenario) {
@@ -411,7 +416,7 @@ export function TemplateAutomationPage() {
       void request
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
-          setRuleItems(buildCategoryKeywordRows(categories, true));
+          setRuleItems(buildCategoryKeywordRows(categories));
           setRuleDialogOpen(false);
         })
         .catch((error) => {
@@ -467,7 +472,7 @@ export function TemplateAutomationPage() {
       void deleteAdminCategoryKeyword(deleteTarget.id)
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
-          setRuleItems(buildCategoryKeywordRows(categories, true));
+          setRuleItems(buildCategoryKeywordRows(categories));
           setDeleteTarget(null);
         })
         .catch((error) => {
@@ -910,7 +915,7 @@ export function TemplateAutomationPage() {
               ) : null}
               {!editingRuleId ? (
                 <span className="admin-field-help">
-                  기존 카테고리를 선택하거나 새 카테고리명을 입력해 전역 검색 키워드 규칙으로 저장할 수 있습니다.
+                  운영 규칙 또는 사용자 카테고리로 등록된 이름만 선택할 수 있습니다.
                 </span>
               ) : null}
             </label>
