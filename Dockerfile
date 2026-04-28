@@ -15,7 +15,7 @@ RUN npm ci
 
 # Copy source and build
 COPY App/ .
-RUN npm run build
+RUN npx vite build
 
 # ─── Stage 2: Serve ───────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
