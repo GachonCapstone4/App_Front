@@ -15,7 +15,9 @@ RUN npm ci
 
 # Copy source and build
 COPY App/ .
-RUN npx vite build
+RUN echo 'export { StatusBadge as AiUsageBadge } from "./StatusBadge";' \
+    > src/shared/ui/primitives/AiUsageBadge.ts
+RUN npm run build
 
 # ─── Stage 2: Serve ───────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
