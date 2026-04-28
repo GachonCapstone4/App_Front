@@ -25,6 +25,8 @@ import {
   updateAdminCategoryKeyword,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstDateTime } from "../../shared/lib/date-time";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminModal } from "../shared/ui/AdminModal";
@@ -333,6 +335,47 @@ export function TemplateAutomationPage() {
       }),
     [categoryFilter, categoryStats, industry],
   );
+  const categoryUsageGroups = useMemo(() => {
+    const groupMap = new Map();
+
+    filteredCategoryStats.forEach((item) => {
+      const industryLabel = item.industryLabel || "업종 미지정";
+      const group = groupMap.get(industryLabel) ?? {
+        industryLabel,
+        templateCount: 0,
+        usageCount: 0,
+        maxUsageCount: 0,
+        categories: [],
+      };
+
+      group.templateCount += item.templateCount;
+      group.usageCount += item.usageCount;
+      group.maxUsageCount = Math.max(group.maxUsageCount, item.usageCount);
+      group.categories.push(item);
+      groupMap.set(industryLabel, group);
+    });
+
+    return Array.from(groupMap.values())
+      .map((group) => ({
+        ...group,
+        categories: group.categories
+          .slice()
+          .sort((first, second) => {
+            if (second.usageCount !== first.usageCount) {
+              return second.usageCount - first.usageCount;
+            }
+
+            return second.templateCount - first.templateCount;
+          }),
+      }))
+      .sort((first, second) => {
+        if (second.usageCount !== first.usageCount) {
+          return second.usageCount - first.usageCount;
+        }
+
+        return first.industryLabel.localeCompare(second.industryLabel, "ko");
+      });
+  }, [filteredCategoryStats]);
 
   const filteredRuleItems = useMemo(() => {
     const keyword = ruleSearch.trim().toLowerCase();
@@ -535,7 +578,7 @@ export function TemplateAutomationPage() {
     <section className="admin-page">
       <PageHeader
         title="템플릿 / 운영 규칙 관리"
-        description="생성된 템플릿 사용 현황과 전체 카테고리의 검색용 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
+        description="AI가 생성한 템플릿 사용 현황과 RAG 검색용 카테고리 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
         actions={
           activeTab === "rules" ? (
             <button type="button" className="admin-button" onClick={openCreateRule}>
@@ -579,9 +622,12 @@ export function TemplateAutomationPage() {
           <section className="admin-panel admin-template-list-panel">
             <div className="admin-panel-head">
               <div>
-                <h2>생성 템플릿 목록</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2>AI 생성 템플릿 목록</h2>
+                  <AiUsageBadge label="AI 생성 결과" />
+                </div>
                 <p className="admin-panel-subtitle">
-                  사용자별로 생성된 템플릿 결과와 사용 현황을 조회합니다.
+                  사용자별 AI 템플릿 생성 결과와 실제 사용 현황을 조회합니다.
                 </p>
               </div>
               <span className="admin-panel-note">{filteredTemplates.length}개 표시</span>
@@ -680,7 +726,7 @@ export function TemplateAutomationPage() {
                         <td>{userIndustryOptions.find((item) => item.value === template.industry)?.label}</td>
                         <td>{template.useCount}회</td>
                         <td>{template.userCount}명</td>
-                        <td>{template.generatedAt}</td>
+                        <td>{formatKstDateTime(template.generatedAt)}</td>
                         <td>
                           <StatusBadge>{template.quality}</StatusBadge>
                         </td>
@@ -701,47 +747,88 @@ export function TemplateAutomationPage() {
           <section className="admin-panel">
             <div className="admin-panel-head">
               <div>
-                <h2>카테고리별 사용 현황 통계</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2>업종별 카테고리 사용 통계</h2>
+                  <AiUsageBadge label="AI/RAG 기준" />
+                </div>
                 <p className="admin-panel-subtitle">
-                  카테고리별 생성 템플릿 수와 사용 누적 횟수를 비교합니다.
+                  업종 단위로 카테고리를 묶고, RAG 매칭 이후 누적 사용 횟수가 높은 순서로 비교합니다.
                 </p>
               </div>
+              <span className="admin-panel-note">
+                {categoryUsageGroups.length}개 업종
+              </span>
             </div>
 
-            <div className="admin-card-grid admin-card-grid--four">
-              {filteredCategoryStats.map((item) => (
-                <article key={item.id} className="admin-list-card">
-                  <div className="admin-list-card-row">
-                    <div>
-                      <h3>{item.category}</h3>
-                      <p>{item.industryLabel}</p>
+            {categoryUsageGroups.length > 0 ? (
+              <div className="admin-usage-stat-groups">
+                {categoryUsageGroups.map((group) => (
+                  <article key={group.industryLabel} className="admin-usage-stat-group">
+                    <div className="admin-usage-stat-group-head">
+                      <div>
+                        <h3>{group.industryLabel}</h3>
+                        <p>
+                          카테고리 {group.categories.length}개 · 생성 템플릿 {group.templateCount}개
+                        </p>
+                      </div>
+                      <strong>{group.usageCount}회 사용</strong>
                     </div>
-                    <span
-                      aria-hidden="true"
-                      className="admin-color-dot"
-                      style={{ background: item.color }}
-                    />
-                  </div>
-                  <div className="admin-inline-stat-row">
-                    <span>생성 템플릿 수</span>
-                    <strong>{item.templateCount}개</strong>
-                  </div>
-                  <div className="admin-inline-stat-row">
-                    <span>누적 사용 횟수</span>
-                    <strong>{item.usageCount}회</strong>
-                  </div>
-                </article>
-              ))}
-            </div>
+
+                    <div className="admin-usage-category-bars">
+                      {group.categories.map((item) => {
+                        const usageRate =
+                          group.maxUsageCount > 0
+                            ? Math.max((item.usageCount / group.maxUsageCount) * 100, item.usageCount > 0 ? 6 : 0)
+                            : 0;
+
+                        return (
+                          <div key={item.id} className="admin-usage-category-row">
+                            <div className="admin-usage-category-meta">
+                              <span
+                                aria-hidden="true"
+                                className="admin-color-dot"
+                                style={{ background: item.color }}
+                              />
+                              <div>
+                                <strong>{item.category}</strong>
+                                <span>템플릿 {item.templateCount}개</span>
+                              </div>
+                            </div>
+                            <div className="admin-usage-category-chart">
+                              <div className="admin-usage-category-track">
+                                <span
+                                  className="admin-usage-category-fill"
+                                  style={{ width: `${usageRate}%`, background: item.color }}
+                                />
+                              </div>
+                              <strong>{item.usageCount}회</strong>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <AdminStateNotice
+                title="표시할 사용 통계가 없습니다"
+                description="업종 또는 카테고리 필터 조건에 맞는 사용 통계가 없습니다."
+                tone="empty"
+              />
+            )}
           </section>
         </>
       ) : (
         <section className="admin-panel">
           <div className="admin-panel-head">
             <div>
-              <h2>운영 규칙 목록</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2>운영 규칙 목록</h2>
+                <AiUsageBadge label="RAG 검색 키워드" />
+              </div>
               <p className="admin-panel-subtitle">
-                전체 카테고리의 검색용 키워드를 조회하고 수정합니다.
+                AI 템플릿 매칭에 보조 정보로 쓰이는 전체 카테고리의 검색용 키워드를 조회하고 수정합니다.
               </p>
             </div>
             <span className="admin-panel-note">
