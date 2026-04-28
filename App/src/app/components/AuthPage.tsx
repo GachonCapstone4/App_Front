@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -15,6 +15,7 @@ import {
   ADMIN_VPN_CIDR,
   createAuthenticatedSession,
   deriveNameFromEmail,
+  setAccessToken,
 } from "../../shared/lib/app-session";
 import {
   getGoogleSignupAuthorizationUrl,
@@ -22,7 +23,11 @@ import {
   verifyPasswordResetCode,
 } from "../../shared/api/auth";
 import { getErrorMessage } from "../../shared/api/http";
-import { loginAndCreateSession } from "../../shared/api/session";
+import { loginAndCreateSession, refreshStoredSession } from "../../shared/api/session";
+import {
+  navigateGoogleOAuthPopup,
+  openGoogleOAuthPopup,
+} from "../../shared/lib/google-oauth-popup";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
@@ -89,6 +94,7 @@ interface AuthPageProps {
 }
 
 const ADMIN_IP_DENIED_MOCK_CLIENT_IP = "203.0.113.25";
+const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
 
 type RuntimeBanner = {
   tone: "error" | "warning" | "info" | "neutral";
@@ -96,9 +102,36 @@ type RuntimeBanner = {
   description: string;
 };
 
+type GoogleOAuthPopupMessage = {
+  type: "emailassist-google-oauth";
+  result: string;
+  message?: string;
+  tempToken?: string;
+  email?: string;
+  name?: string;
+  token?: string;
+};
+
+function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
+    return parsed.type === "emailassist-google-oauth"
+      ? (parsed as GoogleOAuthPopupMessage)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthPage({ scenarioId }: AuthPageProps) {
   const navigate = useNavigate();
   const demoMode = isDemoModeEnabled();
+  const popupWindowRef = useRef<Window | null>(null);
+  const oauthResultHandledRef = useRef(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginForm, setLoginForm] = useState<LoginForm>({
     email: "",
@@ -117,6 +150,121 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
   const [runtimeBanner, setRuntimeBanner] = useState<RuntimeBanner | null>(
     null,
   );
+
+  const handleGoogleSignupResult = async (payload: GoogleOAuthPopupMessage) => {
+    if (oauthResultHandledRef.current) {
+      return;
+    }
+    oauthResultHandledRef.current = true;
+
+    if (popupWindowRef.current && !popupWindowRef.current.closed) {
+      popupWindowRef.current.close();
+    }
+    popupWindowRef.current = null;
+    setSubmittingMode(null);
+
+    if (payload.result === "pending_registration") {
+      if (!payload.tempToken || !payload.email) {
+        setRuntimeBanner({
+          tone: "error",
+          title: "Google 회원가입 정보를 확인하지 못했습니다",
+          description: "Google 회원가입을 다시 시도해 주세요.",
+        });
+        return;
+      }
+
+      const nextSearchParams = new URLSearchParams();
+      nextSearchParams.set("temp_token", payload.tempToken);
+      nextSearchParams.set("email", payload.email);
+      nextSearchParams.set("name", payload.name ?? "");
+      navigate(`/auth/google/register?${nextSearchParams.toString()}`);
+      return;
+    }
+
+    if (payload.result === "auto_login") {
+      if (!payload.token) {
+        setRuntimeBanner({
+          tone: "error",
+          title: "자동 로그인 토큰을 확인하지 못했습니다",
+          description: "로그인 화면에서 다시 시도해 주세요.",
+        });
+        return;
+      }
+
+      try {
+        setAccessToken(payload.token);
+        const session = await refreshStoredSession();
+
+        if (session?.role === "ADMIN") {
+          navigate("/admin");
+          return;
+        }
+
+        navigate(session?.onboardingCompleted ? "/app" : "/onboarding");
+      } catch (error) {
+        setRuntimeBanner({
+          tone: "error",
+          title: "자동 로그인에 실패했습니다",
+          description: getErrorMessage(error, "로그인 화면에서 다시 시도해 주세요."),
+        });
+      }
+      return;
+    }
+
+    setRuntimeBanner({
+      tone: "error",
+      title: "Google 회원가입을 완료하지 못했습니다",
+      description: payload.message || "Google 인증을 다시 진행해 주세요.",
+    });
+  };
+
+  useEffect(() => {
+    if (demoMode) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent<GoogleOAuthPopupMessage>) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data?.type !== "emailassist-google-oauth") {
+        return;
+      }
+
+      void handleGoogleSignupResult(event.data);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== GOOGLE_OAUTH_STORAGE_KEY) {
+        return;
+      }
+
+      const payload = parseStoredGoogleOAuthResult(event.newValue);
+      if (!payload) {
+        return;
+      }
+
+      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+      void handleGoogleSignupResult(payload);
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+
+    const storedPayload = parseStoredGoogleOAuthResult(
+      window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
+    );
+    if (storedPayload) {
+      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+      void handleGoogleSignupResult(storedPayload);
+    }
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [demoMode, navigate]);
 
   const isLogin = mode === "login";
   const isReset = mode === "reset";
@@ -341,6 +489,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     setSubmittingMode("signup");
 
     try {
+      oauthResultHandledRef.current = false;
       if (demoMode) {
         createAuthenticatedSession({
           name: "데모 사용자",
@@ -354,10 +503,23 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         navigate("/onboarding");
         return;
       } else {
+        const popup = openGoogleOAuthPopup();
+
+        if (!popup) {
+          toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+          return;
+        }
+
+        popupWindowRef.current = popup;
         const authorizationUrl = await getGoogleSignupAuthorizationUrl();
-        window.location.assign(authorizationUrl);
+        navigateGoogleOAuthPopup(popup, authorizationUrl);
+        toast("Google 인증을 마치면 이 화면에서 회원가입을 이어갑니다.");
       }
     } catch (error) {
+      if (popupWindowRef.current && !popupWindowRef.current.closed) {
+        popupWindowRef.current.close();
+      }
+      popupWindowRef.current = null;
       toast.error(getErrorMessage(error, "Google 회원가입을 시작하지 못했습니다."));
     } finally {
       setSubmittingMode(null);
