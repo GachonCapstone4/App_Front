@@ -23,6 +23,14 @@ jobs:
           username: ${{ vars.CAPSTONE_CI_VAR }}
           password: ${{ secrets.Capstone_CI_Secret }}
 
+      - name: Debug info
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Push flag: ${{ github.event_name == 'push' }}"
+          echo "DockerHub user: ${{ vars.CAPSTONE_CI_VAR }}"
+          echo "Image tag: ${{ vars.CAPSTONE_CI_VAR }}/capstonefront:latest"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
