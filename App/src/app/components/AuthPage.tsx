@@ -16,12 +16,13 @@ import {
   createAuthenticatedSession,
   deriveNameFromEmail,
 } from "../../shared/lib/app-session";
-import { resetPasswordWithIdentity } from "../../shared/api/auth";
-import { getErrorMessage } from "../../shared/api/http";
 import {
-  loginAndCreateSession,
-  signupAndCreateSession,
-} from "../../shared/api/session";
+  getGoogleSignupAuthorizationUrl,
+  sendPasswordResetCode,
+  verifyPasswordResetCode,
+} from "../../shared/api/auth";
+import { getErrorMessage } from "../../shared/api/http";
+import { loginAndCreateSession } from "../../shared/api/session";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
@@ -33,16 +34,10 @@ type LoginForm = {
   password: string;
 };
 
-type SignupForm = {
-  name: string;
-  email: string;
-  password: string;
-  passwordConfirm: string;
-};
-
 type ResetForm = {
   name: string;
   email: string;
+  code: string;
   password: string;
   passwordConfirm: string;
 };
@@ -63,14 +58,14 @@ const leftPanelContent: Record<
       "EmailAssist AI Agent는\n이메일 분류, 답변 초안 생성, 일정을 자동으로 처리\n반복되는 업무 이메일 처리를 한 흐름으로 정리합니다",
   },
   signup: {
-    title: "몇 단계만 거치면\nAI Agent 준비가 끝납니다",
+    title: "Google 계정으로\n안전하게 시작하세요",
     subtitle:
-      "회원가입 후 온보딩에서 이메일 연결과 비즈니스 설정을 마치면\n업무 이메일 AI Agent를 바로 사용할 수 있습니다",
+      "먼저 Gmail 소유권을 확인하고\n인증된 계정으로 EmailAssist 회원가입을 완료합니다",
   },
   reset: {
     title: "비밀번호를 다시 만들고\n바로 복귀하세요",
     subtitle:
-      "이름과 이메일을 확인한 뒤\n새 비밀번호를 직접 설정할 수 있습니다",
+      "가입 이메일로 인증 코드를 받고\n코드 확인 후 새 비밀번호를 설정합니다",
   },
 };
 
@@ -109,19 +104,15 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     email: "",
     password: "",
   });
-  const [signupForm, setSignupForm] = useState<SignupForm>({
-    name: "",
-    email: "",
-    password: "",
-    passwordConfirm: "",
-  });
   const [resetForm, setResetForm] = useState<ResetForm>({
     name: "",
     email: "",
+    code: "",
     password: "",
     passwordConfirm: "",
   });
   const [submittingMode, setSubmittingMode] = useState<AuthMode | null>(null);
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [resetCompleted, setResetCompleted] = useState(false);
   const [runtimeBanner, setRuntimeBanner] = useState<RuntimeBanner | null>(
     null,
@@ -144,30 +135,21 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     if (signupModeScenario) {
       setMode("signup");
       setResetCompleted(false);
-      setSignupForm({
-        name: "김호진",
-        email: "hojin@company.com",
-        password: "",
-        passwordConfirm: "",
-      });
+      setResetCodeSent(false);
       return;
     }
 
     if (signupValidationScenario) {
       setMode("signup");
       setResetCompleted(false);
-      setSignupForm({
-        name: "김호진",
-        email: "hojin@company.com",
-        password: "password123",
-        passwordConfirm: "password124",
-      });
+      setResetCodeSent(false);
       return;
     }
 
     if (loginValidationScenario) {
       setMode("login");
       setResetCompleted(false);
+      setResetCodeSent(false);
       setLoginForm({
         email: "hojin@company.com",
         password: "",
@@ -178,6 +160,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     if (loginServiceErrorScenario) {
       setMode("login");
       setResetCompleted(false);
+      setResetCodeSent(false);
       setLoginForm({
         email: "hojin@company.com",
         password: "password123",
@@ -188,6 +171,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     if (adminIpDeniedScenario) {
       setMode("login");
       setResetCompleted(false);
+      setResetCodeSent(false);
       setLoginForm({
         email: "admin@admin",
         password: "admin",
@@ -200,10 +184,12 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
       setResetForm({
         name: "김호진",
         email: "hojin@company.com",
+        code: "",
         password: "",
         passwordConfirm: "",
       });
       setResetCompleted(false);
+      setResetCodeSent(false);
       return;
     }
 
@@ -212,10 +198,12 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
       setResetForm({
         name: "김호진",
         email: "hojin@company.com",
+        code: "123456",
         password: "newPassword123!",
         passwordConfirm: "newPassword123!",
       });
       setResetCompleted(true);
+      setResetCodeSent(true);
     }
   }, [
     loginServiceErrorScenario,
@@ -240,9 +228,9 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     if (signupValidationScenario) {
       return {
         tone: "warning" as const,
-        title: "회원가입 정보를 다시 확인해 주세요",
+        title: "Google 인증이 먼저 필요합니다",
         description:
-          "비밀번호와 비밀번호 확인이 일치하지 않아 계정을 만들 수 없습니다.",
+          "회원가입은 Google 계정 소유권을 확인한 뒤 이름과 이메일을 잠근 상태에서 비밀번호를 설정합니다.",
       };
     }
 
@@ -350,44 +338,27 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
   const handleSignupSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (
-      !signupForm.name.trim() ||
-      !signupForm.email.trim() ||
-      !signupForm.password.trim() ||
-      !signupForm.passwordConfirm.trim()
-    ) {
-      toast.error("회원가입 정보를 모두 입력해주세요.");
-      return;
-    }
-
-    if (signupForm.password !== signupForm.passwordConfirm) {
-      toast.error("비밀번호가 일치하지 않습니다.");
-      return;
-    }
-
     setSubmittingMode("signup");
 
     try {
       if (demoMode) {
         createAuthenticatedSession({
-          name: signupForm.name.trim(),
-          email: signupForm.email.trim(),
+          name: "데모 사용자",
+          email: "demo@gmail.com",
           role: "USER",
           onboardingCompleted: false,
-          connectedEmail: "",
-          connectedEmails: [],
+          connectedEmail: "demo@gmail.com",
+          connectedEmails: ["demo@gmail.com"],
         });
+        toast.success("데모 Google 회원가입이 완료되었습니다. 온보딩으로 이동합니다.");
+        navigate("/onboarding");
+        return;
       } else {
-        await signupAndCreateSession(
-          signupForm.name.trim(),
-          signupForm.email.trim(),
-          signupForm.password.trim(),
-        );
+        const authorizationUrl = await getGoogleSignupAuthorizationUrl();
+        window.location.assign(authorizationUrl);
       }
-      toast.success("회원가입이 완료되었습니다. 온보딩으로 이동합니다.");
-      navigate("/onboarding");
     } catch (error) {
-      toast.error(getErrorMessage(error, "회원가입을 완료하지 못했습니다."));
+      toast.error(getErrorMessage(error, "Google 회원가입을 시작하지 못했습니다."));
     } finally {
       setSubmittingMode(null);
     }
@@ -397,13 +368,46 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     event.preventDefault();
     setRuntimeBanner(null);
 
+    if (!resetForm.name.trim() || !resetForm.email.trim()) {
+      toast.error("이름과 이메일을 입력해주세요.");
+      return;
+    }
+
+    if (!resetCodeSent) {
+      if (demoMode) {
+        setResetCodeSent(true);
+        toast.success("데모 인증 코드 발송 상태를 표시했습니다.");
+        return;
+      }
+
+      setSubmittingMode("reset");
+
+      try {
+        await sendPasswordResetCode(resetForm.name.trim(), resetForm.email.trim());
+        setResetCodeSent(true);
+        toast.success("인증 코드를 이메일로 발송했습니다.");
+      } catch (error) {
+        setRuntimeBanner({
+          tone: "error",
+          title: "인증 코드를 발송하지 못했습니다",
+          description: getErrorMessage(
+            error,
+            "입력한 이름과 이메일을 다시 확인해 주세요.",
+          ),
+        });
+      } finally {
+        setSubmittingMode(null);
+      }
+
+      return;
+    }
+
     if (
-      !resetForm.name.trim() ||
-      !resetForm.email.trim() ||
+      !resetForm.code.trim() ||
       !resetForm.password.trim() ||
       !resetForm.passwordConfirm.trim()
     ) {
-      toast.error("이름, 이메일, 새 비밀번호를 모두 입력해주세요.");
+      toast.error("인증 코드와 새 비밀번호를 모두 입력해주세요.");
       return;
     }
 
@@ -426,9 +430,9 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     setSubmittingMode("reset");
 
     try {
-      await resetPasswordWithIdentity(
-        resetForm.name.trim(),
+      await verifyPasswordResetCode(
         resetForm.email.trim(),
+        resetForm.code.trim(),
         resetForm.password.trim(),
       );
       setResetCompleted(true);
@@ -498,15 +502,15 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
             {isLogin
               ? "계정에 로그인하세요"
               : isReset
-                ? "비밀번호를 다시 생성하세요"
-                : "새 계정을 만들어 시작하세요"}
+                ? "이메일 인증 후 비밀번호를 바꾸세요"
+                : "Google 계정으로 먼저 인증하세요"}
           </h2>
           <p className="text-[14px] text-[#94A3B8] dark:text-muted-foreground">
             {isLogin
               ? "로그인 후 일반 사용자는 온보딩으로, 관리자는 운영 콘솔로 이동합니다"
               : isReset
-                ? "이름과 이메일을 확인한 뒤 새 비밀번호를 다시 설정할 수 있습니다"
-                : "회원가입 후 온보딩에서 이메일 연동과 비즈니스 설정을 완료합니다"}
+                ? "가입 이메일로 받은 인증 코드를 확인한 뒤 새 비밀번호를 설정합니다"
+                : "Google 인증으로 이메일 소유권을 확인한 뒤 비밀번호를 설정합니다"}
           </p>
         </div>
 
@@ -527,6 +531,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                 setRuntimeBanner(null);
                 setMode("login");
                 setResetCompleted(false);
+                setResetCodeSent(false);
               }}
               className="text-[13px] font-medium text-[#0F766E] transition-colors hover:text-[#115E59] dark:text-[#5EEAD4] dark:hover:text-[#99F6E4]"
             >
@@ -637,9 +642,11 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                 setResetForm({
                   name: "",
                   email: loginForm.email,
+                  code: "",
                   password: "",
                   passwordConfirm: "",
                 });
+                setResetCodeSent(false);
                 setResetCompleted(false);
               }}
               className="w-full text-center text-[13px] font-medium text-[#0F766E] transition-colors hover:text-[#115E59] dark:text-[#5EEAD4] dark:hover:text-[#99F6E4]"
@@ -658,6 +665,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                     <input
                       type="text"
                       value={resetForm.name}
+                      disabled={resetCodeSent}
                       onChange={(event) =>
                         setResetForm((current) => ({
                           ...current,
@@ -665,7 +673,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                         }))
                       }
                       placeholder="이름을 입력하세요"
-                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
+                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] disabled:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
                     />
                   </div>
                 </label>
@@ -677,6 +685,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                     <input
                       type="email"
                       value={resetForm.email}
+                      disabled={resetCodeSent}
                       onChange={(event) =>
                         setResetForm((current) => ({
                           ...current,
@@ -684,48 +693,74 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                         }))
                       }
                       placeholder="name@company.com"
-                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
+                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] disabled:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
                     />
                   </div>
                 </label>
 
-                <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-                  새 비밀번호
-                  <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                    <Lock className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={resetForm.password}
-                      onChange={(event) =>
-                        setResetForm((current) => ({
-                          ...current,
-                          password: event.target.value,
-                        }))
-                      }
-                      placeholder="8자 이상 새 비밀번호를 입력하세요"
-                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </label>
+                {resetCodeSent ? (
+                  <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
+                    인증 코드
+                    <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
+                      <Shield className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={resetForm.code}
+                        onChange={(event) =>
+                          setResetForm((current) => ({
+                            ...current,
+                            code: event.target.value,
+                          }))
+                        }
+                        placeholder="이메일로 받은 6자리 코드를 입력하세요"
+                        className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </label>
+                ) : null}
 
-                <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-                  새 비밀번호 확인
-                  <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                    <CheckCircle2 className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={resetForm.passwordConfirm}
-                      onChange={(event) =>
-                        setResetForm((current) => ({
-                          ...current,
-                          passwordConfirm: event.target.value,
-                        }))
-                      }
-                      placeholder="새 비밀번호를 다시 입력하세요"
-                      className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </label>
+                {resetCodeSent ? (
+                  <>
+                    <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
+                      새 비밀번호
+                      <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
+                        <Lock className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
+                        <input
+                          type="password"
+                          value={resetForm.password}
+                          onChange={(event) =>
+                            setResetForm((current) => ({
+                              ...current,
+                              password: event.target.value,
+                            }))
+                          }
+                          placeholder="8자 이상 새 비밀번호를 입력하세요"
+                          className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
+                      새 비밀번호 확인
+                      <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
+                        <CheckCircle2 className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
+                        <input
+                          type="password"
+                          value={resetForm.passwordConfirm}
+                          onChange={(event) =>
+                            setResetForm((current) => ({
+                              ...current,
+                              passwordConfirm: event.target.value,
+                            }))
+                          }
+                          placeholder="새 비밀번호를 다시 입력하세요"
+                          className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
+                        />
+                      </div>
+                    </label>
+                  </>
+                ) : null}
 
                 <button
                   type="submit"
@@ -733,8 +768,12 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
                   className="app-cta-primary flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5"
                 >
                   {submittingMode === "reset"
-                    ? "변경 중..."
-                    : "새 비밀번호로 변경하기"}
+                    ? resetCodeSent
+                      ? "변경 중..."
+                      : "코드 발송 중..."
+                    : resetCodeSent
+                      ? "인증하고 새 비밀번호 저장"
+                      : "인증 코드 이메일로 받기"}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </>
@@ -767,86 +806,18 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
           </form>
         ) : (
           <form className="space-y-4" onSubmit={handleSignupSubmit}>
-            <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-              이름
-              <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                <UserRound className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                <input
-                  type="text"
-                  value={signupForm.name}
-                  onChange={(event) =>
-                    setSignupForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="이름을 입력하세요"
-                  className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                />
-              </div>
-            </label>
-
-            <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-              이메일
-              <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                <Mail className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                <input
-                  type="email"
-                  value={signupForm.email}
-                  onChange={(event) =>
-                    setSignupForm((current) => ({
-                      ...current,
-                      email: event.target.value,
-                    }))
-                  }
-                  placeholder="name@company.com"
-                  className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                />
-              </div>
-            </label>
-
-            <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-              비밀번호
-              <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                <Lock className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                <input
-                  type="password"
-                  value={signupForm.password}
-                  onChange={(event) =>
-                    setSignupForm((current) => ({
-                      ...current,
-                      password: event.target.value,
-                    }))
-                  }
-                  placeholder="비밀번호를 입력하세요"
-                  className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                />
-              </div>
-            </label>
-
-            <label className="mb-2 block text-[13px] text-[#1E2A3A] dark:text-foreground">
-              비밀번호 확인
-              <div className="app-input-shell mt-2 flex items-center gap-3 px-4 py-3">
-                <CheckCircle2 className="h-4 w-4 text-[#94A3B8] dark:text-muted-foreground" />
-                <input
-                  type="password"
-                  value={signupForm.passwordConfirm}
-                  onChange={(event) =>
-                    setSignupForm((current) => ({
-                      ...current,
-                      passwordConfirm: event.target.value,
-                    }))
-                  }
-                  placeholder="비밀번호를 다시 입력하세요"
-                  className="w-full bg-transparent text-[14px] text-[#1E2A3A] outline-none placeholder:text-[#94A3B8] dark:text-foreground dark:placeholder:text-muted-foreground"
-                />
-              </div>
-              {signupValidationScenario ? (
-                <p className="mt-2 text-[12px] text-[#B45309] dark:text-[#E7C18A]">
-                  비밀번호와 비밀번호 확인이 서로 다릅니다.
+            <div className="rounded-2xl border border-[#D7EFE9] bg-[#F4FBF8] p-5 dark:border-[#1F4B46] dark:bg-[#0F1F1E]">
+              <div className="mb-3 flex items-center gap-2 text-[#0F766E] dark:text-[#5EEAD4]">
+                <Shield className="h-4 w-4" />
+                <p className="text-[13px] font-semibold">
+                  Google 인증 후 계정을 만듭니다
                 </p>
-              ) : null}
-            </label>
+              </div>
+              <p className="text-[12px] leading-6 text-[#64748B] dark:text-muted-foreground">
+                먼저 Google 계정 소유권을 확인합니다. 인증이 끝나면 Google
+                프로필의 이름과 Gmail 주소가 자동 입력되며 수정할 수 없습니다.
+              </p>
+            </div>
 
             <button
               type="submit"
@@ -854,8 +825,8 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
               disabled={submittingMode === "signup"}
             >
               {submittingMode === "signup"
-                ? "회원가입 중..."
-                : "회원가입하고 계속하기"}
+                ? "Google 인증 준비 중..."
+                : "Google 계정으로 회원가입"}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

@@ -6,6 +6,10 @@ type TokenLoginApiResponse = {
   token_type: string;
 };
 
+type AuthorizationUrlApiResponse = {
+  authorization_url: string;
+};
+
 type UserProfileApiResponse = {
   user_id: number;
   email: string;
@@ -43,6 +47,24 @@ export async function signupUser(name: string, email: string, password: string) 
   });
 }
 
+export async function getGoogleSignupAuthorizationUrl() {
+  const response = await api.get<AuthorizationUrlApiResponse>("/api/auth/google/signup-url");
+  return response.data.authorization_url;
+}
+
+export async function completeGoogleSignup(tempToken: string, password: string) {
+  const response = await api.post<TokenLoginApiResponse>("/api/auth/google/signup", {
+    temp_token: tempToken,
+    password,
+  });
+
+  return {
+    accessToken: response.data.access_token,
+    expiresIn: response.data.expires_in,
+    tokenType: response.data.token_type,
+  };
+}
+
 export async function getMyProfile(): Promise<CurrentUserProfile> {
   const response = await api.get<UserProfileApiResponse>("/api/users/me");
 
@@ -67,14 +89,21 @@ export async function changeMyPassword(oldPassword: string, newPassword: string)
   });
 }
 
-export async function resetPasswordWithIdentity(
-  name: string,
-  email: string,
-  newPassword: string,
-) {
-  await api.post("/api/auth/password-reset", {
+export async function sendPasswordResetCode(name: string, email: string) {
+  await api.post("/api/auth/password-reset/code", {
     name,
     email,
+  });
+}
+
+export async function verifyPasswordResetCode(
+  email: string,
+  code: string,
+  newPassword: string,
+) {
+  await api.post("/api/auth/password-reset/verify", {
+    email,
+    code,
     new_password: newPassword,
   });
 }

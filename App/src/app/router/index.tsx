@@ -156,6 +156,13 @@ export const router = createBrowserRouter([
     },
   },
   {
+    path: "/auth/google/register",
+    lazy: async () => {
+      const module = await import("../../pages/google-signup-register");
+      return { Component: module.GoogleSignupRegisterRoutePage };
+    },
+  },
+  {
     path: "/settings",
     Component: LegacySettingsGate,
   },

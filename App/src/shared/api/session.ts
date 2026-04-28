@@ -4,7 +4,12 @@ import {
   getAccessToken,
   setAccessToken,
 } from "../lib/app-session";
-import { getMyProfile, loginWithPassword, signupUser } from "./auth";
+import {
+  completeGoogleSignup,
+  getMyProfile,
+  loginWithPassword,
+  signupUser,
+} from "./auth";
 import { getBusinessProfile } from "./business";
 import { getMyIntegrationSafe } from "./integrations";
 import { getOnboardingStatusSafe } from "./onboarding";
@@ -52,6 +57,21 @@ export async function loginAndCreateSession(email: string, password: string) {
 export async function signupAndCreateSession(name: string, email: string, password: string) {
   await signupUser(name, email, password);
   const tokenResponse = await loginWithPassword(email, password);
+  setAccessToken(tokenResponse.accessToken);
+
+  try {
+    return await buildSessionFromServerState({ onboardingCompleted: false });
+  } catch (error) {
+    clearAppSession();
+    throw error;
+  }
+}
+
+export async function completeGoogleSignupAndCreateSession(
+  tempToken: string,
+  password: string,
+) {
+  const tokenResponse = await completeGoogleSignup(tempToken, password);
   setAccessToken(tokenResponse.accessToken);
 
   try {
