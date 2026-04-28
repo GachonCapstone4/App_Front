@@ -707,6 +707,16 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.admin-log-stream {
+  margin: 0;
+  color: #d7f7ef;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .admin-log-entry {
   border: 1px solid rgba(215, 247, 239, 0.12);
   border-radius: 16px;

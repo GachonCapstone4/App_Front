@@ -151,6 +151,16 @@ export function InternalMonitoringPage() {
   const [logs, setLogs] = useState([]);
   const focusedButton =
     requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
+  const logStream = logs
+    .map((log, index) =>
+      [
+        `#${logs.length - index} ${formatKstDateTime(log.receivedAt)} [${log.status}] ${log.title}`,
+        `${log.method} ${log.endpoint}`,
+        `요청 ${formatKstDateTime(log.requestedAt)} / 응답 ${formatKstDateTime(log.receivedAt)}`,
+        log.output,
+      ].join("\n"),
+    )
+    .join("\n\n");
 
   const appendLog = (entry) => {
     setLogs((current) => [entry, ...current].slice(0, 20));
@@ -355,7 +365,7 @@ export function InternalMonitoringPage() {
                 최신 요청이 가장 위에 표시됩니다. 실제 장애 확인 시 이 내용을 백엔드 로그와 함께 대조하면 됩니다.
               </p>
             </div>
-            <span className="admin-panel-note">{logs.length}개 요청 기록</span>
+            <span className="admin-panel-note">{logs.length}개 로그</span>
           </div>
 
           {logs.length === 0 ? (
@@ -367,28 +377,7 @@ export function InternalMonitoringPage() {
             />
           ) : (
             <div className="admin-log-output">
-              {logs.map((log, index) => (
-                <article key={`${log.id}-${index}`} className="admin-log-entry">
-                  <div className="admin-log-entry-head">
-                    <div>
-                      <p className="admin-log-entry-kicker">#{logs.length - index}</p>
-                      <h3>{log.title}</h3>
-                    </div>
-                    <span className={`admin-log-status admin-log-status--${log.status.toLowerCase()}`}>
-                      {log.status}
-                    </span>
-                  </div>
-
-                  <div className="admin-log-meta">
-                    <span>{log.method}</span>
-                    <span>{log.endpoint}</span>
-                    <span>요청 {log.requestedAt}</span>
-                    <span>응답 {log.receivedAt}</span>
-                  </div>
-
-                  <pre>{log.output}</pre>
-                </article>
-              ))}
+              <pre className="admin-log-stream">{logStream}</pre>
             </div>
           )}
         </section>
