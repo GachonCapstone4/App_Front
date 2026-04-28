@@ -1,4 +1,11 @@
-import { ApiError, api } from "./http";
+import { ApiError, createApiClient, getApiBaseUrl } from "./http";
+
+function resolveAdminApiBaseUrl() {
+  const envBaseUrl = import.meta.env.VITE_ADMIN_API_BASE_URL?.trim();
+  return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl : getApiBaseUrl();
+}
+
+const adminApi = createApiClient(resolveAdminApiBaseUrl());
 
 type AdminDashboardSummaryApiResponse = {
   total_users: number;
@@ -307,12 +314,12 @@ export type AdminJobItem = {
 };
 
 export async function getAdminDashboardSummary() {
-  const response = await api.get<AdminDashboardSummaryApiResponse>("/api/admin/dashboard/summary");
+  const response = await adminApi.get<AdminDashboardSummaryApiResponse>("/api/admin/dashboard/summary");
   return response.data;
 }
 
 export async function getAdminEmailVolume(startDate: string, endDate: string) {
-  const response = await api.get<AdminEmailVolumeApiResponse>("/api/admin/dashboard/email-volume", {
+  const response = await adminApi.get<AdminEmailVolumeApiResponse>("/api/admin/dashboard/email-volume", {
     params: {
       start_date: startDate,
       end_date: endDate,
@@ -323,7 +330,7 @@ export async function getAdminEmailVolume(startDate: string, endDate: string) {
 }
 
 export async function getAdminDomainDistribution(limit = 5) {
-  const response = await api.get<AdminDomainDistributionApiResponse>(
+  const response = await adminApi.get<AdminDomainDistributionApiResponse>(
     "/api/admin/dashboard/domain-distribution",
     {
       params: { limit },
@@ -334,12 +341,12 @@ export async function getAdminDomainDistribution(limit = 5) {
 }
 
 export async function getAdminWeeklyTrend() {
-  const response = await api.get<AdminWeeklyTrendApiResponse>("/api/admin/dashboard/weekly-trend");
+  const response = await adminApi.get<AdminWeeklyTrendApiResponse>("/api/admin/dashboard/weekly-trend");
   return response.data.trend_data;
 }
 
 export async function getAdminSupportTickets(size = 20) {
-  const response = await api.get<AdminSupportTicketListApiResponse>("/api/admin/support-tickets", {
+  const response = await adminApi.get<AdminSupportTicketListApiResponse>("/api/admin/support-tickets", {
     params: {
       page: 1,
       size,
@@ -356,7 +363,7 @@ export async function getAdminSupportTickets(size = 20) {
 }
 
 export async function getAdminSupportTicket(ticketId: string) {
-  const response = await api.get<AdminSupportTicketDetailApiResponse>(
+  const response = await adminApi.get<AdminSupportTicketDetailApiResponse>(
     `/api/admin/support-tickets/${ticketId}`,
   );
 
@@ -375,7 +382,7 @@ export async function getAdminSupportTicket(ticketId: string) {
 }
 
 export async function replyAdminSupportTicket(ticketId: string, adminReply: string) {
-  const response = await api.post<AdminSupportTicketReplyApiResponse>(
+  const response = await adminApi.post<AdminSupportTicketReplyApiResponse>(
     `/api/admin/support-tickets/${ticketId}/reply`,
     {
       admin_reply: adminReply,
@@ -389,7 +396,7 @@ export async function replyAdminSupportTicket(ticketId: string, adminReply: stri
 }
 
 export async function getAdminUsers(size = 100, searchKeyword = "") {
-  const response = await api.get<AdminUserListApiResponse>("/api/admin/users", {
+  const response = await adminApi.get<AdminUserListApiResponse>("/api/admin/users", {
     params: {
       page: 1,
       size,
@@ -413,8 +420,8 @@ export async function getAdminUsers(size = 100, searchKeyword = "") {
 }
 
 export async function getAdminUserDetail(userId: string) {
-  const detailResponse = await api.get<AdminUserDetailApiResponse>(`/api/admin/users/${userId}`);
-  const integration = await api
+  const detailResponse = await adminApi.get<AdminUserDetailApiResponse>(`/api/admin/users/${userId}`);
+  const integration = await adminApi
     .get<AdminUserIntegrationApiResponse>(`/api/admin/users/${userId}/integration`)
     .then((response) => response.data)
     .catch((error) => {
@@ -448,7 +455,7 @@ export async function getAdminUserDetail(userId: string) {
 }
 
 export async function updateAdminUserStatus(userId: string, isActive: boolean) {
-  const response = await api.patch(`/api/admin/users/${userId}/status`, {
+  const response = await adminApi.patch(`/api/admin/users/${userId}/status`, {
     is_active: isActive,
   });
 
@@ -456,12 +463,12 @@ export async function updateAdminUserStatus(userId: string, isActive: boolean) {
 }
 
 export async function deleteAdminUserIntegration(userId: string) {
-  const response = await api.delete(`/api/admin/users/${userId}/integration`);
+  const response = await adminApi.delete(`/api/admin/users/${userId}/integration`);
   return response.data;
 }
 
 export async function getAdminTemplates(size = 100) {
-  const response = await api.get<AdminTemplateListApiResponse>("/api/admin/templates", {
+  const response = await adminApi.get<AdminTemplateListApiResponse>("/api/admin/templates", {
     params: {
       page: 1,
       size,
@@ -484,12 +491,12 @@ export async function getAdminTemplates(size = 100) {
 }
 
 export async function getAdminTemplateSummary() {
-  const response = await api.get<AdminTemplateSummaryApiResponse>("/api/admin/templates/summary");
+  const response = await adminApi.get<AdminTemplateSummaryApiResponse>("/api/admin/templates/summary");
   return response.data;
 }
 
 export async function getAdminTemplateCategoryStats() {
-  const response = await api.get<AdminTemplateCategoryStatApiResponse>(
+  const response = await adminApi.get<AdminTemplateCategoryStatApiResponse>(
     "/api/admin/templates/statistics/by-category",
   );
 
@@ -502,7 +509,7 @@ export async function getAdminTemplateCategoryStats() {
 }
 
 export async function getAdminAutomationRules(size = 100) {
-  const response = await api.get<AdminAutomationRuleListApiResponse>(
+  const response = await adminApi.get<AdminAutomationRuleListApiResponse>(
     "/api/admin/automations/rules",
     {
       params: {
@@ -535,7 +542,7 @@ export async function createAdminAutomationRule(payload: {
   trigger: string;
   action: string;
 }) {
-  const response = await api.post<AdminAutomationRuleCreateApiResponse>(
+  const response = await adminApi.post<AdminAutomationRuleCreateApiResponse>(
     "/api/admin/automations/rules",
     {
       user_id: Number(payload.userId),
@@ -563,7 +570,7 @@ export async function updateAdminAutomationRule(
     action: string;
   },
 ) {
-  const response = await api.patch<AdminAutomationRuleUpdateApiResponse>(
+  const response = await adminApi.patch<AdminAutomationRuleUpdateApiResponse>(
     `/api/admin/automations/rules/${ruleId}`,
     {
       template_id: payload.templateId ? Number(payload.templateId) : null,
@@ -579,7 +586,7 @@ export async function updateAdminAutomationRule(
 }
 
 export async function deleteAdminAutomationRule(ruleId: string) {
-  const response = await api.delete(`/api/admin/automations/rules/${ruleId}`);
+  const response = await adminApi.delete(`/api/admin/automations/rules/${ruleId}`);
   return response.data;
 }
 
@@ -595,7 +602,7 @@ function mapAdminCategoryKeyword(category: AdminCategoryKeywordApiResponse): Adm
 }
 
 export async function getAdminCategoryKeywords() {
-  const response = await api.get<AdminCategoryKeywordListApiResponse>("/api/admin/categories");
+  const response = await adminApi.get<AdminCategoryKeywordListApiResponse>("/api/admin/categories");
   return response.data.categories.map(mapAdminCategoryKeyword);
 }
 
@@ -604,7 +611,7 @@ export async function createAdminCategoryKeyword(payload: {
   color?: string | null;
   keywords: string[];
 }) {
-  const response = await api.post<AdminCategoryKeywordApiResponse>("/api/admin/categories", {
+  const response = await adminApi.post<AdminCategoryKeywordApiResponse>("/api/admin/categories", {
     category_name: payload.categoryName,
     color: payload.color ?? null,
     keywords: payload.keywords,
@@ -620,7 +627,7 @@ export async function updateAdminCategoryKeyword(
     keywords: string[];
   },
 ) {
-  const response = await api.patch<AdminCategoryKeywordApiResponse>(
+  const response = await adminApi.patch<AdminCategoryKeywordApiResponse>(
     `/api/admin/categories/${encodeURIComponent(categoryName)}`,
     {
       color: payload.color ?? null,
@@ -632,12 +639,12 @@ export async function updateAdminCategoryKeyword(
 }
 
 export async function deleteAdminCategoryKeyword(categoryName: string) {
-  const response = await api.delete(`/api/admin/categories/${encodeURIComponent(categoryName)}`);
+  const response = await adminApi.delete(`/api/admin/categories/${encodeURIComponent(categoryName)}`);
   return response.data;
 }
 
 export async function getAdminOperationJobs(size = 100) {
-  const response = await api.get<AdminJobListApiResponse>("/api/admin/operations/jobs", {
+  const response = await adminApi.get<AdminJobListApiResponse>("/api/admin/operations/jobs", {
     params: {
       page: 1,
       size,
@@ -653,31 +660,31 @@ export async function getAdminOperationJobs(size = 100) {
 }
 
 export async function getAdminOperationJobSummary() {
-  const response = await api.get<AdminJobSummaryApiResponse>("/api/admin/operations/jobs/summary");
+  const response = await adminApi.get<AdminJobSummaryApiResponse>("/api/admin/operations/jobs/summary");
   return response.data;
 }
 
 export async function getAdminOperationJobDetail(jobId: string) {
-  const response = await api.get<AdminJobDetailApiResponse>(
+  const response = await adminApi.get<AdminJobDetailApiResponse>(
     `/api/admin/operations/jobs/${jobId}`,
   );
   return response.data;
 }
 
 export async function getAdminOperationJobError(jobId: string) {
-  const response = await api.get<AdminJobErrorApiResponse>(
+  const response = await adminApi.get<AdminJobErrorApiResponse>(
     `/api/admin/operations/jobs/${jobId}/error`,
   );
   return response.data;
 }
 
 export async function deleteAdminOperationJob(jobId: string) {
-  const response = await api.delete(`/api/admin/operations/jobs/${jobId}`);
+  const response = await adminApi.delete(`/api/admin/operations/jobs/${jobId}`);
   return response.data;
 }
 
 export async function executeAdminNetworkDictJob() {
-  const response = await api.post<AdminKubernetesJobApiResponse>(
+  const response = await adminApi.post<AdminKubernetesJobApiResponse>(
     "/api/admin/k8s/jobs/network-dict",
   );
   return response.data;

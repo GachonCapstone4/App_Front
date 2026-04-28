@@ -28,46 +28,52 @@ export function getApiBaseUrl() {
   return resolveBaseUrl();
 }
 
-export const api = axios.create({
-  baseURL: resolveBaseUrl(),
-  headers: {
-    Accept: "application/json",
-  },
-});
+export function createApiClient(baseURL: string) {
+  const client = axios.create({
+    baseURL,
+    headers: {
+      Accept: "application/json",
+    },
+  });
 
-api.interceptors.request.use((config) => {
-  const accessToken = getAccessToken();
+  client.interceptors.request.use((config) => {
+    const accessToken = getAccessToken();
 
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  return config;
-});
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-    const payload = axios.isAxiosError(error)
-      ? (error.response?.data as ErrorPayload | undefined)
-      : undefined;
-    const message =
-      payload?.result_req ||
-      payload?.message ||
-      (axios.isAxiosError(error) ? error.message : "요청을 처리하지 못했습니다.");
-    const code = payload?.result_code;
-
-    if (status === 401) {
-      clearAppSession();
-      if (typeof window !== "undefined" && window.location.pathname !== "/") {
-        window.location.assign("/");
-      }
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    return Promise.reject(new ApiError(message, status, code));
-  },
-);
+    return config;
+  });
+
+  client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      const payload = axios.isAxiosError(error)
+        ? (error.response?.data as ErrorPayload | undefined)
+        : undefined;
+      const message =
+        payload?.result_req ||
+        payload?.message ||
+        (axios.isAxiosError(error) ? error.message : "요청을 처리하지 못했습니다.");
+      const code = payload?.result_code;
+
+      if (status === 401) {
+        clearAppSession();
+        if (typeof window !== "undefined" && window.location.pathname !== "/") {
+          window.location.assign("/");
+        }
+      }
+
+      return Promise.reject(new ApiError(message, status, code));
+    },
+  );
+
+  return client;
+}
+
+export const api = createApiClient(resolveBaseUrl());
 
 export function getErrorMessage(error: unknown, fallbackMessage = "요청을 처리하지 못했습니다.") {
   if (error instanceof ApiError) {

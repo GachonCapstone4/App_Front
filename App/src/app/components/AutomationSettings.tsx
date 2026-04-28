@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  Calendar,
   Check,
   ChevronDown,
-  ExternalLink,
   Loader2,
   Pencil,
   Plus,
@@ -67,6 +65,7 @@ import {
 } from "../../shared/api/templates";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import {
   buildAutomationCategoryGroups,
   buildAutomationDialogTemplateDrafts,
@@ -325,11 +324,6 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(
     !calendarDisconnectedScenario,
   );
-  const [connectedCalendarEmail, setConnectedCalendarEmail] = useState(
-    scenarioMode && !calendarDisconnectedScenario
-      ? "calendar@mycompany.co.kr"
-      : "",
-  );
 
   const rulesWithTemplateNumbers = useMemo(() => {
     const userTemplateNoByTemplateId = new Map(
@@ -412,7 +406,6 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         setCategories(nextCategoryCatalog);
         setTemplateCatalog(mapTemplateCatalog(nextTemplates, nextCategoryCatalog));
         setGoogleCalendarConnected(Boolean(integration?.isCalendarConnected));
-        setConnectedCalendarEmail(integration?.connectedEmail ?? "");
       } catch (error) {
         if (!active) {
           return;
@@ -441,7 +434,6 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
 
     if (calendarDisconnectedScenario) {
       setGoogleCalendarConnected(false);
-      setConnectedCalendarEmail("");
     }
 
     if (ruleDialogNormalScenario) {
@@ -501,7 +493,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     const targetCategory = availableCategories[0];
 
     if (!targetCategory) {
-      toast("추가할 수 있는 자동발송 규칙이 없습니다.");
+      toast("추가할 수 있는 자동화 규칙이 없습니다.");
       return;
     }
 
@@ -553,6 +545,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
               ...template,
               selected: !template.selected,
               autoSend: !template.selected ? template.autoSend : false,
+              autoCalendar: !template.selected ? template.autoCalendar : false,
             }
           : template,
       ),
@@ -581,7 +574,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     }));
   };
 
-  const createAutomationRuleWithCalendar = async (
+  const createTemplateAutomationRule = async (
     category: AutomationCategoryCatalogItem,
     template: AutomationDialogTemplateDraft,
   ) => {
@@ -610,12 +603,12 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     );
 
     if (selectedTemplates.length === 0) {
-      toast.error("자동발송 규칙에 포함할 템플릿을 선택해 주세요.");
+      toast.error("자동화 규칙에 포함할 템플릿을 선택해 주세요.");
       return;
     }
 
     if (ruleSaveErrorScenario) {
-      toast.error("자동발송 규칙을 저장하지 못했습니다.");
+      toast.error("자동화 규칙을 저장하지 못했습니다.");
       return;
     }
 
@@ -639,7 +632,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           })) satisfies AutomationRuleSnapshot[];
 
           setRules((current) => [...current, ...createdRules]);
-          toast.success("자동발송 규칙을 추가했습니다.");
+          toast.success("자동화 규칙을 추가했습니다.");
         } else {
           const currentCategoryId = selectedDialogCategory.categoryId;
           const existingTemplateMap = new Map(
@@ -673,7 +666,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             );
 
           setRules(nextRules);
-          toast.success("자동발송 규칙을 수정했습니다.");
+          toast.success("자동화 규칙을 수정했습니다.");
         }
 
         setRuleDialogOpen(false);
@@ -683,12 +676,12 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       if (dialogState.mode === "create") {
         const createdRules = await Promise.all(
           selectedTemplates.map((template) =>
-            createAutomationRuleWithCalendar(selectedDialogCategory, template),
+            createTemplateAutomationRule(selectedDialogCategory, template),
           ),
         );
 
         setRules((current) => [...current, ...createdRules]);
-        toast.success("자동발송 규칙을 추가했습니다.");
+        toast.success("자동화 규칙을 추가했습니다.");
       } else {
         const currentCategoryKey = getAutomationCategoryKey(
           selectedDialogCategory.categoryId,
@@ -697,7 +690,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         const currentGroup = groups.find((group) => group.key === currentCategoryKey);
 
         if (!currentGroup) {
-          toast.error("수정할 자동발송 규칙을 찾을 수 없습니다.");
+          toast.error("수정할 자동화 규칙을 찾을 수 없습니다.");
           return;
         }
 
@@ -746,7 +739,10 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                 template.autoSend,
               );
             }
-            if (existingTemplate.autoCalendar !== template.autoCalendar) {
+            if (
+              (updatedRule?.autoCalendarEnabled ?? existingTemplate.autoCalendar) !==
+              template.autoCalendar
+            ) {
               updatedRule = await setAutomationRuleAutoCalendar(
                 existingTemplate.ruleId,
                 template.autoCalendar,
@@ -767,7 +763,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             continue;
           }
 
-          const createdRule = await createAutomationRuleWithCalendar(
+          const createdRule = await createTemplateAutomationRule(
             selectedDialogCategory,
             template,
           );
@@ -776,12 +772,12 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         }
 
         setRules(nextRules);
-        toast.success("자동발송 규칙을 수정했습니다.");
+        toast.success("자동화 규칙을 수정했습니다.");
       }
 
       setRuleDialogOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, "자동발송 규칙을 저장하지 못했습니다."));
+      toast.error(getErrorMessage(error, "자동화 규칙을 저장하지 못했습니다."));
     } finally {
       setSaving(false);
     }
@@ -802,7 +798,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             deleteTarget.key,
           ),
         );
-        toast.success("자동발송 규칙을 삭제했습니다.");
+        toast.success("자동화 규칙을 삭제했습니다.");
         return;
       }
 
@@ -818,9 +814,9 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           deleteTarget.key,
         ),
       );
-      toast.success("자동발송 규칙을 삭제했습니다.");
+      toast.success("자동화 규칙을 삭제했습니다.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "자동발송 규칙을 삭제하지 못했습니다."));
+      toast.error(getErrorMessage(error, "자동화 규칙을 삭제하지 못했습니다."));
     } finally {
       setDeletingCategoryKey(null);
       setDeleteTarget(null);
@@ -877,7 +873,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       });
 
       setRules((current) => [...current, createdRule]);
-      toast.success("새 템플릿 자동발송 규칙을 추가했습니다.");
+      toast.success("새 템플릿 자동화 규칙을 추가했습니다.");
     } catch (error) {
       toast.error(getErrorMessage(error, "자동 발송 상태를 변경하지 못했습니다."));
     } finally {
@@ -894,6 +890,11 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     );
 
     if (!targetTemplate || !group.categoryId) {
+      return;
+    }
+
+    if (!googleCalendarConnected) {
+      toast.error("Google 캘린더를 먼저 연결한 뒤 캘린더 자동 등록을 켤 수 있습니다.");
       return;
     }
 
@@ -978,8 +979,8 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       <div className="mx-auto max-w-[1200px] p-4 lg:p-8">
         {ruleSaveErrorScenario ? (
           <StateBanner
-            title="자동발송 규칙을 저장하지 못했습니다"
-            description="편집한 자동발송 규칙 내용은 유지되었지만 저장 응답이 지연되고 있습니다. 다시 시도해 주세요."
+            title="자동화 규칙을 저장하지 못했습니다"
+            description="편집한 자동화 규칙 내용은 유지되었지만 저장 응답이 지연되고 있습니다. 다시 시도해 주세요."
             tone="error"
             className="mb-6"
           />
@@ -995,18 +996,21 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         ) : null}
 
         <div className="mb-8">
-          <h1 className="mb-1 text-[#1E2A3A] dark:text-foreground">자동화 설정</h1>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h1 className="text-[#1E2A3A] dark:text-foreground">자동화 설정</h1>
+            <AiUsageBadge label="AI 템플릿 기반" />
+          </div>
           <p className="text-[14px] text-[#64748B] dark:text-muted-foreground">
-            원하는 카테고리와 템플릿을 선택해 자동발송 규칙을 구성하고, 각 템플릿마다 자동 발송 여부를 설정합니다.
+            AI가 생성하고 RAG로 매칭한 템플릿을 기준으로 자동 발송과 캘린더 자동 등록 규칙을 구성합니다.
           </p>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm dark:border-border dark:bg-card">
           <div className="flex items-center justify-between border-b border-[#E2E8F0] p-6 dark:border-border">
             <div>
-              <h3 className="text-[#1E2A3A] dark:text-foreground">자동발송 규칙</h3>
+              <h3 className="text-[#1E2A3A] dark:text-foreground">자동화 규칙</h3>
               <p className="mt-1 text-[12px] text-[#94A3B8] dark:text-muted-foreground">
-                카테고리를 선택한 뒤 원하는 템플릿만 골라 자동발송 규칙으로 저장할 수 있습니다.
+                카테고리별 AI 추천 템플릿에 자동 발송과 캘린더 자동 등록 여부를 각각 설정합니다.
               </p>
             </div>
             <button
@@ -1035,10 +1039,10 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             <div className="p-8">
               <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-6 text-center dark:border-border dark:bg-[#131D2F]">
                 <p className="text-[15px] text-[#1E2A3A] dark:text-foreground">
-                  아직 설정된 자동발송 규칙이 없습니다
+                  아직 설정된 자동화 규칙이 없습니다
                 </p>
                 <p className="mt-2 text-[13px] text-[#94A3B8] dark:text-muted-foreground">
-                  규칙을 추가한 뒤 필요한 템플릿만 선택해 자동발송 여부를 저장해 주세요.
+                  규칙을 추가한 뒤 필요한 템플릿별 실행 옵션을 저장해 주세요.
                 </p>
                 <button
                   onClick={openCreateDialog}
@@ -1093,7 +1097,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                           </div>
                           <div className="mt-2 flex items-center gap-2 text-[12px] text-[#94A3B8] dark:text-muted-foreground">
                             <span>
-                              선택한 템플릿만 자동발송 규칙에 포함되며, 카드 안에서 개별 자동 발송 여부를 바꿀 수 있습니다.
+                              선택한 템플릿만 자동화 규칙에 포함되며, 카드 안에서 실행 옵션을 각각 바꿀 수 있습니다.
                             </span>
                             <span className="hidden rounded-full bg-white px-2.5 py-1 text-[11px] text-[#64748B] shadow-sm dark:bg-[#0F172A] dark:text-muted-foreground md:inline-flex">
                               {isExpanded ? "접기" : "펴기"}
@@ -1201,7 +1205,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                                     </button>
                                   </div>
                                   <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
-                                    <span>캘린더</span>
+                                    <span>캘린더 자동 등록</span>
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -1209,10 +1213,14 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                                           ? handleAutoCalendarToggle(group, template.templateId)
                                           : undefined
                                       }
-                                      disabled={isCalendarBusy || template.templateId === null}
+                                      disabled={
+                                        isCalendarBusy ||
+                                        template.templateId === null ||
+                                        !googleCalendarConnected
+                                      }
                                       className={`relative h-5.5 w-10 rounded-full transition-colors ${
                                         template.autoCalendar
-                                          ? "bg-[#8B5CF6] dark:bg-[#6D28D9]"
+                                          ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
                                           : "bg-[#CBD5E1] dark:bg-[#334155]"
                                       } disabled:cursor-not-allowed disabled:opacity-60`}
                                       aria-label={`${group.categoryName} ${template.title} 캘린더 자동 등록`}
@@ -1243,11 +1251,11 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         </div>
 
         <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm dark:border-border dark:bg-card">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-[#1E2A3A] dark:text-foreground">캘린더 연동</h3>
               <p className="mt-1 text-[12px] text-[#94A3B8] dark:text-muted-foreground">
-                현재는 연동 상태 확인만 실제 API에 연결되어 있습니다.
+                캘린더 자동 등록 토글은 위 자동화 규칙에서 템플릿별로 설정합니다.
               </p>
             </div>
             {!googleCalendarConnected ? (
@@ -1267,61 +1275,6 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
               </button>
             )}
           </div>
-
-          <div className="space-y-3">
-            {googleCalendarConnected ? (
-              <div className="app-soft-surface flex items-center gap-4 rounded-xl p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4285F4] text-white text-[14px]">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px] text-[#1E2A3A] dark:text-foreground">
-                      Google Calendar
-                    </span>
-                    <span className="app-success-pill rounded-full px-2 py-0.5 text-[10px]">
-                      연결됨
-                    </span>
-                  </div>
-                  <p className="truncate text-[12px] text-[#94A3B8] dark:text-muted-foreground">
-                    {connectedCalendarEmail || "연결된 계정 정보를 확인하는 중입니다."}
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    window.open(
-                      "https://calendar.google.com",
-                      "_blank",
-                      "noopener,noreferrer",
-                    )
-                  }
-                  className="rounded-md p-2 text-[#94A3B8] transition-colors hover:bg-[#F1F5F9] hover:text-[#64748B] dark:text-muted-foreground dark:hover:bg-[#1E293B] dark:hover:text-foreground"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4 rounded-xl border border-dashed border-[#E2E8F0] bg-[#F8FAFC] p-4 dark:border-border dark:bg-[#131D2F]">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E2E8F0] text-[#94A3B8] dark:bg-[#1E293B] dark:text-muted-foreground">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[13px] text-[#94A3B8] dark:text-muted-foreground">
-                    Google 캘린더를 연결하세요
-                  </p>
-                  <p className="text-[11px] text-[#CBD5E1] dark:text-[#64748B]">
-                    일정 자동 등록 기능을 사용하려면 설정 화면에서 Google 연동이 필요합니다.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <StateBanner
-              title="전역 일정 자동 등록은 아직 실제 연결하지 않았습니다"
-              description="현재 백엔드는 규칙별 auto_calendar_enabled만 제공하고, 이 화면의 전역 토글/카테고리 묶음 UX와는 1:1로 맞지 않습니다. 필요한 API와 DB 보완 항목은 문서에 정리해 두었습니다."
-              tone="warning"
-            />
-          </div>
         </div>
       </div>
 
@@ -1330,17 +1283,17 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           <DialogHeader>
             <DialogTitle>
               {dialogState.mode === "edit"
-                ? "자동발송 규칙 수정"
-                : "자동발송 규칙 추가"}
+                ? "자동화 규칙 수정"
+                : "자동화 규칙 추가"}
             </DialogTitle>
             <DialogDescription>
-              카테고리를 선택한 뒤, 사용할 템플릿과 템플릿별 자동 발송 여부를 직접 선택해 저장합니다.
+              카테고리를 선택한 뒤, 사용할 템플릿과 템플릿별 자동 발송, 캘린더 자동 등록 여부를 직접 선택해 저장합니다.
             </DialogDescription>
           </DialogHeader>
 
           {ruleSaveErrorScenario ? (
             <StateBanner
-              title="자동발송 규칙 저장을 완료하지 못했습니다"
+              title="자동화 규칙 저장을 완료하지 못했습니다"
               description="입력한 규칙 내용은 유지됩니다. 다시 저장해 주세요."
               tone="error"
             />
@@ -1382,7 +1335,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                     지정 템플릿 ID
                   </p>
                   <p className="text-[11px] text-[#94A3B8] dark:text-muted-foreground">
-                    선택한 카테고리 안에서 자동발송 규칙에 포함할 템플릿을 고르세요.
+                    선택한 카테고리 안에서 자동화 규칙에 포함할 템플릿을 고르세요.
                   </p>
                 </div>
                 <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-[#64748B] shadow-sm dark:bg-[#0F172A] dark:text-muted-foreground">
@@ -1450,18 +1403,20 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                           </button>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-[#64748B] dark:text-muted-foreground">
-                          <span>캘린더</span>
+                          <span>캘린더 자동 등록</span>
                           <button
                             type="button"
                             onClick={() =>
                               template.selected
-                                ? handleDialogTemplateAutoCalendarToggle(template.templateId)
+                                ? handleDialogTemplateAutoCalendarToggle(
+                                    template.templateId,
+                                  )
                                 : undefined
                             }
-                            disabled={!template.selected}
+                            disabled={!template.selected || !googleCalendarConnected}
                             className={`relative h-5.5 w-10 rounded-full transition-colors ${
                               template.autoCalendar
-                                ? "bg-[#8B5CF6] dark:bg-[#6D28D9]"
+                                ? "bg-[#2DD4BF] dark:bg-[#0F766E]"
                                 : "bg-[#CBD5E1] dark:bg-[#334155]"
                             } disabled:cursor-not-allowed disabled:opacity-50`}
                             aria-label={`${template.title} 캘린더 자동 등록`}
@@ -1507,9 +1462,9 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>자동발송 규칙을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogTitle>자동화 규칙을 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteTarget?.categoryName}"에 연결된 템플릿 자동발송 규칙이 함께 제거됩니다.
+              "{deleteTarget?.categoryName}"에 연결된 템플릿 자동화 규칙이 함께 제거됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

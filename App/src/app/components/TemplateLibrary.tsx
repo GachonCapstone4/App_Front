@@ -848,8 +848,7 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
               disabled={!useDemoDataMode && categoryOptions.length === 0}
             >
               <Plus className="h-4 w-4" />
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="hidden text-[13px] sm:inline">새 템플릿 생성</span>
+              <span className="hidden text-[13px] sm:inline">템플릿 만들기</span>
             </button>
           </div>
 
