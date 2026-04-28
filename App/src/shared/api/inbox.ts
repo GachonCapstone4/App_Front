@@ -43,6 +43,15 @@ type InboxDetailApiResponse = {
     entities: Record<string, unknown> | null;
     confidence_score: number | null;
     schedule_detected: boolean | null;
+    schedule?: {
+      has_schedule: boolean;
+      title: string | null;
+      date: string | null;
+      start_time: string | null;
+      end_time: string | null;
+      location: string | null;
+      participants: string[] | null;
+    } | null;
   } | null;
   draft_reply: {
     draft_id: number;

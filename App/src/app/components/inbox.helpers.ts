@@ -45,6 +45,7 @@ type InboxDetailApiResponse = {
     entities: Record<string, unknown> | null;
     confidence_score: number | null;
     schedule_detected: boolean | null;
+    schedule?: InboxScheduleApiItem | null;
   } | null;
   draft_reply: {
     draft_id: number;
@@ -71,6 +72,16 @@ type InboxRecommendationApiItem = {
   body: string;
   similarity: number;
   email_id: number;
+};
+
+type InboxScheduleApiItem = {
+  has_schedule: boolean;
+  title: string | null;
+  date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  participants: string[] | null;
 };
 
 export function mapBackendInboxStatus(status: string, draftStatus?: string | null): EmailStatus {
@@ -177,27 +188,95 @@ export function deriveCompanyFromEmail(senderEmail: string) {
     .join(" ");
 }
 
-function buildSchedule(entities: Record<string, unknown> | null, detected: boolean): EmailSchedule {
-  if (!detected || !entities) {
+function normalizeScheduleTime(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const [hour, minute] = value.split(":");
+
+  if (!hour || !minute) {
+    return value;
+  }
+
+  return `${hour.padStart(2, "0")}:${minute}`;
+}
+
+function buildDurationLabel(
+  startTime: string | null,
+  endTime: string | null,
+  fallbackDuration?: unknown,
+) {
+  if (typeof fallbackDuration === "string" && fallbackDuration.trim()) {
+    return fallbackDuration;
+  }
+
+  if (!startTime || !endTime) {
+    return "미정";
+  }
+
+  return `${startTime} - ${endTime}`;
+}
+
+function getEntityString(entities: Record<string, unknown> | null, keys: string[]) {
+  if (!entities) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = entities[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function getEntityStringList(entities: Record<string, unknown> | null, key: string) {
+  const value = entities?.[key];
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+}
+
+function buildSchedule(
+  entities: Record<string, unknown> | null,
+  detected: boolean,
+  schedule?: InboxScheduleApiItem | null,
+): EmailSchedule {
+  const hasBackendSchedule = schedule?.has_schedule === true;
+
+  if (!detected && !hasBackendSchedule) {
     return { detected: false };
   }
 
-  const title = typeof entities.title === "string" ? entities.title : null;
-  const suggestedDate = typeof entities.date === "string" ? entities.date : null;
+  const title =
+    schedule?.title?.trim() ||
+    getEntityString(entities, ["title", "event_title", "subject"]) ||
+    "감지된 일정";
+  const suggestedDate =
+    schedule?.date ||
+    getEntityString(entities, ["date", "event_date", "meeting_date"]);
   const suggestedTime =
-    typeof entities.time === "string"
-      ? entities.time
-      : typeof entities.start_time === "string"
-        ? entities.start_time
-        : null;
-  const location = typeof entities.location === "string" ? entities.location : "";
-  const attendees = Array.isArray(entities.participants)
-    ? entities.participants
-        .map((value) => (typeof value === "string" ? value : ""))
-        .filter(Boolean)
-    : [];
+    normalizeScheduleTime(schedule?.start_time) ||
+    normalizeScheduleTime(getEntityString(entities, ["time", "start_time", "event_time", "meeting_time"]));
+  const endTime = normalizeScheduleTime(schedule?.end_time);
+  const location =
+    schedule?.location?.trim() ||
+    getEntityString(entities, ["location", "place", "meeting_location"]) ||
+    "";
+  const attendees =
+    schedule?.participants?.filter(Boolean) ??
+    getEntityStringList(entities, "participants");
 
-  if (!title || !suggestedDate || !suggestedTime) {
+  if (!suggestedDate || !suggestedTime) {
     return { detected: false };
   }
 
@@ -206,7 +285,7 @@ function buildSchedule(entities: Record<string, unknown> | null, detected: boole
     title,
     suggestedDate,
     suggestedTime,
-    duration: typeof entities.duration === "string" ? entities.duration : "미정",
+    duration: buildDurationLabel(suggestedTime, endTime, entities?.duration),
     type: location.toLowerCase().includes("zoom") || location.toLowerCase().includes("meet") ? "video" : "meeting",
     location: location || "미정",
     attendees,
@@ -272,7 +351,11 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
     category: aiIntent || current.category || "분석 대기",
     businessDomain: aiDomain || current.businessDomain,
     confidence: aiAnalysis?.confidence_score ? Number(aiAnalysis.confidence_score) : 0,
-    schedule: buildSchedule(aiAnalysis?.entities ?? null, aiAnalysis?.schedule_detected === true),
+    schedule: buildSchedule(
+      aiAnalysis?.entities ?? null,
+      aiAnalysis?.schedule_detected === true,
+      aiAnalysis?.schedule ?? null,
+    ),
     draft: draftReply?.body ?? "",
     status: mergeFrontendStatus(current.status, draftReply?.status ?? null),
     templateName: draftReply?.template_info?.template_title ?? undefined,
