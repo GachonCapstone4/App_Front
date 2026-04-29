@@ -3,11 +3,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Build-time env vars (VITE_ prefix → embedded in bundle at build time)
-ARG VITE_BACKEND_ORIGIN=https://capstone.studylink.click
-ARG VITE_SSE_ORIGIN=https://capstone.studylink.click
-ENV VITE_BACKEND_ORIGIN=$VITE_BACKEND_ORIGIN
-ENV VITE_SSE_ORIGIN=$VITE_SSE_ORIGIN
+# Vite 환경변수는 빌드 시점에 정적 번들에 포함된다.
+ARG VITE_API_BASE_URL=https://capstone.studylink.click
+ARG VITE_ADMIN_API_BASE_URL=https://admin.studylink.click
+ARG VITE_SSE_BASE_URL=https://capstone.studylink.click
+ARG VITE_DEMO_MODE=false
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_ADMIN_API_BASE_URL=$VITE_ADMIN_API_BASE_URL
+ENV VITE_SSE_BASE_URL=$VITE_SSE_BASE_URL
+ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 
 # Install dependencies (cached layer)
 COPY App/package.json App/package-lock.json ./

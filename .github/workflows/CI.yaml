@@ -37,5 +37,10 @@ jobs:
           context: .
           push: ${{ github.event_name == 'push' }}
           tags: ${{ vars.CAPSTONE_CI_VAR }}/capstonefront:latest,${{ vars.CAPSTONE_CI_VAR }}/capstonefront:${{ github.sha }}
+          build-args: |
+            VITE_API_BASE_URL=https://capstone.studylink.click
+            VITE_ADMIN_API_BASE_URL=https://admin.studylink.click
+            VITE_SSE_BASE_URL=https://capstone.studylink.click
+            VITE_DEMO_MODE=false
           cache-from: type=gha
           cache-to: type=gha,mode=min
