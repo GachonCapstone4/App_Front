@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link2Off, Power, Search } from "lucide-react";
 import { useSearchParams } from "react-router";
 import {
@@ -15,6 +15,7 @@ import {
   updateAdminUserStatus,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstDateTime, parseKstDateTime } from "../../shared/lib/date-time";
 import { adminUsers, userIndustryOptions } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -22,6 +23,23 @@ import { AdminModal } from "../shared/ui/AdminModal";
 import { AdminStateNotice } from "../shared/ui/AdminStateNotice";
 import { AdminStatePage } from "../shared/ui/AdminStatePage";
 import { StatusBadge } from "../shared/ui/StatusBadge";
+
+function formatAdminDateTime(value, fallback = "기록 없음") {
+  const formatted = formatKstDateTime(value);
+  return formatted || fallback;
+}
+
+function formatUserListActivity(user) {
+  if (parseKstDateTime(user.lastActive)) {
+    return `최근 ${formatKstDateTime(user.lastActive)}`;
+  }
+
+  if (parseKstDateTime(user.joinedAt)) {
+    return `가입 ${formatKstDateTime(user.joinedAt)}`;
+  }
+
+  return user.lastActive || "기록 없음";
+}
 
 export function UsersPage() {
   const [searchParams] = useSearchParams();
@@ -55,6 +73,11 @@ export function UsersPage() {
       ? "계정 상태 변경 또는 Google 강제 해제 요청을 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
       : "",
   );
+  const usersRef = useRef(users);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
 
   useEffect(() => {
     if (useDemoDataMode) {
@@ -148,6 +171,8 @@ export function UsersPage() {
           return;
         }
 
+        const currentUser = usersRef.current.find((user) => user.id === selectedUserId);
+        const joinedAt = detail.createdAt || currentUser?.joinedAt || "";
         const mappedDetail = {
           id: detail.userId,
           name: detail.name,
@@ -162,7 +187,7 @@ export function UsersPage() {
           status: detail.active ? "활성" : "비활성",
           googleStatus: detail.gmailConnected ? "연동 완료" : "미연동",
           googleEmail: detail.integratedEmail,
-          joinedAt: "",
+          joinedAt,
           lastActive: detail.lastLoginAt ?? detail.lastSyncAt ?? "기록 없음",
           processedEmails: detail.totalProcessedEmails,
           generatedDrafts: detail.totalGeneratedDrafts,
@@ -483,7 +508,7 @@ export function UsersPage() {
                     <div className="admin-master-item-meta">
                       <span>{user.industryLabel}</span>
                       <span>{user.googleStatus}</span>
-                      <span>{user.lastActive}</span>
+                      <span>{formatUserListActivity(user)}</span>
                     </div>
                   </button>
                 );
@@ -571,7 +596,7 @@ export function UsersPage() {
                     </div>
                     <div>
                       <dt>가입일</dt>
-                      <dd>{selectedUser.joinedAt}</dd>
+                      <dd>{formatAdminDateTime(selectedUser.joinedAt, "가입일 정보 없음")}</dd>
                     </div>
                   </dl>
                 </div>

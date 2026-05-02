@@ -8,6 +8,8 @@ import {
   getAdminWeeklyTrend,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstDateKey, formatKstDateTime, formatKstMonthDay } from "../../shared/lib/date-time";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminStateNotice } from "../shared/ui/AdminStateNotice";
@@ -15,16 +17,7 @@ import { AdminStatePage } from "../shared/ui/AdminStatePage";
 import { StatusBadge } from "../shared/ui/StatusBadge";
 
 function formatDateLabel(value) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-  }).format(date);
+  return formatKstMonthDay(value);
 }
 
 function getRecentDateRange() {
@@ -32,11 +25,9 @@ function getRecentDateRange() {
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 6);
 
-  const toDateString = (date) => date.toISOString().slice(0, 10);
-
   return {
-    startDate: toDateString(startDate),
-    endDate: toDateString(endDate),
+    startDate: formatKstDateKey(startDate),
+    endDate: formatKstDateKey(endDate),
   };
 }
 
@@ -130,12 +121,12 @@ export function DashboardPage() {
       {
         label: "오늘 분석된 메일",
         value: `${summary.today_analyzed_emails}건`,
-        hint: "오늘 분석 완료 건수",
+        hint: "AI 메일 분석 완료 건수",
       },
       {
         label: "오늘 생성된 초안",
         value: `${summary.today_generated_drafts}건`,
-        hint: "오늘 초안 생성 건수",
+        hint: "AI 답변 초안 생성 건수",
       },
       {
         label: "전체 문의",
@@ -199,7 +190,7 @@ export function DashboardPage() {
     <section className="admin-page">
       <PageHeader
         title="운영 대시보드"
-        description="가입자 현황, 메일 처리량, 초안 생성 추이, 최근 문의 접수 현황을 한 화면에서 확인합니다."
+        description="가입자 현황과 함께 AI 메일 분석량, 답변 초안 생성 추이, 최근 문의 접수 현황을 한 화면에서 확인합니다."
       />
 
       <div className="admin-card-grid admin-card-grid--five">
@@ -286,9 +277,12 @@ export function DashboardPage() {
         <section className="admin-panel">
           <div className="admin-panel-head">
             <div>
-              <h2>최근 7일 처리 추이</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2>최근 7일 처리 추이</h2>
+                <AiUsageBadge label="AI 초안 생성" />
+              </div>
               <p className="admin-panel-subtitle">
-                일자별 수신량과 초안 생성량을 세로 막대로 요약합니다.
+                일자별 수신량과 AI 초안 생성량을 세로 막대로 요약합니다.
               </p>
             </div>
             <span className="admin-panel-note">수신량 / 초안량</span>
@@ -343,7 +337,7 @@ export function DashboardPage() {
                 </div>
                 <div className="admin-inline-stat-row">
                   <span>문의 #{ticket.ticketId}</span>
-                  <strong>{ticket.createdAt}</strong>
+                  <strong>{formatKstDateTime(ticket.createdAt)}</strong>
                 </div>
               </article>
             ))}

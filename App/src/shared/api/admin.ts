@@ -90,6 +90,7 @@ type AdminUserDetailApiResponse = {
   name: string;
   role: string;
   is_active: boolean;
+  created_at?: string | null;
   last_login_at: string | null;
   industry_type: string | null;
   email_tone: string | null;
@@ -444,7 +445,7 @@ export async function getAdminUserDetail(userId: string) {
     name: detailResponse.data.name,
     industryType: detailResponse.data.industry_type,
     active: detailResponse.data.is_active,
-    createdAt: "",
+    createdAt: detailResponse.data.created_at ?? "",
     role: detailResponse.data.role,
     lastLoginAt: detailResponse.data.last_login_at,
     emailTone: detailResponse.data.email_tone,
