@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { businessTypeOptions } from "../../shared/config/onboarding-options";
+import { formatKstCompactDate } from "../../shared/lib/date-time";
 import {
   createBusinessFaq,
   deleteBusinessFaq,
@@ -121,13 +122,7 @@ interface BusinessProfileProps {
 }
 
 function formatDateLabel(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString("ko-KR").replace(/\.\s?/g, ".").replace(/\.$/, "");
+  return formatKstCompactDate(value);
 }
 
 function mapApiToneToUi(value: string | null | undefined): ToneId {

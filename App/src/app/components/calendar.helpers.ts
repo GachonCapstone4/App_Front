@@ -1,3 +1,5 @@
+import { splitKstDateTime } from "../../shared/lib/date-time";
+
 export type CalendarEventType = "meeting" | "call" | "video" | "deadline";
 
 export function inferCalendarEventType(title: string): CalendarEventType {
@@ -34,19 +36,7 @@ export function inferCalendarEventType(title: string): CalendarEventType {
 }
 
 export function splitCalendarDateTime(value: string, fallback = "00:00") {
-  const [datePart, timePart] = value.split("T");
-
-  if (!datePart || !timePart) {
-    return {
-      date: value,
-      time: fallback,
-    };
-  }
-
-  return {
-    date: datePart,
-    time: timePart.slice(0, 5),
-  };
+  return splitKstDateTime(value, fallback);
 }
 
 export function toCalendarApiDateTime(date: string, time: string) {

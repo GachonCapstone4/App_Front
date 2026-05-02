@@ -6,6 +6,7 @@ import type {
   EmailSchedule,
   EmailStatus,
 } from "../../shared/types";
+import { formatKstMonthDay, formatKstTime } from "../../shared/lib/date-time";
 
 type InboxAttachmentApiItem = {
   attachment_id: number;
@@ -145,32 +146,11 @@ export function mapFrontendInboxStatus(status: "all" | EmailStatus) {
 }
 
 export function formatInboxTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
+  return formatKstTime(value);
 }
 
 export function formatInboxReceivedDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-  })
-    .format(date)
-    .replace(/\s/g, "");
+  return formatKstMonthDay(value);
 }
 
 export function deriveCompanyFromEmail(senderEmail: string) {

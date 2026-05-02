@@ -18,6 +18,7 @@ import {
   getDashboardWeeklySummary,
 } from "../../shared/api/dashboard";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstHourMinute, formatKstMonthDay } from "../../shared/lib/date-time";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { SectionCard } from "../../shared/ui/primitives/SectionCard";
 import { StatePanel } from "../../shared/ui/primitives/StatePanel";
@@ -37,28 +38,11 @@ function formatSignedNumber(value: number, suffix = "") {
 }
 
 function formatDateLabel(dateTime: string) {
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) {
-    return dateTime;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-  }).format(date);
+  return formatKstMonthDay(dateTime);
 }
 
 function formatTimeLabel(dateTime: string) {
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
+  return formatKstHourMinute(dateTime);
 }
 
 function isVideoSchedule(source: string) {
