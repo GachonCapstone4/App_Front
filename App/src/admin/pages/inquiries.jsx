@@ -7,6 +7,7 @@ import {
   replyAdminSupportTicket,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstDateTime } from "../../shared/lib/date-time";
 import { inquiries, responseHistory } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -464,7 +465,7 @@ export function InquiriesPage() {
                     <div className="admin-master-item-meta">
                       <span>{inquiry.industry}</span>
                       <span>{inquiry.latestResponder}</span>
-                      <span>{inquiry.updatedAt}</span>
+                      <span>{formatKstDateTime(inquiry.updatedAt)}</span>
                     </div>
                   </button>
                 );
@@ -509,11 +510,11 @@ export function InquiriesPage() {
                     </div>
                     <div>
                       <dt>접수 시각</dt>
-                      <dd>{selectedInquiry.createdAt}</dd>
+                      <dd>{formatKstDateTime(selectedInquiry.createdAt)}</dd>
                     </div>
                     <div>
                       <dt>최근 업데이트</dt>
-                      <dd>{selectedInquiry.updatedAt}</dd>
+                      <dd>{formatKstDateTime(selectedInquiry.updatedAt)}</dd>
                     </div>
                     <div>
                       <dt>최근 응답자</dt>
@@ -599,7 +600,7 @@ export function InquiriesPage() {
                             <div className="admin-timeline-meta">
                               <strong>{item.author}</strong>
                               <span>{item.channel}</span>
-                              <span>{item.at}</span>
+                              <span>{formatKstDateTime(item.at)}</span>
                             </div>
                             <p>{item.note}</p>
                           </div>
