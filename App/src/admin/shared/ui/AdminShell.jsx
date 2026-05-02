@@ -3,6 +3,8 @@ import { NavLink, Outlet, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
 import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Terminal, Users } from "lucide-react";
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
+import { ADMIN_NETWORK_ERROR_EVENT } from "../../../shared/api/admin";
+import { AdminStatePage } from "./AdminStatePage";
 
 const navItems = [
   { to: "/admin", label: "운영 대시보드", icon: LayoutGrid },
@@ -17,6 +19,7 @@ export function AdminShell() {
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
   const [session, setSession] = useState(() => getAppSession());
+  const [networkErrorMessage, setNetworkErrorMessage] = useState("");
   const theme = resolvedTheme === "dark" ? "dark" : "light";
 
   useEffect(() => {
@@ -24,6 +27,18 @@ export function AdminShell() {
 
     window.addEventListener("emailassist-session-updated", syncSession);
     return () => window.removeEventListener("emailassist-session-updated", syncSession);
+  }, []);
+
+  useEffect(() => {
+    const handleNetworkError = (event) => {
+      setNetworkErrorMessage(
+        event.detail?.message ||
+          "관리자 서버에 연결하지 못했습니다. VPN 연결 상태와 서버 상태를 확인한 뒤 다시 시도해주세요.",
+      );
+    };
+
+    window.addEventListener(ADMIN_NETWORK_ERROR_EVENT, handleNetworkError);
+    return () => window.removeEventListener(ADMIN_NETWORK_ERROR_EVENT, handleNetworkError);
   }, []);
 
   return (
@@ -89,7 +104,23 @@ export function AdminShell() {
       </aside>
 
       <main className="admin-content">
-        <Outlet />
+        {networkErrorMessage ? (
+          <AdminStatePage
+            title="관리자 서버에 연결하지 못했습니다"
+            description={networkErrorMessage}
+            action={
+              <button
+                type="button"
+                className="admin-button"
+                onClick={() => window.location.reload()}
+              >
+                다시 시도
+              </button>
+            }
+          />
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );

@@ -5,7 +5,13 @@ function resolveAdminApiBaseUrl() {
   return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl : getApiBaseUrl();
 }
 
-const adminApi = createApiClient(resolveAdminApiBaseUrl());
+export const ADMIN_NETWORK_ERROR_EVENT = "emailassist-admin-network-error";
+
+const adminApi = createApiClient(resolveAdminApiBaseUrl(), {
+  networkErrorMessage:
+    "관리자 서버에 연결하지 못했습니다. VPN 연결 상태와 서버 상태를 확인한 뒤 다시 시도해주세요.",
+  networkErrorEventName: ADMIN_NETWORK_ERROR_EVENT,
+});
 
 type AdminDashboardSummaryApiResponse = {
   total_users: number;

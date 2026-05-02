@@ -7,6 +7,14 @@ type ErrorPayload = {
   result_code?: number;
 };
 
+type ApiClientOptions = {
+  networkErrorMessage?: string;
+  networkErrorEventName?: string;
+};
+
+const DEFAULT_NETWORK_ERROR_MESSAGE =
+  "서버와의 연결이 원활하지 않습니다. 잠시 후 다시 시도해주세요.";
+
 export class ApiError extends Error {
   status?: number;
   code?: number;
@@ -28,7 +36,7 @@ export function getApiBaseUrl() {
   return resolveBaseUrl();
 }
 
-export function createApiClient(baseURL: string) {
+export function createApiClient(baseURL: string, options: ApiClientOptions = {}) {
   const client = axios.create({
     baseURL,
     headers: {
@@ -49,15 +57,29 @@ export function createApiClient(baseURL: string) {
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      const payload = axios.isAxiosError(error)
+      const isAxiosError = axios.isAxiosError(error);
+      const status = isAxiosError ? error.response?.status : undefined;
+      const payload = isAxiosError
         ? (error.response?.data as ErrorPayload | undefined)
         : undefined;
-      const message =
-        payload?.result_req ||
+      const isNetworkError = isAxiosError && !error.response;
+      const message = isNetworkError
+        ? options.networkErrorMessage ?? DEFAULT_NETWORK_ERROR_MESSAGE
+        : payload?.result_req ||
         payload?.message ||
-        (axios.isAxiosError(error) ? error.message : "요청을 처리하지 못했습니다.");
+        (isAxiosError ? error.message : "요청을 처리하지 못했습니다.");
       const code = payload?.result_code;
+
+      if (isNetworkError && options.networkErrorEventName && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(options.networkErrorEventName, {
+            detail: {
+              message,
+              baseURL,
+            },
+          }),
+        );
+      }
 
       if (status === 401) {
         clearAppSession();
