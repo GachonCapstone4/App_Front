@@ -31,14 +31,27 @@ function formatAdminDateTime(value, fallback = "기록 없음") {
 
 function formatUserListActivity(user) {
   if (parseKstDateTime(user.lastActive)) {
-    return `최근 ${formatKstDateTime(user.lastActive)}`;
+    const label =
+      user.lastActiveKind === "sync"
+        ? "최근 동기화"
+        : user.lastActiveKind === "login"
+          ? "최근 로그인"
+          : user.lastActiveKind === "status-change"
+            ? "최근 상태 변경"
+            : "최근 활동";
+
+    return `${label} ${formatKstDateTime(user.lastActive)}`;
   }
 
   if (parseKstDateTime(user.joinedAt)) {
-    return `가입 ${formatKstDateTime(user.joinedAt)}`;
+    return `가입일 ${formatKstDateTime(user.joinedAt)}`;
   }
 
-  return user.lastActive || "기록 없음";
+  if (user.lastActive && user.lastActive !== "상세 조회 후 표시") {
+    return user.lastActive;
+  }
+
+  return "활동 기록 없음";
 }
 
 export function UsersPage() {
@@ -118,6 +131,7 @@ export function UsersPage() {
           googleEmail: null,
           joinedAt: user.createdAt,
           lastActive: "상세 조회 후 표시",
+          lastActiveKind: null,
           processedEmails: 0,
           generatedDrafts: 0,
           inquiryCount: 0,
@@ -189,6 +203,7 @@ export function UsersPage() {
           googleEmail: detail.integratedEmail,
           joinedAt,
           lastActive: detail.lastLoginAt ?? detail.lastSyncAt ?? "기록 없음",
+          lastActiveKind: detail.lastLoginAt ? "login" : detail.lastSyncAt ? "sync" : null,
           processedEmails: detail.totalProcessedEmails,
           generatedDrafts: detail.totalGeneratedDrafts,
           inquiryCount: detail.recentTicketCount,
@@ -304,13 +319,16 @@ export function UsersPage() {
 
     const applyLocalChange = () => {
       if (activeConfirmAction.type === "toggle-status") {
+        const changedAt = new Date().toISOString();
+
         setUsers((current) =>
           current.map((user) =>
             user.id === activeConfirmAction.user.id
               ? {
                   ...user,
                   status: user.status === "활성" ? "비활성" : "활성",
-                  lastActive: user.status === "활성" ? "방금 비활성화" : "방금 활성화",
+                  lastActive: changedAt,
+                  lastActiveKind: "status-change",
                 }
               : user,
           ),
@@ -505,10 +523,14 @@ export function UsersPage() {
                     </div>
                     <p className="admin-master-item-title">{user.company}</p>
                     <p className="admin-master-item-copy">{user.email}</p>
-                    <div className="admin-master-item-meta">
-                      <span>{user.industryLabel}</span>
-                      <span>{user.googleStatus}</span>
-                      <span>{formatUserListActivity(user)}</span>
+                    <div className="admin-master-item-meta admin-user-card-meta">
+                      <div className="admin-user-card-meta-row">
+                        <span>{user.industryLabel}</span>
+                        <span>{user.googleStatus}</span>
+                      </div>
+                      <div className="admin-user-card-meta-row admin-user-card-meta-row--time">
+                        <span>{formatUserListActivity(user)}</span>
+                      </div>
                     </div>
                   </button>
                 );

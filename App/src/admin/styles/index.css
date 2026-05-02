@@ -1049,6 +1049,30 @@
   font-size: 11px;
 }
 
+.admin-user-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-user-card-meta-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.admin-user-card-meta-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-card-meta-row--time span {
+  max-width: 100%;
+}
+
 .admin-master-item {
   width: 100%;
   border: 1px solid var(--line);
@@ -1099,6 +1123,12 @@
   margin-top: 12px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.admin-master-item-meta.admin-user-card-meta {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 4px;
 }
 
 .admin-meta-grid {
