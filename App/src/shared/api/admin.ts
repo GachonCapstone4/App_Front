@@ -696,3 +696,17 @@ export async function executeAdminNetworkDictJob() {
   );
   return response.data;
 }
+
+export async function executeAdminOSDictJob() {
+  const response = await adminApi.post<AdminKubernetesJobApiResponse>(
+    "/api/admin/k8s/jobs/os-dict",
+  );
+  return response.data;
+}
+
+export async function executeAdminVPNDictJob() {
+  const response = await adminApi.post<AdminKubernetesJobApiResponse>(
+    "/api/admin/k8s/jobs/vpn-dict",
+  );
+  return response.data;
+}

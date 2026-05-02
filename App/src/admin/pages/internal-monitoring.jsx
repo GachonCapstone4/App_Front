@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Activity, FileSearch, ListChecks, Play, Search } from "lucide-react";
 import {
   executeAdminNetworkDictJob,
+  executeAdminOSDictJob,
+  executeAdminVPNDictJob,
   getAdminOperationJobDetail,
   getAdminOperationJobError,
   getAdminOperationJobSummary,
@@ -45,6 +47,20 @@ const requestButtons = [
     id: "network-dict",
     label: "클러스터 네트워크 진단 실행",
     description: "각 서버 노드의 게이트웨이 및 외부 인터넷 연결 상태를 점검합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "os-dict",
+    label: "OS 진단 실행",
+    description: "각 서버 노드의 OS 환경 진단 작업을 실행합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "vpn-dict",
+    label: "VPN 진단 실행",
+    description: "각 서버 노드의 VPN 접속 환경 진단 작업을 실행합니다.",
     icon: Play,
     dangerous: true,
   },
@@ -150,7 +166,6 @@ export function InternalMonitoringPage() {
   const [jobId, setJobId] = useState("");
   const [activeRequestId, setActiveRequestId] = useState("");
   const [focusedButtonId, setFocusedButtonId] = useState("summary");
-  const [networkEventLogEnabled, setNetworkEventLogEnabled] = useState(true);
   const [logs, setLogs] = useState([]);
   const focusedButton =
     requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
@@ -181,17 +196,13 @@ export function InternalMonitoringPage() {
   );
 
   useEffect(() => {
-    if (!networkEventLogEnabled) {
-      return undefined;
-    }
-
     return subscribeAppEvent("network_test", (payload) => {
       setLogs((current) => [
         createNetworkTestLogEntry(payload),
         ...current,
       ].slice(0, 20));
     });
-  }, [networkEventLogEnabled]);
+  }, []);
 
   const runRequest = async (button) => {
     if (button.needsJobId && !jobId.trim()) {
@@ -242,6 +253,18 @@ export function InternalMonitoringPage() {
         method = "POST";
         endpoint = "/api/admin/k8s/jobs/network-dict";
         data = await executeAdminNetworkDictJob();
+      }
+
+      if (button.id === "os-dict") {
+        method = "POST";
+        endpoint = "/api/admin/k8s/jobs/os-dict";
+        data = await executeAdminOSDictJob();
+      }
+
+      if (button.id === "vpn-dict") {
+        method = "POST";
+        endpoint = "/api/admin/k8s/jobs/vpn-dict";
+        data = await executeAdminVPNDictJob();
       }
 
       appendLog(
@@ -308,15 +331,12 @@ export function InternalMonitoringPage() {
           <div className="admin-request-section">
             <span className="admin-request-section-label">outbox 기반 조회</span>
             <div className="admin-internal-monitoring-job-field">
-              <label className="admin-field-label" htmlFor="internal-monitoring-job-id">
-                outbox ID
-              </label>
               <input
                 id="internal-monitoring-job-id"
                 className="admin-input"
                 type="text"
                 inputMode="numeric"
-                placeholder="outbox ID 입력"
+                placeholder="OUTBOX ID 입력"
                 value={jobId}
                 onChange={(event) => setJobId(event.target.value)}
               />
@@ -329,25 +349,14 @@ export function InternalMonitoringPage() {
           </div>
 
           <div className="admin-request-section">
-            <span className="admin-request-section-label">클러스터 네트워크 진단</span>
-            <label className="admin-event-log-toggle">
-              <input
-                type="checkbox"
-                checked={networkEventLogEnabled}
-                onChange={(event) => setNetworkEventLogEnabled(event.target.checked)}
-              />
-              <span className="admin-event-log-toggle-control" aria-hidden="true">
-                <span />
-              </span>
-              <span className="admin-event-log-toggle-label">
-                실시간 진단
-                <br />
-                로그 수신
-              </span>
-            </label>
+            <span className="admin-request-section-label">시스템 진단 Job 실행</span>
             <div className="admin-internal-monitoring-actions">
               {requestButtons
-                .filter((button) => button.id === "network-dict")
+                .filter((button) =>
+                  button.id === "network-dict" ||
+                  button.id === "os-dict" ||
+                  button.id === "vpn-dict"
+                )
                 .map(renderRequestButton)}
             </div>
           </div>
