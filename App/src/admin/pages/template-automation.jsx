@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router";
-import { recommendedCategoryOptions } from "../../shared/config/onboarding-options";
+import {
+  getBusinessTypeLabel,
+  recommendedCategoryOptions,
+} from "../../shared/config/onboarding-options";
 import {
   Select,
   SelectContent,
@@ -49,6 +52,22 @@ const presetRuleDraft = {
 const categoryColorMap = new Map(
   recommendedCategoryOptions.map((category) => [category.name, category.color]),
 );
+const categoryDomainMap = new Map(
+  recommendedCategoryOptions.map((category) => [
+    category.name,
+    {
+      domain: category.domain,
+      industryLabel: getBusinessTypeLabel(category.domain),
+    },
+  ]),
+);
+
+function getCategoryDomainMeta(categoryName) {
+  return categoryDomainMap.get(categoryName) ?? {
+    domain: "uncategorized",
+    industryLabel: "도메인 미지정",
+  };
+}
 
 const recommendedCategoryStats = recommendedCategoryOptions.map((category) => ({
   id: category.id,
@@ -77,6 +96,8 @@ function buildCategoryKeywordRows(categoryKeywords, includeRecommendedBase = fal
       categoryMap.set(category.name, {
         id: category.name,
         categoryName: category.name,
+        domain: category.domain,
+        industryLabel: getBusinessTypeLabel(category.domain),
         color: category.color,
         keywords: [],
         categoryCount: 0,
@@ -86,9 +107,13 @@ function buildCategoryKeywordRows(categoryKeywords, includeRecommendedBase = fal
   }
 
   categoryKeywords.forEach((category) => {
+    const domainMeta = getCategoryDomainMeta(category.categoryName);
+
     categoryMap.set(category.categoryName, {
       id: category.categoryKey ?? category.categoryName,
       categoryName: category.categoryName,
+      domain: domainMeta.domain,
+      industryLabel: domainMeta.industryLabel,
       color: category.color || categoryColorMap.get(category.categoryName) || "#64748B",
       keywords: category.keywords ?? [],
       categoryCount: category.categoryCount ?? 0,
@@ -393,6 +418,45 @@ export function TemplateAutomationPage() {
     });
   }, [ruleItems, ruleSearch, showEmptyRulesOnly]);
 
+  const ruleDomainGroups = useMemo(() => {
+    const groupMap = new Map();
+
+    filteredRuleItems.forEach((rule) => {
+      const industryLabel = rule.industryLabel || "도메인 미지정";
+      const group = groupMap.get(industryLabel) ?? {
+        domain: rule.domain || "uncategorized",
+        industryLabel,
+        keywordCount: 0,
+        emptyCount: 0,
+        rules: [],
+      };
+
+      group.keywordCount += rule.keywords.length;
+      group.emptyCount += rule.keywords.length === 0 ? 1 : 0;
+      group.rules.push(rule);
+      groupMap.set(industryLabel, group);
+    });
+
+    return Array.from(groupMap.values())
+      .map((group) => ({
+        ...group,
+        rules: group.rules
+          .slice()
+          .sort((first, second) => first.categoryName.localeCompare(second.categoryName, "ko")),
+      }))
+      .sort((first, second) => {
+        const firstIndex = userIndustryOptions.findIndex((option) => option.label === first.industryLabel);
+        const secondIndex = userIndustryOptions.findIndex((option) => option.label === second.industryLabel);
+
+        if (firstIndex !== -1 || secondIndex !== -1) {
+          return (firstIndex === -1 ? Number.MAX_SAFE_INTEGER : firstIndex) -
+            (secondIndex === -1 ? Number.MAX_SAFE_INTEGER : secondIndex);
+        }
+
+        return first.industryLabel.localeCompare(second.industryLabel, "ko");
+      });
+  }, [filteredRuleItems]);
+
   const emptyKeywordCount = useMemo(
     () => ruleItems.filter((rule) => rule.keywords.length === 0).length,
     [ruleItems],
@@ -490,6 +554,7 @@ export function TemplateAutomationPage() {
         {
           id: ruleDraft.categoryName.trim(),
           categoryName,
+          ...getCategoryDomainMeta(categoryName),
           color: ruleDraft.color.trim() || null,
           keywords,
           categoryCount: 1,
@@ -870,72 +935,94 @@ export function TemplateAutomationPage() {
           ) : null}
 
           {filteredRuleItems.length > 0 ? (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>카테고리</th>
-                    <th>검색용 키워드</th>
-                    <th>색상</th>
-                    <th>작업</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRuleItems.map((rule) => (
-                    <tr key={rule.id}>
-                      <td>
-                        <strong>{rule.categoryName}</strong>
-                        <div className="admin-table-subcopy">운영 규칙 기준</div>
-                      </td>
-                      <td>
-                        <div className="admin-button-row">
-                          {rule.keywords.length ? (
-                            rule.keywords.map((keyword) => (
-                              <StatusBadge key={keyword}>{keyword}</StatusBadge>
-                            ))
-                          ) : (
-                            <span className="admin-table-subcopy">등록된 검색용 키워드 없음</span>
-                          )}
-                        </div>
-                        <div className="admin-table-subcopy">{rule.keywords.length}개 등록</div>
-                      </td>
-                      <td>
-                        <div className="admin-color-cell">
-                          <span
-                            aria-hidden="true"
-                            className="admin-color-dot"
-                            style={{ background: rule.color || "#64748B" }}
-                          />
-                          <span>{rule.color || "#64748B"}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="admin-button-row">
-                          <button
-                            type="button"
-                            className="admin-icon-button"
-                            onClick={() => openEditRule(rule)}
-                            aria-label={`${rule.categoryName} 수정`}
-                            title="검색용 키워드 수정"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-icon-button admin-icon-button--danger"
-                            onClick={() => setDeleteTarget(rule)}
-                            aria-label={`${rule.categoryName} 키워드 초기화`}
-                            disabled={rule.keywords.length === 0}
-                            title={rule.keywords.length === 0 ? "초기화할 검색용 키워드가 없습니다" : "검색용 키워드 초기화"}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="admin-rule-domain-groups">
+              {ruleDomainGroups.map((group, index) => (
+                <details
+                  key={group.industryLabel}
+                  className="admin-rule-domain-group"
+                  open={index === 0}
+                >
+                  <summary className="admin-rule-domain-summary">
+                    <div>
+                      <strong>{group.industryLabel}</strong>
+                      <span>
+                        카테고리 {group.rules.length}개 · 검색용 키워드 {group.keywordCount}개
+                      </span>
+                    </div>
+                    <span className="admin-rule-domain-badge">
+                      미등록 {group.emptyCount}개
+                    </span>
+                  </summary>
+
+                  <div className="admin-table-wrap admin-rule-domain-table">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>카테고리</th>
+                          <th>검색용 키워드</th>
+                          <th>색상</th>
+                          <th>작업</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rules.map((rule) => (
+                          <tr key={rule.id}>
+                            <td>
+                              <strong>{rule.categoryName}</strong>
+                              <div className="admin-table-subcopy">{rule.industryLabel} 기준</div>
+                            </td>
+                            <td>
+                              <div className="admin-button-row">
+                                {rule.keywords.length ? (
+                                  rule.keywords.map((keyword) => (
+                                    <StatusBadge key={keyword}>{keyword}</StatusBadge>
+                                  ))
+                                ) : (
+                                  <span className="admin-table-subcopy">등록된 검색용 키워드 없음</span>
+                                )}
+                              </div>
+                              <div className="admin-table-subcopy">{rule.keywords.length}개 등록</div>
+                            </td>
+                            <td>
+                              <div className="admin-color-cell">
+                                <span
+                                  aria-hidden="true"
+                                  className="admin-color-dot"
+                                  style={{ background: rule.color || "#64748B" }}
+                                />
+                                <span>{rule.color || "#64748B"}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="admin-button-row">
+                                <button
+                                  type="button"
+                                  className="admin-icon-button"
+                                  onClick={() => openEditRule(rule)}
+                                  aria-label={`${rule.categoryName} 수정`}
+                                  title="검색용 키워드 수정"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-icon-button admin-icon-button--danger"
+                                  onClick={() => setDeleteTarget(rule)}
+                                  aria-label={`${rule.categoryName} 키워드 초기화`}
+                                  disabled={rule.keywords.length === 0}
+                                  title={rule.keywords.length === 0 ? "초기화할 검색용 키워드가 없습니다" : "검색용 키워드 초기화"}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              ))}
             </div>
           ) : (
             <AdminStateNotice
