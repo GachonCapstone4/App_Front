@@ -19,8 +19,6 @@ RUN npm ci
 
 # Copy source and build
 COPY App/ .
-RUN echo 'export { StatusBadge as AiUsageBadge } from "./StatusBadge";' \
-    > src/shared/ui/primitives/AiUsageBadge.ts
 RUN npm run build
 
 # ─── Stage 2: Serve ───────────────────────────────────────────────────────────
