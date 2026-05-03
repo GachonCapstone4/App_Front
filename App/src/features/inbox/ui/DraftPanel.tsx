@@ -200,12 +200,29 @@ export function DraftPanel({
   }
 
   const handleOpenTemplate = () => {
-    navigate("/app/templates", {
-      state: {
-        templateName,
-        emailCategory: email.category,
+    const selectedRecommendation = recommendations.find(
+      (recommendation) => recommendation.draftId === email.selectedRecommendationId,
+    );
+    const templateId = selectedRecommendation?.templateId ?? email.selectedTemplateId;
+    const searchParams = new URLSearchParams();
+
+    if (templateId != null) {
+      searchParams.set("template_id", String(templateId));
+    }
+
+    navigate(
+      {
+        pathname: "/app/templates",
+        search: searchParams.toString(),
       },
-    });
+      {
+        state: {
+          templateId,
+          templateName,
+          emailCategory: email.category,
+        },
+      },
+    );
   };
 
   const meta = metaByStatus[email.status];

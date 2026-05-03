@@ -50,6 +50,7 @@ export interface EmailAttachment {
 
 export interface EmailRecommendationItem {
   draftId: number;
+  templateId?: number;
   templateTitle: string;
   subject: string;
   body: string;
@@ -68,6 +69,7 @@ export interface DraftEditSnapshot {
   draft: string;
   draftSubject?: string;
   templateName?: string;
+  selectedTemplateId?: number;
   autoCompletedCount?: number;
   autoCompletedValues?: Record<string, string>;
   requiredInputCount?: number;
@@ -105,6 +107,7 @@ export interface EmailItem {
   recommendationState?: RecommendationState;
   recommendationError?: string;
   selectedRecommendationId?: number;
+  selectedTemplateId?: number;
   isDraftEditing?: boolean;
   isManualDraft?: boolean;
   draftEditSnapshot?: DraftEditSnapshot;

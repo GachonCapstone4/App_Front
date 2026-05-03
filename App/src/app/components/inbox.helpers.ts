@@ -68,6 +68,7 @@ type InboxDetailApiResponse = {
 
 type InboxRecommendationApiItem = {
   draft_id: number;
+  template_id?: number | null;
   template_title?: string | null;
   subject: string;
   body: string;
@@ -344,6 +345,7 @@ export function mergeInboxDetail(current: EmailItem, detail: InboxDetailApiRespo
     draft: draftReply?.body ?? "",
     status: mergeFrontendStatus(current.status, draftReply?.status ?? null),
     templateName: draftReply?.template_info?.template_title ?? undefined,
+    selectedTemplateId: draftReply?.template_info?.template_id ?? undefined,
     draftSubject: draftReply?.subject ?? undefined,
     autoCompletedCount: draftReply?.variables?.auto_completed_count ?? undefined,
     requiredInputCount: draftReply?.variables?.required_input_count ?? undefined,
@@ -359,6 +361,7 @@ export function mapInboxRecommendation(item: InboxRecommendationApiItem): EmailR
 
   return {
     draftId: item.draft_id,
+    templateId: typeof item.template_id === "number" ? item.template_id : undefined,
     templateTitle: item.template_title,
     subject: item.subject,
     body: item.body,

@@ -77,6 +77,7 @@ type InboxActionApiResponse = {
 
 type InboxRecommendationApiItem = {
   draft_id: number;
+  template_id?: number | null;
   template_title?: string | null;
   subject: string;
   body: string;

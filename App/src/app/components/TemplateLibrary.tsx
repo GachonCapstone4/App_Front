@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   Search,
   Plus,
@@ -305,6 +305,7 @@ interface TemplateLibraryProps {
 export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const createNormalScenario = scenarioId === "templates-create-normal";
   const previewNormalScenario = scenarioId === "templates-preview-normal";
   const editNormalScenario = scenarioId === "templates-edit-normal";
@@ -371,21 +372,25 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
   }, [useDemoDataMode]);
 
   useEffect(() => {
-    if (!useDemoDataMode) {
-      return;
-    }
-
     const state = location.state as
-      | { templateName?: string; emailCategory?: string }
+      | { templateId?: number; templateName?: string; emailCategory?: string }
       | null;
+    const templateIdParam = searchParams.get("template_id");
+    const targetTemplateId =
+      templateIdParam && !Number.isNaN(Number(templateIdParam))
+        ? Number(templateIdParam)
+        : state?.templateId;
+    const targetTemplateName = state?.templateName?.trim();
 
-    if (!state?.templateName) {
+    if (isLoading || (!targetTemplateId && !targetTemplateName)) {
       return;
     }
 
-    setSearchQuery(state.templateName);
+    if (targetTemplateName) {
+      setSearchQuery(targetTemplateName);
+    }
 
-    if (state.emailCategory) {
+    if (state?.emailCategory) {
       const matchedCategory = categoryOptions.find(
         (category) => category.name === state.emailCategory,
       );
@@ -394,19 +399,33 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
       }
     }
 
-    const targetTemplateName = state.templateName;
+    const matchedByName = targetTemplateName
+      ? templates.find((template) => template.title.includes(targetTemplateName)) ||
+        templates.find((template) => template.subject.includes(targetTemplateName))
+      : null;
     const matchedTemplate =
-      templates.find((template) => template.title.includes(targetTemplateName)) ||
-      templates.find((template) => template.subject.includes(targetTemplateName)) ||
-      templates.find((template) => template.category === state.emailCategory) ||
+      templates.find((template) => template.templateId === targetTemplateId) ||
+      matchedByName ||
+      templates.find((template) => template.category === state?.emailCategory) ||
       null;
 
     if (matchedTemplate) {
+      setActiveCategory(matchedTemplate.categoryId);
       setPreviewTemplate(matchedTemplate);
     }
 
-    navigate(location.pathname, { replace: true, state: null });
-  }, [categoryOptions, location.pathname, location.state, navigate, templates, useDemoDataMode]);
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("template_id");
+    const nextSearch = nextSearchParams.toString();
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true, state: null },
+    );
+  }, [categoryOptions, isLoading, location.pathname, location.state, navigate, searchParams, templates]);
 
   useEffect(() => {
     if (!useDemoDataMode) {
