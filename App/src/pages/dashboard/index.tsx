@@ -25,6 +25,9 @@ import { StatePanel } from "../../shared/ui/primitives/StatePanel";
 import { StatusBadge } from "../../shared/ui/primitives/StatusBadge";
 import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
+import { defaultSettingsState } from "../../entities/settings/model/default-settings";
+import { getDisplaySettings } from "../../shared/api/display-settings";
+import type { DisplaySettings } from "../../shared/types";
 
 type DashboardState = {
   summary: Awaited<ReturnType<typeof getDashboardSummary>> | null;
@@ -77,6 +80,8 @@ const initialDashboardState: DashboardState = {
   weeklySummary: null,
   recentEmails: [],
 };
+
+const defaultDisplaySettings = defaultSettingsState.display as DisplaySettings;
 
 const demoDashboardState: DashboardState = {
   summary: {
@@ -167,8 +172,33 @@ export function DashboardPage() {
   const showCalendarPanelError = scenarioId === "dashboard-calendar-panel-error";
   const showEmailPanelError = scenarioId === "dashboard-email-panel-error";
   const [dashboardState, setDashboardState] = useState<DashboardState>(initialDashboardState);
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(defaultDisplaySettings);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    void getDisplaySettings(defaultDisplaySettings)
+      .then((settings) => {
+        if (!mounted) {
+          return;
+        }
+
+        setDisplaySettings(settings);
+      })
+      .catch(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setDisplaySettings(defaultDisplaySettings);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (useDemoDataMode) {
@@ -277,6 +307,14 @@ export function DashboardPage() {
       })),
     [dashboardState.weeklySummary],
   );
+  const visibleWidgetIds = useMemo(
+    () => new Set(displaySettings.widgets.filter((widget) => widget.visible).map((widget) => widget.id)),
+    [displaySettings.widgets],
+  );
+  const showUpcomingWidget = visibleWidgetIds.has("upcoming");
+  const showEmailsWidget = visibleWidgetIds.has("emails");
+  const showSummaryWidget = visibleWidgetIds.has("summary");
+  const hasVisibleDashboardWidget = showUpcomingWidget || showEmailsWidget || showSummaryWidget;
 
   if (showPermissionError) {
     return (
@@ -359,9 +397,11 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <div className="space-y-6">
-          <SectionCard
+      {hasVisibleDashboardWidget ? (
+        <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+          <div className="space-y-6">
+            {showUpcomingWidget ? (
+              <SectionCard
             title="다가오는 일정"
             action={
               <Link
@@ -428,9 +468,11 @@ export function DashboardPage() {
                 ))}
               </div>
             )}
-          </SectionCard>
+              </SectionCard>
+            ) : null}
 
-          <SectionCard
+            {showEmailsWidget ? (
+              <SectionCard
             title="최근 수신 이메일"
             action={
               <Link
@@ -485,10 +527,12 @@ export function DashboardPage() {
                 })}
               </div>
             )}
-          </SectionCard>
-        </div>
+              </SectionCard>
+            ) : null}
+          </div>
 
-        <SectionCard
+          {showSummaryWidget ? (
+            <SectionCard
           title="이번 주 요약"
           description={
             dashboardState.weeklySummary
@@ -532,8 +576,16 @@ export function DashboardPage() {
               </div>
             </div>
           )}
-        </SectionCard>
-      </div>
+            </SectionCard>
+          ) : null}
+        </div>
+      ) : (
+        <StatePanel
+          title="표시할 대시보드 위젯이 없습니다"
+          description="설정의 화면 탭에서 대시보드 위젯을 다시 켜면 이 영역에 표시됩니다."
+          tone="empty"
+        />
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export const defaultSettingsState = {
     widgets: [
       { id: "upcoming", label: "다가오는 일정", visible: true },
       { id: "emails", label: "최근 수신 이메일", visible: true },
-      { id: "summary", label: "이번 주 요약", visible: false },
+      { id: "summary", label: "이번 주 요약", visible: true },
     ],
   },
   emailAccounts: [

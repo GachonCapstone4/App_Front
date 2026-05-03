@@ -1,22 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GripVertical, Moon, SunMedium } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { DisplaySettings, DisplayWidget } from "../../../shared/types";
 import { toast } from "sonner";
+import {
+  getDisplaySettings,
+  updateDisplaySettings,
+} from "../../../shared/api/display-settings";
+import { getErrorMessage } from "../../../shared/api/http";
 
 interface WidgetToggleProps {
   checked: boolean;
+  disabled?: boolean;
   onToggle: () => void;
 }
 
-function WidgetToggle({ checked, onToggle }: WidgetToggleProps) {
+function WidgetToggle({ checked, disabled = false, onToggle }: WidgetToggleProps) {
   return (
     <button
       type="button"
       aria-pressed={checked}
+      disabled={disabled}
       className={`relative inline-flex h-7 w-12 items-center rounded-full p-1 transition ${
         checked ? "bg-[#2DD4BF] dark:bg-[#0F766E]" : "bg-[#CBD5E1] dark:bg-[#334155]"
-      }`}
+      } disabled:cursor-not-allowed disabled:opacity-60`}
       onClick={onToggle}
     >
       <span
@@ -36,6 +43,68 @@ export function DisplaySettingsPanel({ display }: DisplaySettingsPanelProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const currentTheme = resolvedTheme === "dark" ? "dark" : "light";
   const [widgets, setWidgets] = useState<DisplayWidget[]>(display.widgets);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    setLoadingSettings(true);
+    setSettingsError("");
+
+    void getDisplaySettings(display)
+      .then((settings) => {
+        if (!mounted) {
+          return;
+        }
+
+        setWidgets(settings.widgets);
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+
+        setWidgets(display.widgets);
+        setSettingsError(getErrorMessage(error, "화면 설정을 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setLoadingSettings(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [display]);
+
+  const handleSave = async () => {
+    setSavingSettings(true);
+    setSettingsError("");
+
+    try {
+      const savedSettings = await updateDisplaySettings(
+        {
+          ...display,
+          theme: currentTheme,
+          widgets,
+        },
+        display,
+      );
+
+      setWidgets(savedSettings.widgets);
+      toast.success("화면 설정을 저장했습니다.");
+    } catch (error) {
+      setSettingsError(getErrorMessage(error, "화면 설정 저장에 실패했습니다."));
+      toast.error("화면 설정 저장에 실패했습니다.");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -87,6 +156,11 @@ export function DisplaySettingsPanel({ display }: DisplaySettingsPanelProps) {
         <p className="mt-2 text-sm text-muted-foreground">
           대시보드에 표시할 섹션과 순서를 설정합니다
         </p>
+        {settingsError ? (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+            {settingsError}
+          </p>
+        ) : null}
 
         <div className="mt-5 space-y-2.5">
           {widgets.map((widget: DisplayWidget) => (
@@ -101,6 +175,7 @@ export function DisplaySettingsPanel({ display }: DisplaySettingsPanelProps) {
 
               <WidgetToggle
                 checked={widget.visible}
+                disabled={loadingSettings || savingSettings}
                 onToggle={() =>
                   setWidgets((current: DisplayWidget[]) =>
                     current.map((item: DisplayWidget) =>
@@ -118,9 +193,10 @@ export function DisplaySettingsPanel({ display }: DisplaySettingsPanelProps) {
         <button
           type="button"
           className="app-cta-primary rounded-xl px-5 py-2.5 text-sm font-medium"
-          onClick={() => toast.success("화면 설정을 저장했습니다.")}
+          disabled={loadingSettings || savingSettings}
+          onClick={handleSave}
         >
-          저장
+          {savingSettings ? "저장 중..." : "저장"}
         </button>
       </div>
     </div>
