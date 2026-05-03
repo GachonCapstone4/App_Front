@@ -31,6 +31,20 @@ import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 
 type InboxStatus = "all" | EmailStatus;
 
+function extractPlaceholders(text: string) {
+  return Array.from(new Set(text.match(/{{\s*[^{}]+?\s*}}/g) ?? []));
+}
+
+function showRemainingPlaceholderError(content: string) {
+  const placeholders = extractPlaceholders(content);
+  if (!placeholders.length) {
+    return false;
+  }
+
+  toast.error(`입력되지 않은 변수 ${placeholders.length}개가 남아 있습니다: ${placeholders.join(", ")}`);
+  return true;
+}
+
 function getCurrentTimeLabel() {
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -677,6 +691,10 @@ export function InboxPage() {
         return;
       }
 
+      if (shouldSendContent && showRemainingPlaceholderError(selectedEmail.draft)) {
+        return;
+      }
+
       const response = shouldSendContent
         ? await editAndSendInboxReply(
             Number(selectedEmail.id),
@@ -727,6 +745,10 @@ export function InboxPage() {
     try {
       if (!selectedEmail.draft.trim()) {
         toast.error("발송할 답장 내용을 입력해 주세요.");
+        return;
+      }
+
+      if (showRemainingPlaceholderError(selectedEmail.draft)) {
         return;
       }
 
