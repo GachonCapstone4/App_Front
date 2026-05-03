@@ -7,6 +7,7 @@ import {
   Plus,
   AlertTriangle,
   Save,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { businessTypeOptions } from "../../shared/config/onboarding-options";
@@ -623,9 +624,12 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
         ) : null}
 
         <div className="mb-8">
-          <h1 className="mb-1 text-[#1E2A3A]">비즈니스 프로필</h1>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h1 className="text-[#1E2A3A]">비즈니스 프로필</h1>
+            <AiUsageBadge label="AI/RAG 학습 자료" />
+          </div>
           <p className="text-[14px] text-[#64748B]">
-            AI 템플릿 생성에 사용되는 비즈니스 정보를 관리합니다
+            회사 정보, FAQ, 업로드 자료는 AI 템플릿 생성과 RAG 검색 품질에 직접 반영됩니다.
           </p>
         </div>
 
@@ -829,9 +833,11 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
               <button
                 onClick={() => setRegenerateMode("bulk")}
                 disabled={!canRegenerate}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#1E2A3A] px-4 py-2 text-[13px] text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center gap-2.5 rounded-xl bg-[#1E2A3A] px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <AiUsageBadge label="AI" compact />
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </span>
                 템플릿 재생성
               </button>
             </div>
