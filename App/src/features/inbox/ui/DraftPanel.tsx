@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { AlertTriangle, CheckCircle2, FileText, Loader2, PencilLine, Send, SkipForward } from "lucide-react";
 import { toast } from "sonner";
@@ -5,6 +6,11 @@ import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import type { EmailItem, EmailRecommendationItem, EmailStatus } from "../../../shared/types";
 import { AiUsageBadge } from "../../../shared/ui/primitives/AiUsageBadge";
 import { StatePanel } from "../../../shared/ui/primitives/StatePanel";
+import {
+  getTemplateLibrary,
+  type TemplateSnapshot,
+} from "../../../shared/api/templates";
+import { getErrorMessage } from "../../../shared/api/http";
 
 const metaByStatus = emailStatusMeta as Record<
   EmailStatus,
@@ -178,6 +184,7 @@ interface DraftPanelProps {
   onStartManualReply?: () => void;
   onCancelDraftEdit?: () => void;
   onSaveDraftEdit?: () => void;
+  onLoadLibraryTemplate?: (template: TemplateSnapshot) => void;
 }
 
 export function DraftPanel({
@@ -192,8 +199,13 @@ export function DraftPanel({
   onStartManualReply,
   onCancelDraftEdit,
   onSaveDraftEdit,
+  onLoadLibraryTemplate,
 }: DraftPanelProps) {
   const navigate = useNavigate();
+  const [libraryTemplates, setLibraryTemplates] = useState<TemplateSnapshot[]>([]);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templatePickerLoading, setTemplatePickerLoading] = useState(false);
+  const [templatePickerError, setTemplatePickerError] = useState<string | null>(null);
 
   if (!email) {
     return null;
@@ -238,6 +250,73 @@ export function DraftPanel({
     required: email.requiredInputCount ?? tokenCounts.required,
   };
   const showDraftFallbackState = !readonly && !email.draft.trim() && !email.isManualDraft;
+  const manualTemplateOptions = useMemo(() => {
+    const normalizedCategory = email.category.trim();
+
+    return [...libraryTemplates].sort((left, right) => {
+      const leftMatched = left.categoryName === normalizedCategory ? 0 : 1;
+      const rightMatched = right.categoryName === normalizedCategory ? 0 : 1;
+
+      if (leftMatched !== rightMatched) {
+        return leftMatched - rightMatched;
+      }
+
+      return left.title.localeCompare(right.title, "ko");
+    });
+  }, [email.category, libraryTemplates]);
+
+  useEffect(() => {
+    if (!templatePickerOpen || libraryTemplates.length || templatePickerLoading) {
+      return;
+    }
+
+    let active = true;
+
+    setTemplatePickerLoading(true);
+    setTemplatePickerError(null);
+
+    void getTemplateLibrary()
+      .then((templates) => {
+        if (!active) {
+          return;
+        }
+
+        setLibraryTemplates(templates);
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+
+        setTemplatePickerError(
+          getErrorMessage(error, "템플릿 라이브러리를 불러오지 못했습니다."),
+        );
+      })
+      .finally(() => {
+        if (!active) {
+          return;
+        }
+
+        setTemplatePickerLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [libraryTemplates.length, templatePickerLoading, templatePickerOpen]);
+
+  const handleLoadLibraryTemplate = (template: TemplateSnapshot) => {
+    if (onLoadLibraryTemplate) {
+      onLoadLibraryTemplate(template);
+    } else {
+      onDraftSubjectChange?.(template.subjectTemplate);
+      onDraftChange?.(template.bodyTemplate);
+    }
+
+    setTemplatePickerOpen(false);
+    toast.success("템플릿을 답장 작성 영역으로 불러왔습니다.");
+  };
+
   const manualReplyButton = (
     <button
       type="button"
@@ -402,6 +481,71 @@ export function DraftPanel({
       ) : (
         <div className={`mt-4 rounded-2xl border border-border bg-card ${readonly ? "opacity-85" : ""}`}>
           <div className="space-y-4 border-b border-border px-4 py-4">
+            {email.isManualDraft && isEditingDraft && !readonly ? (
+              <div className="rounded-xl border border-dashed border-[#BFD8D4] bg-[#F8FFFD] px-3 py-3 dark:border-[#1F4E48] dark:bg-[#082F2D]/25">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0F766E] dark:text-[#5EEAD4]">
+                      템플릿 라이브러리
+                    </p>
+                    <p className="mt-1 text-xs text-[#64748B] dark:text-muted-foreground">
+                      직접 작성 중에도 기존 템플릿을 불러와 편집 후 발송할 수 있습니다.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#99F6E4] bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] transition hover:bg-[#F0FDFA] dark:border-[#134E4A] dark:bg-card dark:text-[#5EEAD4] dark:hover:bg-[#0B2728]"
+                    onClick={() => setTemplatePickerOpen((current) => !current)}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    템플릿 선택
+                  </button>
+                </div>
+
+                {templatePickerOpen ? (
+                  <div className="mt-3 max-h-[240px] space-y-2 overflow-y-auto pr-1">
+                    {templatePickerLoading ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        템플릿을 불러오고 있습니다.
+                      </div>
+                    ) : templatePickerError ? (
+                      <div className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-3 py-3 text-xs text-[#991B1B] dark:border-[#5B2323] dark:bg-[#211314] dark:text-[#FCA5A5]">
+                        {templatePickerError}
+                      </div>
+                    ) : manualTemplateOptions.length ? (
+                      manualTemplateOptions.map((template) => (
+                        <button
+                          key={template.templateId}
+                          type="button"
+                          className="w-full rounded-lg border border-border bg-card px-3 py-3 text-left transition hover:border-[#14B8A6] hover:bg-[#F0FDFA] dark:hover:border-[#5EEAD4] dark:hover:bg-[#0B2728]"
+                          onClick={() => handleLoadLibraryTemplate(template)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[#1E2A3A] dark:text-foreground">
+                                {template.title}
+                              </p>
+                              <p className="mt-1 truncate text-xs text-[#64748B] dark:text-muted-foreground">
+                                {template.subjectTemplate}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground">
+                              {template.categoryName}
+                            </span>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card px-3 py-3 text-xs text-muted-foreground">
+                        불러올 수 있는 템플릿이 없습니다.
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div>
               <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">받는 사람</p>
               <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">

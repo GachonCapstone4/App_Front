@@ -27,6 +27,7 @@ import {
   mapInboxRecommendation,
   mergeInboxRecommendations,
 } from "../../app/components/inbox.helpers";
+import type { TemplateSnapshot } from "../../shared/api/templates";
 import { subscribeAppEvent } from "../../shared/lib/app-event-stream";
 import { resolveDemoScenarioId } from "../../shared/scenarios/demo-mode";
 
@@ -63,6 +64,7 @@ function createDraftEditSnapshot(email: EmailItem): DraftEditSnapshot {
     draft: email.draft,
     draftSubject: email.draftSubject,
     templateName: email.templateName,
+    selectedTemplateId: email.selectedTemplateId,
     autoCompletedCount: email.autoCompletedCount,
     autoCompletedValues: email.autoCompletedValues,
     requiredInputCount: email.requiredInputCount,
@@ -347,6 +349,7 @@ export function InboxPage() {
           ? {
               ...item,
               selectedRecommendationId: recommendation.draftId,
+              selectedTemplateId: recommendation.templateId,
               templateName: recommendation.templateTitle,
               draftSubject: recommendation.subject,
               draft: recommendation.body,
@@ -401,6 +404,27 @@ export function InboxPage() {
       draftSubject: `Re: ${selectedEmail.subject}`,
       templateName: undefined,
       selectedRecommendationId: undefined,
+      selectedTemplateId: undefined,
+      autoCompletedCount: undefined,
+      autoCompletedValues: undefined,
+      requiredInputCount: undefined,
+      isDraftEditing: true,
+      isManualDraft: true,
+      draftEditSnapshot: selectedEmail.draftEditSnapshot ?? createDraftEditSnapshot(selectedEmail),
+    });
+  };
+
+  const handleLoadLibraryTemplate = (template: TemplateSnapshot) => {
+    if (!selectedEmail) {
+      return;
+    }
+
+    updateSelectedDraft({
+      draft: template.bodyTemplate,
+      draftSubject: template.subjectTemplate || `Re: ${selectedEmail.subject}`,
+      templateName: template.title,
+      selectedTemplateId: template.templateId,
+      selectedRecommendationId: undefined,
       autoCompletedCount: undefined,
       autoCompletedValues: undefined,
       requiredInputCount: undefined,
@@ -423,6 +447,7 @@ export function InboxPage() {
         draftSubject: snapshot.draftSubject,
         templateName: snapshot.templateName,
         selectedRecommendationId: snapshot.selectedRecommendationId,
+        selectedTemplateId: snapshot.selectedTemplateId,
         autoCompletedCount: snapshot.autoCompletedCount,
         autoCompletedValues: snapshot.autoCompletedValues,
         requiredInputCount: snapshot.requiredInputCount,
@@ -966,6 +991,7 @@ export function InboxPage() {
                 onStartManualReply={handleStartManualReply}
                 onCancelDraftEdit={handleCancelDraftEdit}
                 onSaveDraftEdit={handleSaveDraftEdit}
+                onLoadLibraryTemplate={handleLoadLibraryTemplate}
               />
             </div>
           </div>
@@ -1087,6 +1113,7 @@ export function InboxPage() {
               onStartManualReply={handleStartManualReply}
               onCancelDraftEdit={handleCancelDraftEdit}
               onSaveDraftEdit={handleSaveDraftEdit}
+              onLoadLibraryTemplate={handleLoadLibraryTemplate}
             />
           </div>
         </div>
