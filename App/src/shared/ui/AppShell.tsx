@@ -116,6 +116,9 @@ export function AppShell() {
     const unsubscribeTemplateMatch = subscribeAppEvent("template-match-updated", () => {
       void loadNotifications(true);
     });
+    const unsubscribeNotification = subscribeAppEvent("notification-updated", () => {
+      void loadNotifications(true);
+    });
     const unsubscribeRag = subscribeAppEvent("rag-job-updated", (payload) => {
       if (payload.status === "COMPLETED" || payload.status === "FAILED") {
         void loadNotifications(true);
@@ -127,6 +130,7 @@ export function AppShell() {
       unsubscribeClassify();
       unsubscribeSupport();
       unsubscribeTemplateMatch();
+      unsubscribeNotification();
       unsubscribeRag();
     };
   }, [demoMode]);

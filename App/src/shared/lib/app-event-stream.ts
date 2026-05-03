@@ -30,6 +30,13 @@ export type TemplateMatchUpdatedEventPayload = {
   recommendation_count?: number | null;
 };
 
+export type NotificationUpdatedEventPayload = {
+  notification_id?: number | string | null;
+  type?: string | null;
+  title?: string | null;
+  related_id?: number | string | null;
+};
+
 export type DiagnosticEventPayload = {
   user_id?: number | string | null;
   sse_type?: "network_test" | "os" | "vpn" | string;
@@ -56,6 +63,7 @@ type AppEventPayloadMap = {
   "rag-job-updated": RagJobUpdatedEventPayload;
   "support-ticket-updated": SupportTicketUpdatedEventPayload;
   "template-match-updated": TemplateMatchUpdatedEventPayload;
+  "notification-updated": NotificationUpdatedEventPayload;
   network_test: DiagnosticEventPayload;
   os: DiagnosticEventPayload;
   vpn: DiagnosticEventPayload;
@@ -71,6 +79,7 @@ const listeners: {
   "rag-job-updated": new Set(),
   "support-ticket-updated": new Set(),
   "template-match-updated": new Set(),
+  "notification-updated": new Set(),
   network_test: new Set(),
   os: new Set(),
   vpn: new Set(),
@@ -185,6 +194,7 @@ function ensureEventSource() {
   bindEventListener(source, "rag-job-updated");
   bindEventListener(source, "support-ticket-updated");
   bindEventListener(source, "template-match-updated");
+  bindEventListener(source, "notification-updated");
   bindEventListener(source, "network_test");
   bindEventListener(source, "os");
   bindEventListener(source, "vpn");

@@ -24,6 +24,7 @@ type NotificationListApiResponse = {
 type NotificationSettingsApiResponse = {
   NEW_EMAIL?: boolean;
   DRAFT_PENDING?: boolean;
+  DRAFT_THRESHOLD?: number | string | null;
   EMAIL_DISCONNECTED?: boolean;
   UNCLASSIFIED_EMAIL?: boolean;
   EVENT_PENDING?: boolean;
@@ -41,10 +42,16 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 };
 
 function mapSettingsFromApi(data: NotificationSettingsApiResponse): NotificationSettings {
+  const draftThreshold = Number(data.DRAFT_THRESHOLD);
+
   return {
     ...DEFAULT_NOTIFICATION_SETTINGS,
     newEmail: data.NEW_EMAIL ?? DEFAULT_NOTIFICATION_SETTINGS.newEmail,
     draftQueue: data.DRAFT_PENDING ?? DEFAULT_NOTIFICATION_SETTINGS.draftQueue,
+    draftThreshold:
+      Number.isFinite(draftThreshold) && draftThreshold > 0
+        ? draftThreshold
+        : DEFAULT_NOTIFICATION_SETTINGS.draftThreshold,
     accountError: data.EMAIL_DISCONNECTED ?? DEFAULT_NOTIFICATION_SETTINGS.accountError,
     unclassified: data.UNCLASSIFIED_EMAIL ?? DEFAULT_NOTIFICATION_SETTINGS.unclassified,
     calendarQueue: data.EVENT_PENDING ?? DEFAULT_NOTIFICATION_SETTINGS.calendarQueue,
@@ -56,6 +63,7 @@ function mapSettingsToApi(settings: NotificationSettings): NotificationSettingsA
   return {
     NEW_EMAIL: settings.newEmail,
     DRAFT_PENDING: settings.draftQueue,
+    DRAFT_THRESHOLD: settings.draftThreshold,
     EMAIL_DISCONNECTED: settings.accountError,
     UNCLASSIFIED_EMAIL: settings.unclassified,
     EVENT_PENDING: settings.calendarQueue,
@@ -95,6 +103,14 @@ function buildNotificationMeta(type: string) {
       actionLabel: "초안 확인",
       actionPath: "/app/inbox",
       tone: "amber" as const,
+    };
+  }
+
+  if (normalizedType.includes("SUMMARY")) {
+    return {
+      actionLabel: "요약 확인",
+      actionPath: "/app/dashboard",
+      tone: "teal" as const,
     };
   }
 
