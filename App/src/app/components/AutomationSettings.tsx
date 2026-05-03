@@ -59,8 +59,10 @@ import {
   type IntegrationSnapshot,
 } from "../../shared/api/integrations";
 import {
+  closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
+  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -398,7 +400,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     popupClosePollingRef.current = window.setInterval(() => {
       const popup = popupWindowRef.current;
 
-      if (!popup || !popup.closed) {
+      if (!popup || !isGoogleOAuthPopupClosed(popup)) {
         return;
       }
 
@@ -411,9 +413,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
   const handlePopupResult = async (payload: GoogleOAuthPopupMessage) => {
     clearPopupClosePolling();
 
-    if (popupWindowRef.current && !popupWindowRef.current.closed) {
-      popupWindowRef.current.close();
-    }
+    closeGoogleOAuthPopup(popupWindowRef.current);
     popupWindowRef.current = null;
 
     if (payload.result !== "success") {
@@ -549,7 +549,10 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         return;
       }
 
-      if (popupWindowRef.current?.closed) {
+      if (
+        popupWindowRef.current &&
+        isGoogleOAuthPopupClosed(popupWindowRef.current)
+      ) {
         clearPopupClosePolling();
         popupWindowRef.current = null;
         void refreshAfterPopupClosed();
@@ -1143,9 +1146,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       toast("Google 권한 동의가 완료되면 이 화면에서 Calendar 상태를 갱신합니다.");
     } catch (error) {
       clearPopupClosePolling();
-      if (popupWindowRef.current && !popupWindowRef.current.closed) {
-        popupWindowRef.current.close();
-      }
+      closeGoogleOAuthPopup(popupWindowRef.current);
       popupWindowRef.current = null;
       toast.error(getErrorMessage(error, "Google Calendar 권한 확인을 시작하지 못했습니다."));
     } finally {

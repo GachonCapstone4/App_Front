@@ -79,28 +79,45 @@ function buildGoogleOAuthPopupFeatures() {
   ].join(",");
 }
 
-function renderLoadingState(popup: Window) {
-  popup.document.title = "Google 인증을 준비하고 있습니다";
-  popup.document.body.innerHTML = `
-    <div style="font-family: system-ui, sans-serif; padding: 32px; color: #0f172a; line-height: 1.6;">
-      <h1 style="font-size: 18px; margin: 0 0 12px;">Google 인증을 준비하고 있습니다</h1>
-      <p style="margin: 0;">잠시 후 Google 로그인 화면으로 이동합니다.</p>
-    </div>
-  `;
-}
-
 export function openGoogleOAuthPopup() {
-  const popup = window.open("", GOOGLE_OAUTH_POPUP_NAME, buildGoogleOAuthPopupFeatures());
-
-  if (!popup) {
-    return null;
-  }
-
-  renderLoadingState(popup);
-  return popup;
+  return window.open(
+    "",
+    `${GOOGLE_OAUTH_POPUP_NAME}-${Date.now()}`,
+    buildGoogleOAuthPopupFeatures(),
+  );
 }
 
 export function navigateGoogleOAuthPopup(popup: Window, authorizationUrl: string) {
   popup.location.href = authorizationUrl;
   popup.focus();
+}
+
+export function isGoogleOAuthPopupWindow() {
+  return window.name.startsWith(GOOGLE_OAUTH_POPUP_NAME);
+}
+
+export function isGoogleOAuthPopupClosed(popup: Window | null) {
+  if (!popup) {
+    return true;
+  }
+
+  try {
+    return popup.closed;
+  } catch {
+    return false;
+  }
+}
+
+export function closeGoogleOAuthPopup(popup: Window | null) {
+  if (!popup) {
+    return;
+  }
+
+  try {
+    if (!popup.closed) {
+      popup.close();
+    }
+  } catch {
+    // Google COOP 정책으로 분리된 창은 접근이 막힐 수 있다. 콜백 페이지의 자체 close에 맡긴다.
+  }
 }

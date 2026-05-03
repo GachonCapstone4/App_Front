@@ -11,8 +11,10 @@ import {
 import { getErrorMessage } from "../../../shared/api/http";
 import { formatKstDateTime } from "../../../shared/lib/date-time";
 import {
+  closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
+  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -109,7 +111,7 @@ export function EmailIntegrationSettingsPanel({
     popupClosePollingRef.current = window.setInterval(() => {
       const popup = popupWindowRef.current;
 
-      if (!popup || !popup.closed) {
+      if (!popup || !isGoogleOAuthPopupClosed(popup)) {
         return;
       }
 
@@ -123,9 +125,7 @@ export function EmailIntegrationSettingsPanel({
     setPopupResult(payload);
     clearPopupClosePolling();
 
-    if (popupWindowRef.current && !popupWindowRef.current.closed) {
-      popupWindowRef.current.close();
-    }
+    closeGoogleOAuthPopup(popupWindowRef.current);
     popupWindowRef.current = null;
 
     if (payload.result === "success") {
@@ -233,7 +233,10 @@ export function EmailIntegrationSettingsPanel({
         return;
       }
 
-      if (popupWindowRef.current?.closed) {
+      if (
+        popupWindowRef.current &&
+        isGoogleOAuthPopupClosed(popupWindowRef.current)
+      ) {
         clearPopupClosePolling();
         popupWindowRef.current = null;
         void refreshAfterPopupClosed();
@@ -331,9 +334,7 @@ export function EmailIntegrationSettingsPanel({
       navigateGoogleOAuthPopup(popup, authorizationUrl);
     } catch (error) {
       clearPopupClosePolling();
-      if (popupWindowRef.current && !popupWindowRef.current.closed) {
-        popupWindowRef.current.close();
-      }
+      closeGoogleOAuthPopup(popupWindowRef.current);
       popupWindowRef.current = null;
       toast.error(getErrorMessage(error, "Google 인증을 시작하지 못했습니다."));
     }

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { refreshStoredSession } from "../../shared/api/session";
 import { setAccessToken } from "../../shared/lib/app-session";
+import { isGoogleOAuthPopupWindow } from "../../shared/lib/google-oauth-popup";
 
 type GoogleOAuthPopupMessage = {
   type: "emailassist-google-oauth";
@@ -16,8 +17,6 @@ type GoogleOAuthPopupMessage = {
 };
 
 const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
-const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
-
 export function GoogleOAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -48,14 +47,17 @@ export function GoogleOAuthCallbackPage() {
       token,
     };
 
-    const openedAsPopup =
-      window.name === GOOGLE_OAUTH_POPUP_NAME || Boolean(window.opener && !window.opener.closed);
+    const openedAsPopup = isGoogleOAuthPopupWindow() || Boolean(window.opener);
 
     if (openedAsPopup) {
       window.localStorage.setItem(GOOGLE_OAUTH_STORAGE_KEY, JSON.stringify(payload));
 
-      if (window.opener && !window.opener.closed) {
-        window.opener.postMessage(payload, window.location.origin);
+      if (window.opener) {
+        try {
+          window.opener.postMessage(payload, window.location.origin);
+        } catch {
+          // opener 접근이 COOP 정책으로 차단되면 localStorage 이벤트로 원래 창에 전달한다.
+        }
       }
 
       const closeTimer = window.setInterval(() => {

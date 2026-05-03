@@ -25,8 +25,10 @@ import {
 import { getErrorMessage } from "../../shared/api/http";
 import { loginAndCreateSession, refreshStoredSession } from "../../shared/api/session";
 import {
+  closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
+  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -154,7 +156,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     popupClosePollingRef.current = window.setInterval(() => {
       const popup = popupWindowRef.current;
 
-      if (!popup || !popup.closed) {
+      if (!popup || !isGoogleOAuthPopupClosed(popup)) {
         return;
       }
 
@@ -174,9 +176,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     oauthResultHandledRef.current = true;
     clearPopupClosePolling();
 
-    if (popupWindowRef.current && !popupWindowRef.current.closed) {
-      popupWindowRef.current.close();
-    }
+    closeGoogleOAuthPopup(popupWindowRef.current);
     popupWindowRef.current = null;
     setSubmittingMode(null);
 
@@ -271,7 +271,10 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         return;
       }
 
-      if (popupWindowRef.current?.closed) {
+      if (
+        popupWindowRef.current &&
+        isGoogleOAuthPopupClosed(popupWindowRef.current)
+      ) {
         clearPopupClosePolling();
         popupWindowRef.current = null;
         setSubmittingMode(null);
@@ -552,9 +555,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
       }
     } catch (error) {
       clearPopupClosePolling();
-      if (popupWindowRef.current && !popupWindowRef.current.closed) {
-        popupWindowRef.current.close();
-      }
+      closeGoogleOAuthPopup(popupWindowRef.current);
       popupWindowRef.current = null;
       toast.error(getErrorMessage(error, "Google 회원가입을 시작하지 못했습니다."));
     } finally {
