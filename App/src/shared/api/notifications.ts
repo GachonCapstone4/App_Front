@@ -1,8 +1,17 @@
 import type { NotificationItem } from "../types";
+import type { NotificationSettings } from "../types";
 import { api } from "./http";
 
 type NotificationListApiResponse = {
-  data: Array<{
+  notifications?: Array<{
+    notification_id: number;
+    type: string;
+    title: string;
+    noti_message: string;
+    related_id: number | null;
+    is_read: boolean;
+  }>;
+  data?: Array<{
     notification_id: number;
     type: string;
     title: string;
@@ -11,6 +20,48 @@ type NotificationListApiResponse = {
     is_read: boolean;
   }>;
 };
+
+type NotificationSettingsApiResponse = {
+  NEW_EMAIL?: boolean;
+  DRAFT_PENDING?: boolean;
+  EMAIL_DISCONNECTED?: boolean;
+  UNCLASSIFIED_EMAIL?: boolean;
+  EVENT_PENDING?: boolean;
+  AUTO_SEND_SUMMARY?: boolean;
+};
+
+const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  newEmail: true,
+  draftQueue: true,
+  draftThreshold: 3,
+  accountError: true,
+  unclassified: true,
+  calendarQueue: true,
+  dailySummary: true,
+};
+
+function mapSettingsFromApi(data: NotificationSettingsApiResponse): NotificationSettings {
+  return {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    newEmail: data.NEW_EMAIL ?? DEFAULT_NOTIFICATION_SETTINGS.newEmail,
+    draftQueue: data.DRAFT_PENDING ?? DEFAULT_NOTIFICATION_SETTINGS.draftQueue,
+    accountError: data.EMAIL_DISCONNECTED ?? DEFAULT_NOTIFICATION_SETTINGS.accountError,
+    unclassified: data.UNCLASSIFIED_EMAIL ?? DEFAULT_NOTIFICATION_SETTINGS.unclassified,
+    calendarQueue: data.EVENT_PENDING ?? DEFAULT_NOTIFICATION_SETTINGS.calendarQueue,
+    dailySummary: data.AUTO_SEND_SUMMARY ?? DEFAULT_NOTIFICATION_SETTINGS.dailySummary,
+  };
+}
+
+function mapSettingsToApi(settings: NotificationSettings): NotificationSettingsApiResponse {
+  return {
+    NEW_EMAIL: settings.newEmail,
+    DRAFT_PENDING: settings.draftQueue,
+    EMAIL_DISCONNECTED: settings.accountError,
+    UNCLASSIFIED_EMAIL: settings.unclassified,
+    EVENT_PENDING: settings.calendarQueue,
+    AUTO_SEND_SUMMARY: settings.dailySummary,
+  };
+}
 
 function normalizeType(type: string) {
   return type.trim().toUpperCase();
@@ -54,7 +105,11 @@ function buildNotificationMeta(type: string) {
   };
 }
 
-function mapNotification(item: NotificationListApiResponse["data"][number]): NotificationItem {
+type NotificationApiItem = NonNullable<
+  NotificationListApiResponse["notifications"] | NotificationListApiResponse["data"]
+>[number];
+
+function mapNotification(item: NotificationApiItem): NotificationItem {
   const meta = buildNotificationMeta(item.type);
 
   return {
@@ -75,7 +130,9 @@ export async function getNotifications(isRead?: boolean) {
     params: typeof isRead === "boolean" ? { is_read: isRead } : undefined,
   });
 
-  return response.data.data.map(mapNotification);
+  const notifications = response.data.notifications ?? response.data.data ?? [];
+
+  return notifications.map(mapNotification);
 }
 
 export async function markNotificationRead(notificationId: string) {
@@ -84,4 +141,17 @@ export async function markNotificationRead(notificationId: string) {
 
 export async function markAllNotificationsRead() {
   await api.patch("/api/notifications/read-all");
+}
+
+export async function getNotificationSettings() {
+  const response = await api.get<NotificationSettingsApiResponse>("/api/notifications/settings");
+  return mapSettingsFromApi(response.data);
+}
+
+export async function updateNotificationSettings(settings: NotificationSettings) {
+  const response = await api.patch<NotificationSettingsApiResponse>(
+    "/api/notifications/settings",
+    mapSettingsToApi(settings),
+  );
+  return mapSettingsFromApi(response.data);
 }

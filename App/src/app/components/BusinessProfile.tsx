@@ -564,7 +564,6 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
         regenerateAll: regenerateMode === "bulk",
         templateIds: selectedTemplateIds,
       });
-      setHasChanges(false);
       setRegenerateMode(null);
       toast.success(`템플릿 ${result.processingCount}개 재생성 작업을 등록했습니다.`);
     } catch (error) {
@@ -810,16 +809,17 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
           </div>
         </div>
 
-        {hasChanges ? (
-          <div className="rounded-xl border border-[#FDE68A] bg-[#FEF3C7] p-5">
+        {canRegenerate ? (
+          <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#D97706]" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#0F766E]" />
               <div className="flex-1">
-                <p className="mb-1 text-[14px] text-[#92400E]">
-                  비즈니스 자료가 변경되었습니다.
+                <p className="mb-1 text-[14px] font-semibold text-[#1E2A3A]">
+                  템플릿을 다시 생성할 수 있습니다.
                 </p>
-                <p className="text-[12px] text-[#B45309]">
-                  영향받는 템플릿 {impactedCount}개가 있습니다.
+                <p className="text-[12px] text-[#64748B]">
+                  현재 비즈니스 프로필과 자료를 기준으로 AI 생성 원본 템플릿만 다시 생성합니다.
+                  직접 만든 템플릿과 사용자가 수정한 템플릿은 유지됩니다.
                 </p>
               </div>
             </div>
@@ -828,22 +828,10 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
               <button
                 onClick={() => setRegenerateMode("bulk")}
                 disabled={!canRegenerate}
-                className="rounded-lg bg-[#1E2A3A] px-4 py-2 text-[13px] text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#1E2A3A] px-4 py-2 text-[13px] text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                템플릿 일괄 재생성
-              </button>
-              <button
-                onClick={() => setRegenerateMode("select")}
-                disabled={!canRegenerate}
-                className="rounded-lg border border-[#E2E8F0] bg-white px-4 py-2 text-[13px] text-[#64748B] transition-colors hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                개별 선택 후 재생성
-              </button>
-              <button
-                onClick={() => setHasChanges(false)}
-                className="rounded-lg px-4 py-2 text-[13px] text-[#64748B] transition-colors hover:text-[#1E2A3A]"
-              >
-                나중에
+                <AiUsageBadge label="AI" compact />
+                템플릿 재생성
               </button>
             </div>
           </div>
@@ -955,7 +943,7 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
             </DialogTitle>
             <DialogDescription>
               {regenerateMode === "bulk"
-                ? `현재 변경 내용을 기준으로 템플릿 ${impactedCount}개를 다시 생성합니다.`
+                ? "AI 생성 원본 템플릿만 교체합니다. 직접 만든 템플릿과 사용자가 수정한 템플릿은 유지됩니다."
                 : "변경된 비즈니스 자료를 반영할 템플릿을 선택하세요."}
             </DialogDescription>
           </DialogHeader>

@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionCard } from "../../../shared/ui/primitives/SectionCard";
+import {
+  getNotificationSettings,
+  updateNotificationSettings,
+} from "../../../shared/api/notifications";
 import type { NotificationSettings } from "../../../shared/types";
 import { toast } from "sonner";
 
@@ -49,6 +53,34 @@ export function NotificationSettingsPanel({
   notifications,
 }: NotificationSettingsPanelProps) {
   const [settings, setSettings] = useState(notifications);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    setIsLoading(true);
+    getNotificationSettings()
+      .then((nextSettings) => {
+        if (mounted) {
+          setSettings(nextSettings);
+        }
+      })
+      .catch((error) => {
+        if (mounted) {
+          toast.error(error instanceof Error ? error.message : "알림 설정을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const toggle = (key: keyof NotificationSettings) => {
     setSettings((current) => ({
@@ -57,8 +89,26 @@ export function NotificationSettingsPanel({
     }));
   };
 
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const savedSettings = await updateNotificationSettings(settings);
+      setSettings(savedSettings);
+      toast.success("알림 설정을 저장했습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "알림 설정을 저장하지 못했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="알림 설정">
+      {isLoading ? (
+        <p className="mb-3 rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          저장된 알림 설정을 불러오는 중입니다.
+        </p>
+      ) : null}
       <div>
         <ToggleRow
           label="새 이메일 수신 알림"
@@ -117,9 +167,10 @@ export function NotificationSettingsPanel({
         <button
           type="button"
           className="app-cta-primary rounded-xl px-5 py-2.5 text-sm font-medium"
-          onClick={() => toast.success("알림 설정을 저장했습니다.")}
+          disabled={isSaving}
+          onClick={handleSave}
         >
-          저장
+          {isSaving ? "저장 중..." : "저장"}
         </button>
       </div>
     </SectionCard>

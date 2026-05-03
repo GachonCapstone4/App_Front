@@ -71,6 +71,9 @@ interface Template {
   confidence: number;
   category: string;
   categoryId: string;
+  origin?: "AI_GENERATED" | "USER_CREATED" | null;
+  userModified?: boolean;
+  indexStatus?: "NOT_INDEXED" | "INDEXING" | "INDEXED" | "FAILED" | null;
   updatedAt: string;
 }
 
@@ -220,8 +223,57 @@ function mapTemplateSnapshot(snapshot: TemplateSnapshot): Template {
     confidence: snapshot.accuracyScore ? Number(snapshot.accuracyScore) : 0,
     category: snapshot.categoryName,
     categoryId: String(snapshot.categoryId),
+    origin: snapshot.origin,
+    userModified: snapshot.userModified,
+    indexStatus: snapshot.indexStatus,
     updatedAt: formatRelativeTimeLabel(snapshot.createdAt),
   };
+}
+
+function getTemplateOriginLabel(template: Template) {
+  if (template.origin === "AI_GENERATED" && template.userModified) {
+    return "AI 생성 후 수정";
+  }
+  if (template.origin === "AI_GENERATED") {
+    return "AI 생성";
+  }
+  return "직접 생성";
+}
+
+function getTemplateOriginBadgeClass(template: Template) {
+  if (template.origin === "AI_GENERATED" && template.userModified) {
+    return "bg-[#FEF3C7] text-[#92400E] dark:bg-[#422006] dark:text-[#FDE68A]";
+  }
+  if (template.origin === "AI_GENERATED") {
+    return "bg-[#CCFBF1] text-[#0F766E] dark:bg-[#134E4A] dark:text-[#99F6E4]";
+  }
+  return "bg-[#E0E7FF] text-[#3730A3] dark:bg-[#312E81] dark:text-[#C7D2FE]";
+}
+
+function getTemplateIndexLabel(status: Template["indexStatus"]) {
+  if (status === "INDEXED") {
+    return "검색 반영 완료";
+  }
+  if (status === "INDEXING") {
+    return "검색 반영 중";
+  }
+  if (status === "FAILED") {
+    return "검색 반영 실패";
+  }
+  return "검색 미반영";
+}
+
+function getTemplateIndexBadgeClass(status: Template["indexStatus"]) {
+  if (status === "INDEXED") {
+    return "bg-[#DCFCE7] text-[#166534] dark:bg-[#14532D] dark:text-[#BBF7D0]";
+  }
+  if (status === "INDEXING") {
+    return "bg-[#DBEAFE] text-[#1D4ED8] dark:bg-[#1E3A8A] dark:text-[#BFDBFE]";
+  }
+  if (status === "FAILED") {
+    return "bg-[#FEE2E2] text-[#B91C1C] dark:bg-[#7F1D1D] dark:text-[#FECACA]";
+  }
+  return "bg-[#F1F5F9] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground";
 }
 
 function buildCategoryOptions(
@@ -896,6 +948,12 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
                       </span>
                       <span className="inline-flex rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground">
                         {template.category}
+                      </span>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${getTemplateOriginBadgeClass(template)}`}>
+                        {getTemplateOriginLabel(template)}
+                      </span>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${getTemplateIndexBadgeClass(template.indexStatus)}`}>
+                        {getTemplateIndexLabel(template.indexStatus)}
                       </span>
                     </div>
                     <DropdownMenu>

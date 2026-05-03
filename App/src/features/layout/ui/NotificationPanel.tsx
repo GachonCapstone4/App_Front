@@ -89,6 +89,15 @@ export function NotificationPanel({
           </div>
 
           <div className="max-h-[360px] space-y-2 overflow-y-auto">
+            {visibleNotifications.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                <p className="text-sm font-medium text-foreground">표시할 알림이 없습니다</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  새 알림이 도착하면 이곳에 표시됩니다.
+                </p>
+              </div>
+            ) : null}
+
             {visibleNotifications.map((item: NotificationItem) => (
               <button
                 key={item.id}

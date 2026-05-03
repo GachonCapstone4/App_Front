@@ -8,6 +8,9 @@ type TemplateApiResponse = {
   title: string;
   subject_template: string;
   body_template: string;
+  origin?: "AI_GENERATED" | "USER_CREATED" | null;
+  user_modified?: boolean | null;
+  index_status?: "NOT_INDEXED" | "INDEXING" | "INDEXED" | "FAILED" | null;
   accuracy_score: number | null;
   created_at: string;
 };
@@ -24,6 +27,9 @@ export type TemplateSnapshot = {
   title: string;
   subjectTemplate: string;
   bodyTemplate: string;
+  origin: "AI_GENERATED" | "USER_CREATED" | null;
+  userModified: boolean;
+  indexStatus: "NOT_INDEXED" | "INDEXING" | "INDEXED" | "FAILED" | null;
   accuracyScore: number | null;
   createdAt: string;
 };
@@ -37,6 +43,9 @@ function mapTemplateSnapshot(template: TemplateApiResponse): TemplateSnapshot {
     title: template.title,
     subjectTemplate: template.subject_template,
     bodyTemplate: template.body_template,
+    origin: template.origin ?? null,
+    userModified: Boolean(template.user_modified),
+    indexStatus: template.index_status ?? null,
     accuracyScore: template.accuracy_score,
     createdAt: template.created_at,
   };
