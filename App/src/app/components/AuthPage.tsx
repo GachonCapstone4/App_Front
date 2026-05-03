@@ -28,7 +28,6 @@ import {
   closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
-  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -154,18 +153,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     clearPopupClosePolling();
 
     popupClosePollingRef.current = window.setInterval(() => {
-      const popup = popupWindowRef.current;
-
-      if (!popup || !isGoogleOAuthPopupClosed(popup)) {
-        return;
-      }
-
-      clearPopupClosePolling();
-      popupWindowRef.current = null;
-
-      if (!consumePopupResult()) {
-        setSubmittingMode(null);
-      }
+      consumePopupResult();
     }, 700);
   };
 
@@ -271,14 +259,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         return;
       }
 
-      if (
-        popupWindowRef.current &&
-        isGoogleOAuthPopupClosed(popupWindowRef.current)
-      ) {
-        clearPopupClosePolling();
-        popupWindowRef.current = null;
-        setSubmittingMode(null);
-      }
+      consumePopupResult();
     };
 
     const handleVisibilityChange = () => {

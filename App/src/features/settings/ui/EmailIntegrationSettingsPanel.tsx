@@ -14,7 +14,6 @@ import {
   closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
-  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -109,15 +108,10 @@ export function EmailIntegrationSettingsPanel({
     clearPopupClosePolling();
 
     popupClosePollingRef.current = window.setInterval(() => {
-      const popup = popupWindowRef.current;
-
-      if (!popup || !isGoogleOAuthPopupClosed(popup)) {
-        return;
+      const payload = consumeStoredGoogleOAuthResult();
+      if (payload) {
+        void handlePopupResult(payload);
       }
-
-      clearPopupClosePolling();
-      popupWindowRef.current = null;
-      void refreshAfterPopupClosed();
     }, 700);
   };
 
@@ -231,15 +225,6 @@ export function EmailIntegrationSettingsPanel({
       if (payload) {
         void handlePopupResult(payload);
         return;
-      }
-
-      if (
-        popupWindowRef.current &&
-        isGoogleOAuthPopupClosed(popupWindowRef.current)
-      ) {
-        clearPopupClosePolling();
-        popupWindowRef.current = null;
-        void refreshAfterPopupClosed();
       }
     };
 

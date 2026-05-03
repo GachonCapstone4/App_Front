@@ -96,27 +96,13 @@ export function isGoogleOAuthPopupWindow() {
   return window.name.startsWith(GOOGLE_OAUTH_POPUP_NAME);
 }
 
-export function isGoogleOAuthPopupClosed(popup: Window | null) {
-  if (!popup) {
-    return true;
-  }
-
-  try {
-    return popup.closed;
-  } catch {
-    return false;
-  }
-}
-
 export function closeGoogleOAuthPopup(popup: Window | null) {
   if (!popup) {
     return;
   }
 
   try {
-    if (!popup.closed) {
-      popup.close();
-    }
+    popup.close();
   } catch {
     // Google COOP 정책으로 분리된 창은 접근이 막힐 수 있다. 콜백 페이지의 자체 close에 맡긴다.
   }

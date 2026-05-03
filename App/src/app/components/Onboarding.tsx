@@ -60,7 +60,6 @@ import {
   closeGoogleOAuthPopup,
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
-  isGoogleOAuthPopupClosed,
   type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
@@ -394,13 +393,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
         return;
       }
 
-      if (
-        popupWindowRef.current &&
-        isGoogleOAuthPopupClosed(popupWindowRef.current)
-      ) {
-        popupWindowRef.current = null;
-        void completeEmailConnectionFromServer();
-      }
+      void completeEmailConnectionFromServer();
     };
 
     const handleVisibilityChange = () => {
