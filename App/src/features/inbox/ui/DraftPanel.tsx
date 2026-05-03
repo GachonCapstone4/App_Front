@@ -206,52 +206,9 @@ export function DraftPanel({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [templatePickerLoading, setTemplatePickerLoading] = useState(false);
   const [templatePickerError, setTemplatePickerError] = useState<string | null>(null);
-
-  if (!email) {
-    return null;
-  }
-
-  const handleOpenTemplate = () => {
-    const selectedRecommendation = recommendations.find(
-      (recommendation) => recommendation.draftId === email.selectedRecommendationId,
-    );
-    const templateId = selectedRecommendation?.templateId ?? email.selectedTemplateId;
-    const searchParams = new URLSearchParams();
-
-    if (templateId != null) {
-      searchParams.set("template_id", String(templateId));
-    }
-
-    navigate(
-      {
-        pathname: "/app/templates",
-        search: searchParams.toString(),
-      },
-      {
-        state: {
-          templateId,
-          templateName,
-          emailCategory: email.category,
-        },
-      },
-    );
-  };
-
-  const meta = metaByStatus[email.status];
-  const readonly = email.status !== "pending";
-  const recommendations = email.recommendations ?? [];
-  const recommendationState = email.recommendationState ?? "idle";
-  const templateName = email.templateName || recommendations[0]?.templateTitle || "";
-  const tokenCounts = getVariableCounts(email.draft);
-  const isEditingDraft = Boolean(email.isDraftEditing || email.isManualDraft);
-  const canUseDraftActions = !readonly && Boolean(email.draft.trim() || email.isManualDraft);
-  const counts = {
-    auto: email.autoCompletedCount ?? tokenCounts.auto,
-    required: email.requiredInputCount ?? tokenCounts.required,
-  };
-  const showDraftFallbackState = !readonly && !email.draft.trim() && !email.isManualDraft;
+  const emailCategory = email?.category ?? "";
   const manualTemplateOptions = useMemo(() => {
-    const normalizedCategory = email.category.trim();
+    const normalizedCategory = emailCategory.trim();
 
     return [...libraryTemplates].sort((left, right) => {
       const leftMatched = left.categoryName === normalizedCategory ? 0 : 1;
@@ -263,7 +220,7 @@ export function DraftPanel({
 
       return left.title.localeCompare(right.title, "ko");
     });
-  }, [email.category, libraryTemplates]);
+  }, [emailCategory, libraryTemplates]);
 
   useEffect(() => {
     if (!templatePickerOpen || libraryTemplates.length || templatePickerLoading) {
@@ -304,6 +261,50 @@ export function DraftPanel({
       active = false;
     };
   }, [libraryTemplates.length, templatePickerLoading, templatePickerOpen]);
+
+  if (!email) {
+    return null;
+  }
+
+  const recommendations = email.recommendations ?? [];
+  const recommendationState = email.recommendationState ?? "idle";
+  const templateName = email.templateName || recommendations[0]?.templateTitle || "";
+  const handleOpenTemplate = () => {
+    const selectedRecommendation = recommendations.find(
+      (recommendation) => recommendation.draftId === email.selectedRecommendationId,
+    );
+    const templateId = selectedRecommendation?.templateId ?? email.selectedTemplateId;
+    const searchParams = new URLSearchParams();
+
+    if (templateId != null) {
+      searchParams.set("template_id", String(templateId));
+    }
+
+    navigate(
+      {
+        pathname: "/app/templates",
+        search: searchParams.toString(),
+      },
+      {
+        state: {
+          templateId,
+          templateName,
+          emailCategory: email.category,
+        },
+      },
+    );
+  };
+
+  const meta = metaByStatus[email.status];
+  const readonly = email.status !== "pending";
+  const tokenCounts = getVariableCounts(email.draft);
+  const isEditingDraft = Boolean(email.isDraftEditing || email.isManualDraft);
+  const canUseDraftActions = !readonly && Boolean(email.draft.trim() || email.isManualDraft);
+  const counts = {
+    auto: email.autoCompletedCount ?? tokenCounts.auto,
+    required: email.requiredInputCount ?? tokenCounts.required,
+  };
+  const showDraftFallbackState = !readonly && !email.draft.trim() && !email.isManualDraft;
 
   const handleLoadLibraryTemplate = (template: TemplateSnapshot) => {
     if (onLoadLibraryTemplate) {
