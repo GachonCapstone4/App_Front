@@ -13,6 +13,16 @@ type AuthorizationUrlApiResponse = {
   authorization_url: string;
 };
 
+function getFrontendOriginParams() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return {
+    frontend_origin: window.location.origin,
+  };
+}
+
 export type IntegrationSnapshot = {
   provider: string;
   connectedEmail: string;
@@ -48,7 +58,12 @@ export async function getMyIntegrationSafe() {
 }
 
 export async function getGoogleAuthorizationUrl() {
-  const response = await api.get<AuthorizationUrlApiResponse>("/api/integrations/google/authorization-url");
+  const response = await api.get<AuthorizationUrlApiResponse>(
+    "/api/integrations/google/authorization-url",
+    {
+      params: getFrontendOriginParams(),
+    },
+  );
   return response.data.authorization_url;
 }
 

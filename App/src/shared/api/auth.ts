@@ -18,6 +18,16 @@ type UserProfileApiResponse = {
   created_at: string;
 };
 
+function getFrontendOriginParams() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return {
+    frontend_origin: window.location.origin,
+  };
+}
+
 export type CurrentUserProfile = {
   userId: number;
   email: string;
@@ -48,7 +58,9 @@ export async function signupUser(name: string, email: string, password: string) 
 }
 
 export async function getGoogleSignupAuthorizationUrl() {
-  const response = await api.get<AuthorizationUrlApiResponse>("/api/auth/google/signup-url");
+  const response = await api.get<AuthorizationUrlApiResponse>("/api/auth/google/signup-url", {
+    params: getFrontendOriginParams(),
+  });
   return response.data.authorization_url;
 }
 
