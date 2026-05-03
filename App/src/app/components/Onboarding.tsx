@@ -980,35 +980,44 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
         existingCategories.map((category) => [category.categoryName, category]),
       );
 
-      const persistedCategories = await Promise.all(
-        categories.map(async (category) => {
-          if (typeof category.categoryId === "number") {
-            return category;
-          }
+      const persistedCategories: OnboardingCategoryItem[] = [];
+      const persistedByName = new Map(existingByName);
 
-          const matchedExisting = existingByName.get(category.name);
-          if (matchedExisting) {
-            return {
-              ...category,
-              id: String(matchedExisting.categoryId),
-              categoryId: matchedExisting.categoryId,
-              color: matchedExisting.color ?? category.color,
-            };
-          }
-
-          const savedCategory = await createBusinessCategory({
+      for (const category of categories) {
+        if (typeof category.categoryId === "number") {
+          persistedCategories.push(category);
+          persistedByName.set(category.name, {
+            categoryId: category.categoryId,
             categoryName: category.name,
             color: category.color,
           });
+          continue;
+        }
 
-          return {
+        const matchedExisting = persistedByName.get(category.name);
+        if (matchedExisting) {
+          persistedCategories.push({
             ...category,
-            id: String(savedCategory.categoryId),
-            categoryId: savedCategory.categoryId,
-            color: savedCategory.color ?? category.color,
-          };
-        }),
-      );
+            id: String(matchedExisting.categoryId),
+            categoryId: matchedExisting.categoryId,
+            color: matchedExisting.color ?? category.color,
+          });
+          continue;
+        }
+
+        const savedCategory = await createBusinessCategory({
+          categoryName: category.name,
+          color: category.color,
+        });
+
+        persistedByName.set(category.name, savedCategory);
+        persistedCategories.push({
+          ...category,
+          id: String(savedCategory.categoryId),
+          categoryId: savedCategory.categoryId,
+          color: savedCategory.color ?? category.color,
+        });
+      }
 
       setCategories(persistedCategories);
       return persistedCategories;
