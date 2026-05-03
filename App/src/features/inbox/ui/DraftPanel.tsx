@@ -177,6 +177,7 @@ interface DraftPanelProps {
   onStartEditDraft?: () => void;
   onStartManualReply?: () => void;
   onCancelDraftEdit?: () => void;
+  onSaveDraftEdit?: () => void;
 }
 
 export function DraftPanel({
@@ -190,6 +191,7 @@ export function DraftPanel({
   onStartEditDraft,
   onStartManualReply,
   onCancelDraftEdit,
+  onSaveDraftEdit,
 }: DraftPanelProps) {
   const navigate = useNavigate();
 
@@ -444,34 +446,67 @@ export function DraftPanel({
             </button>
 
             {isEditingDraft ? (
-              <button
-                type="button"
-                className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-                onClick={() => {
-                  if (onCancelDraftEdit) {
-                    onCancelDraftEdit();
-                    return;
-                  }
-                  toast("편집을 취소했습니다.");
-                }}
-              >
-                편집 취소
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
+                  onClick={() => {
+                    if (onSaveDraftEdit) {
+                      onSaveDraftEdit();
+                      return;
+                    }
+                    toast.success("임시 저장했습니다.");
+                  }}
+                >
+                  임시 저장
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-[#64748B] transition hover:bg-muted dark:text-muted-foreground"
+                  onClick={() => {
+                    if (onCancelDraftEdit) {
+                      onCancelDraftEdit();
+                      return;
+                    }
+                    toast("편집을 취소했습니다.");
+                  }}
+                >
+                  편집 취소
+                </button>
+              </>
             ) : (
-              <button
-                type="button"
-                className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-                onClick={() => {
-                  if (onStartEditDraft) {
-                    onStartEditDraft();
-                    return;
-                  }
-                  toast("초안 편집 모드로 전환합니다.");
-                }}
-              >
-                <PencilLine className="h-4 w-4" />
-                편집하기
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
+                  onClick={() => {
+                    if (onStartEditDraft) {
+                      onStartEditDraft();
+                      return;
+                    }
+                    toast("초안 편집 모드로 전환합니다.");
+                  }}
+                >
+                  <PencilLine className="h-4 w-4" />
+                  편집하기
+                </button>
+                {!email.isManualDraft ? (
+                  <button
+                    type="button"
+                    className="inline-flex min-w-[142px] items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-[#64748B] transition hover:border-[#14B8A6] hover:text-[#0F766E] dark:text-muted-foreground dark:hover:text-[#5EEAD4]"
+                    onClick={() => {
+                      if (onStartManualReply) {
+                        onStartManualReply();
+                        return;
+                      }
+                      toast("직접 답장 작성 모드로 전환합니다.");
+                    }}
+                  >
+                    <PencilLine className="h-4 w-4" />
+                    직접 작성
+                  </button>
+                ) : null}
+              </>
             )}
           </div>
 

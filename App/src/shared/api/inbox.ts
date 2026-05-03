@@ -200,6 +200,23 @@ export async function editAndSendInboxReply(emailId: number, content: string, su
   return response.data;
 }
 
+export async function saveInboxReplyDraft(
+  emailId: number,
+  content: string,
+  subject?: string,
+  recommendationId?: number,
+  manualDraft = false,
+) {
+  const response = await api.post<InboxActionApiResponse>(`/api/inbox/${emailId}/reply`, {
+    action: "SAVE_DRAFT",
+    subject: subject?.trim() || null,
+    content,
+    recommendation_id: recommendationId ?? null,
+    manual_draft: manualDraft,
+  });
+  return response.data;
+}
+
 export async function skipInboxReply(emailId: number) {
   const response = await api.post<InboxActionApiResponse>(`/api/inbox/${emailId}/reply`, {
     action: "SKIP",

@@ -64,6 +64,17 @@ export interface EmailRecommendationItem {
 
 export type RecommendationState = "idle" | "loading" | "ready" | "empty" | "error";
 
+export interface DraftEditSnapshot {
+  draft: string;
+  draftSubject?: string;
+  templateName?: string;
+  autoCompletedCount?: number;
+  autoCompletedValues?: Record<string, string>;
+  requiredInputCount?: number;
+  selectedRecommendationId?: number;
+  isManualDraft?: boolean;
+}
+
 export interface EmailItem {
   id: string;
   sender: string;
@@ -96,6 +107,7 @@ export interface EmailItem {
   selectedRecommendationId?: number;
   isDraftEditing?: boolean;
   isManualDraft?: boolean;
+  draftEditSnapshot?: DraftEditSnapshot;
 }
 
 export interface NotificationItem {
