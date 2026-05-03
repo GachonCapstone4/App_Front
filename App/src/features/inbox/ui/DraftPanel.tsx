@@ -596,6 +596,11 @@ export function DraftPanel({
               type="button"
               className="app-cta-accent inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
               onClick={() => {
+                if (isEditingDraft && onEditSend) {
+                  onEditSend();
+                  return;
+                }
+
                 if (onSend) {
                   onSend();
                   return;
