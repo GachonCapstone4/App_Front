@@ -1506,12 +1506,24 @@ export function Calendar({ scenarioId }: CalendarProps) {
                 })}
               </div>
 
-              <div className="border-t border-[#E2E8F0] dark:border-border">
-                <div className="px-4 pb-2 pt-4">
-                  <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[#94A3B8] dark:text-muted-foreground">
-                    <Sparkles className="h-3 w-3" />
-                    이메일에서 감지된 일정
-                  </p>
+              <div className="border-t border-[#CCFBF1] bg-[#F0FDFA]/70 dark:border-[#115E59] dark:bg-[#082F2D]/40">
+                <div className="px-4 pb-3 pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#0F766E] text-white shadow-sm dark:bg-[#2DD4BF] dark:text-[#042F2E]">
+                        <Sparkles className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-[#0F766E] dark:text-[#99F6E4]">
+                          이메일에서 감지된 일정
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-[#64748B] dark:text-muted-foreground">
+                          AI가 메일에서 찾아낸 일정 후보입니다
+                        </p>
+                      </div>
+                    </div>
+                    <AiUsageBadge label="AI 일정 감지" compact className="shrink-0" />
+                  </div>
                 </div>
                 <div className="space-y-2 px-4 pb-4">
                   {!useDemoDataMode && isLoadingCandidates ? (
@@ -1533,9 +1545,12 @@ export function Calendar({ scenarioId }: CalendarProps) {
                       <button
                         key={`${candidate.emailId}-${candidate.date}-${candidate.time}`}
                         onClick={() => openEmailCandidate(candidate)}
-                        className="w-full rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left transition-colors hover:border-[#CBD5E1] dark:border-border dark:bg-[#131D2F] dark:hover:border-[#475569]"
+                        className="w-full rounded-xl border border-[#99F6E4] bg-card p-3 text-left shadow-sm transition-colors hover:border-[#0D9488] hover:bg-[#F0FDFA] dark:border-[#115E59] dark:bg-[#0F172A] dark:hover:border-[#2DD4BF] dark:hover:bg-[#102A2D]"
                       >
                         <div className="mb-1 flex items-center gap-2">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#CCFBF1] text-[#0F766E] dark:bg-[#134E4A] dark:text-[#99F6E4]">
+                            <Sparkles className="h-3.5 w-3.5" />
+                          </span>
                           <span className={`h-2 w-2 rounded-full ${candidate.isRegistered ? "bg-[#10B981]" : "bg-[#F59E0B]"}`} />
                           <span className="flex-1 truncate text-[12px] text-[#1E2A3A] dark:text-foreground">
                             {candidate.title}

@@ -946,6 +946,15 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
                       <span className="inline-flex rounded-full bg-[#1E2A3A] px-2 py-0.5 text-[11px] text-white dark:bg-[#E2E8F0] dark:text-[#111827]">
                         ID {template.userTemplateNo ?? template.id}
                       </span>
+                      {template.origin === "AI_GENERATED" ? (
+                        <span
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0F766E] text-white shadow-sm ring-1 ring-[#0D9488] dark:bg-[#2DD4BF] dark:text-[#042F2E] dark:ring-[#5EEAD4]"
+                          aria-label="AI 생성 템플릿"
+                          title="AI 생성 템플릿"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </span>
+                      ) : null}
                       <span className="inline-flex rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground">
                         {template.category}
                       </span>
