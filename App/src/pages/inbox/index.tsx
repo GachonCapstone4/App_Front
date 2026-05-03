@@ -325,10 +325,86 @@ export function InboxPage() {
               autoCompletedCount: recommendation.autoCompletedCount,
               autoCompletedValues: recommendation.autoCompletedValues,
               requiredInputCount: recommendation.requiredInputCount,
+              isDraftEditing: false,
+              isManualDraft: false,
             }
           : item,
       ),
     );
+  };
+
+  const updateSelectedDraft = (updates: Partial<EmailItem>) => {
+    if (!selectedEmailId) {
+      return;
+    }
+
+    setEmails((current) =>
+      current.map((item) =>
+        item.id === selectedEmailId
+          ? {
+              ...item,
+              ...updates,
+            }
+          : item,
+      ),
+    );
+  };
+
+  const handleStartEditDraft = () => {
+    if (!selectedEmail) {
+      return;
+    }
+
+    updateSelectedDraft({
+      draftSubject: selectedEmail.draftSubject || `Re: ${selectedEmail.subject}`,
+      isDraftEditing: true,
+    });
+  };
+
+  const handleStartManualReply = () => {
+    if (!selectedEmail) {
+      return;
+    }
+
+    updateSelectedDraft({
+      draft: "",
+      draftSubject: `Re: ${selectedEmail.subject}`,
+      templateName: undefined,
+      selectedRecommendationId: undefined,
+      autoCompletedCount: undefined,
+      autoCompletedValues: undefined,
+      requiredInputCount: undefined,
+      isDraftEditing: true,
+      isManualDraft: true,
+    });
+  };
+
+  const handleCancelDraftEdit = () => {
+    if (!selectedEmail) {
+      return;
+    }
+
+    if (selectedEmail.isManualDraft) {
+      updateSelectedDraft({
+        draft: "",
+        draftSubject: undefined,
+        isDraftEditing: false,
+        isManualDraft: false,
+      });
+      return;
+    }
+
+    updateSelectedDraft({
+      isDraftEditing: false,
+    });
+  };
+
+  const handleDraftChange = (content: string) => {
+    updateSelectedDraft({ draft: content });
+  };
+
+  const handleDraftSubjectChange = (subject: string) => {
+    updateSelectedDraft({ draftSubject: subject });
   };
 
   const pendingCount = emails.filter((item: EmailItem) => item.status === "pending").length;
@@ -590,15 +666,32 @@ export function InboxPage() {
     }
 
     try {
-      const response = selectedEmail.selectedRecommendationId
-        ? await editAndSendInboxReply(Number(selectedEmail.id), selectedEmail.draft)
+      const shouldSendContent =
+        Boolean(selectedEmail.selectedRecommendationId) ||
+        Boolean(selectedEmail.isManualDraft) ||
+        Boolean(selectedEmail.isDraftEditing) ||
+        !selectedEmail.draftStatus;
+
+      if (shouldSendContent && !selectedEmail.draft.trim()) {
+        toast.error("발송할 답장 내용을 입력해 주세요.");
+        return;
+      }
+
+      const response = shouldSendContent
+        ? await editAndSendInboxReply(
+            Number(selectedEmail.id),
+            selectedEmail.draft,
+            selectedEmail.draftSubject || `Re: ${selectedEmail.subject}`,
+          )
         : await sendInboxReply(Number(selectedEmail.id));
       updateSelectedEmail(
         (item) => ({
           ...item,
           status: "completed",
           sentTime: getCurrentTimeLabel(),
-          draftStatus: selectedEmail.selectedRecommendationId ? "EDITED" : "SENT",
+          draftStatus: shouldSendContent ? "EDITED" : "SENT",
+          isDraftEditing: false,
+          isManualDraft: false,
         }),
         response.message || "답변을 발송했습니다."
       );
@@ -632,13 +725,24 @@ export function InboxPage() {
     }
 
     try {
-      const response = await editAndSendInboxReply(Number(selectedEmail.id), selectedEmail.draft);
+      if (!selectedEmail.draft.trim()) {
+        toast.error("발송할 답장 내용을 입력해 주세요.");
+        return;
+      }
+
+      const response = await editAndSendInboxReply(
+        Number(selectedEmail.id),
+        selectedEmail.draft,
+        selectedEmail.draftSubject || `Re: ${selectedEmail.subject}`,
+      );
       updateSelectedEmail(
         (item) => ({
           ...item,
           status: "completed",
           sentTime: getCurrentTimeLabel(),
           draftStatus: "EDITED",
+          isDraftEditing: false,
+          isManualDraft: false,
         }),
         response.message || "수정본을 발송했습니다."
       );
@@ -754,6 +858,11 @@ export function InboxPage() {
                 onEditSend={() => void handleEditSend()}
                 onSkip={() => void handleSkip()}
                 onSelectRecommendation={handleSelectRecommendation}
+                onDraftChange={handleDraftChange}
+                onDraftSubjectChange={handleDraftSubjectChange}
+                onStartEditDraft={handleStartEditDraft}
+                onStartManualReply={handleStartManualReply}
+                onCancelDraftEdit={handleCancelDraftEdit}
               />
             </div>
           </div>
@@ -869,6 +978,11 @@ export function InboxPage() {
               onEditSend={() => void handleEditSend()}
               onSkip={() => void handleSkip()}
               onSelectRecommendation={handleSelectRecommendation}
+              onDraftChange={handleDraftChange}
+              onDraftSubjectChange={handleDraftSubjectChange}
+              onStartEditDraft={handleStartEditDraft}
+              onStartManualReply={handleStartManualReply}
+              onCancelDraftEdit={handleCancelDraftEdit}
             />
           </div>
         </div>

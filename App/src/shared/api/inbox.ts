@@ -191,9 +191,10 @@ export async function sendInboxReply(emailId: number) {
   return response.data;
 }
 
-export async function editAndSendInboxReply(emailId: number, content: string) {
+export async function editAndSendInboxReply(emailId: number, content: string, subject?: string) {
   const response = await api.post<InboxActionApiResponse>(`/api/inbox/${emailId}/reply`, {
     action: "EDIT_SEND",
+    subject: subject?.trim() || null,
     content,
   });
   return response.data;

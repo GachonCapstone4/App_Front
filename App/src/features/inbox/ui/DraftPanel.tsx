@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, FileText, Loader2, PencilLine, Send, SkipF
 import { toast } from "sonner";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
 import type { EmailItem, EmailRecommendationItem, EmailStatus } from "../../../shared/types";
+import { AiUsageBadge } from "../../../shared/ui/primitives/AiUsageBadge";
 import { StatePanel } from "../../../shared/ui/primitives/StatePanel";
 
 const metaByStatus = emailStatusMeta as Record<
@@ -171,6 +172,11 @@ interface DraftPanelProps {
   onEditSend?: () => void;
   onSkip?: () => void;
   onSelectRecommendation?: (recommendation: EmailRecommendationItem) => void;
+  onDraftChange?: (content: string) => void;
+  onDraftSubjectChange?: (subject: string) => void;
+  onStartEditDraft?: () => void;
+  onStartManualReply?: () => void;
+  onCancelDraftEdit?: () => void;
 }
 
 export function DraftPanel({
@@ -179,6 +185,11 @@ export function DraftPanel({
   onEditSend,
   onSkip,
   onSelectRecommendation,
+  onDraftChange,
+  onDraftSubjectChange,
+  onStartEditDraft,
+  onStartManualReply,
+  onCancelDraftEdit,
 }: DraftPanelProps) {
   const navigate = useNavigate();
 
@@ -201,11 +212,29 @@ export function DraftPanel({
   const recommendationState = email.recommendationState ?? "idle";
   const templateName = email.templateName || recommendations[0]?.templateTitle || "";
   const tokenCounts = getVariableCounts(email.draft);
+  const isEditingDraft = Boolean(email.isDraftEditing || email.isManualDraft);
+  const canUseDraftActions = !readonly && Boolean(email.draft.trim() || email.isManualDraft);
   const counts = {
     auto: email.autoCompletedCount ?? tokenCounts.auto,
     required: email.requiredInputCount ?? tokenCounts.required,
   };
-  const showDraftFallbackState = !readonly && !email.draft.trim();
+  const showDraftFallbackState = !readonly && !email.draft.trim() && !email.isManualDraft;
+  const manualReplyButton = (
+    <button
+      type="button"
+      className="app-secondary-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
+      onClick={() => {
+        if (onStartManualReply) {
+          onStartManualReply();
+          return;
+        }
+        toast("직접 답장 작성 모드로 전환합니다.");
+      }}
+    >
+      <PencilLine className="h-4 w-4" />
+      직접 답장 작성
+    </button>
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -215,9 +244,14 @@ export function DraftPanel({
         </span>
 
         <div className="min-w-0">
-          <p className="text-base font-semibold text-[#1E2A3A] dark:text-foreground">{getPanelTitle(email.status)}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold text-[#1E2A3A] dark:text-foreground">{getPanelTitle(email.status)}</p>
+            <AiUsageBadge label="AI 초안" />
+          </div>
           {getPanelDescription(email.status) ? (
-            <p className="mt-1 text-xs text-[#94A3B8] dark:text-muted-foreground">{getPanelDescription(email.status)}</p>
+            <p className="mt-1 text-xs text-[#94A3B8] dark:text-muted-foreground">
+              {getPanelDescription(email.status)}. 초안은 AI 분석과 템플릿 매칭 결과를 바탕으로 제안됩니다.
+            </p>
           ) : null}
         </div>
       </div>
@@ -244,9 +278,12 @@ export function DraftPanel({
 
       {recommendations.length ? (
         <div className="mt-3 rounded-xl border border-border bg-card px-3 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8] dark:text-muted-foreground">
-            추천 템플릿
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8] dark:text-muted-foreground">
+              추천 템플릿
+            </p>
+            <AiUsageBadge label="AI/RAG 매칭" />
+          </div>
           <div className="mt-3 space-y-2">
             {recommendations.map((recommendation, index) => {
               const similarityLabel = `${Math.round(recommendation.similarity * 100)}%`;
@@ -315,24 +352,33 @@ export function DraftPanel({
 
       {showDraftFallbackState ? (
         recommendationState === "loading" || recommendationState === "idle" ? (
-          <TemplateMatchingPanel
-            title="템플릿을 매칭 중입니다"
-            description="AI 분석과 RAG 인덱스 결과가 준비되면 추천 템플릿을 자동으로 표시합니다."
-            className="mt-4 min-h-[280px]"
-          />
+          <div>
+            <TemplateMatchingPanel
+              title="템플릿을 매칭 중입니다"
+              description="AI 분석과 RAG 인덱스 결과가 준비되면 추천 템플릿을 자동으로 표시합니다."
+              className="mt-4 min-h-[240px]"
+            />
+            <div className="mt-4">{manualReplyButton}</div>
+          </div>
         ) : recommendationState === "error" ? (
-          <StatePanel
-            title="추천 템플릿을 불러오지 못했습니다"
-            description={email.recommendationError || "RAG 추천 결과를 확인하는 중 오류가 발생했습니다."}
-            tone="error"
-            className="mt-4 min-h-[280px]"
-          />
+          <div>
+            <StatePanel
+              title="추천 템플릿을 불러오지 못했습니다"
+              description={email.recommendationError || "RAG 추천 결과를 확인하는 중 오류가 발생했습니다."}
+              tone="error"
+              className="mt-4 min-h-[240px]"
+            />
+            <div className="mt-4">{manualReplyButton}</div>
+          </div>
         ) : recommendationState === "empty" ? (
-          <TemplateMatchingPanel
-            title="템플릿 매칭을 계속 확인하고 있습니다"
-            description="아직 일치 템플릿이 도착하지 않았습니다. 결과가 들어오면 이 영역이 자동으로 갱신됩니다."
-            className="mt-4 min-h-[280px]"
-          />
+          <div>
+            <TemplateMatchingPanel
+              title="템플릿 매칭을 계속 확인하고 있습니다"
+              description="아직 일치 템플릿이 도착하지 않았습니다. 직접 답장을 작성하거나 추천 결과가 도착할 때까지 기다릴 수 있습니다."
+              className="mt-4 min-h-[240px]"
+            />
+            <div className="mt-4">{manualReplyButton}</div>
+          </div>
         ) : null
       ) : (
         <div className={`mt-4 rounded-2xl border border-border bg-card ${readonly ? "opacity-85" : ""}`}>
@@ -346,21 +392,40 @@ export function DraftPanel({
 
             <div>
               <p className="text-[11px] font-medium text-[#94A3B8] dark:text-muted-foreground">제목</p>
-              <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
-                {email.draftSubject || `Re: ${email.subject}`}
-              </p>
+              {isEditingDraft && !readonly ? (
+                <input
+                  type="text"
+                  value={email.draftSubject ?? `Re: ${email.subject}`}
+                  onChange={(event) => onDraftSubjectChange?.(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-[#1E2A3A] outline-none transition focus:border-[#14B8A6] dark:text-foreground"
+                />
+              ) : (
+                <p className="mt-1 text-sm text-[#1E2A3A] dark:text-foreground">
+                  {email.draftSubject ?? `Re: ${email.subject}`}
+                </p>
+              )}
             </div>
           </div>
 
           <div className="px-4 py-4">
-            <div className="whitespace-pre-wrap text-sm leading-8 text-[#475569] dark:text-muted-foreground">
-              {renderDraftText(email.draft, !readonly, email.autoCompletedValues)}
-            </div>
+            {isEditingDraft && !readonly ? (
+              <textarea
+                value={email.draft}
+                onChange={(event) => onDraftChange?.(event.target.value)}
+                placeholder="보낼 답장 내용을 직접 작성하세요."
+                rows={14}
+                className="min-h-[280px] w-full resize-y rounded-xl border border-border bg-background px-3 py-3 text-sm leading-7 text-[#475569] outline-none transition focus:border-[#14B8A6] dark:text-muted-foreground"
+              />
+            ) : (
+              <div className="whitespace-pre-wrap text-sm leading-8 text-[#475569] dark:text-muted-foreground">
+                {renderDraftText(email.draft, !readonly, email.autoCompletedValues)}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {readonly ? null : (
+      {readonly || !canUseDraftActions ? null : (
         <div className="mt-5">
           <div className="flex flex-wrap gap-2">
             <button
@@ -375,39 +440,57 @@ export function DraftPanel({
               }}
             >
               <Send className="h-4 w-4" />
-              발송하기
+              {email.isManualDraft ? "직접 답장 발송" : isEditingDraft ? "수정본 발송" : "발송하기"}
             </button>
 
-            <button
-              type="button"
-              className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-              onClick={() => {
-                if (onEditSend) {
-                  onEditSend();
-                  return;
-                }
-                toast.success("초안을 검토 후 발송했습니다.");
-              }}
-            >
-              <PencilLine className="h-4 w-4" />
-              편집 후 발송
-            </button>
+            {isEditingDraft ? (
+              <button
+                type="button"
+                className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
+                onClick={() => {
+                  if (onCancelDraftEdit) {
+                    onCancelDraftEdit();
+                    return;
+                  }
+                  toast("편집을 취소했습니다.");
+                }}
+              >
+                편집 취소
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="app-secondary-button inline-flex min-w-[126px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
+                onClick={() => {
+                  if (onStartEditDraft) {
+                    onStartEditDraft();
+                    return;
+                  }
+                  toast("초안 편집 모드로 전환합니다.");
+                }}
+              >
+                <PencilLine className="h-4 w-4" />
+                편집하기
+              </button>
+            )}
           </div>
 
-          <button
-            type="button"
-            className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[#94A3B8] transition hover:text-[#64748B] dark:text-muted-foreground dark:hover:text-foreground"
-            onClick={() => {
-              if (onSkip) {
-                onSkip();
-                return;
-              }
-              toast("이 메일을 건너뛰었습니다.");
-            }}
-          >
-            <SkipForward className="h-4 w-4" />
-            건너뛰기
-          </button>
+          {!email.isManualDraft ? (
+            <button
+              type="button"
+              className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[#94A3B8] transition hover:text-[#64748B] dark:text-muted-foreground dark:hover:text-foreground"
+              onClick={() => {
+                if (onSkip) {
+                  onSkip();
+                  return;
+                }
+                toast("이 메일을 건너뛰었습니다.");
+              }}
+            >
+              <SkipForward className="h-4 w-4" />
+              건너뛰기
+            </button>
+          ) : null}
         </div>
       )}
 

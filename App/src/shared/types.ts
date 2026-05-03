@@ -94,6 +94,8 @@ export interface EmailItem {
   recommendationState?: RecommendationState;
   recommendationError?: string;
   selectedRecommendationId?: number;
+  isDraftEditing?: boolean;
+  isManualDraft?: boolean;
 }
 
 export interface NotificationItem {
