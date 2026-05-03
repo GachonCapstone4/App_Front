@@ -5,7 +5,6 @@ type InboxStatus = "all" | EmailStatus;
 interface InboxStatusTabsProps {
   activeStatus: InboxStatus;
   pendingCount: number;
-  unsentCount: number;
   onChange: (status: InboxStatus) => void;
 }
 
@@ -18,14 +17,13 @@ interface TabDefinition {
 export function InboxStatusTabs({
   activeStatus,
   pendingCount,
-  unsentCount,
   onChange,
 }: InboxStatusTabsProps) {
   const tabs: TabDefinition[] = [
     { id: "all", label: "전체" },
     { id: "pending", label: "대기 중", badge: pendingCount },
     { id: "completed", label: "처리 완료" },
-    { id: "unsent", label: "미발송", badge: unsentCount },
+    { id: "unsent", label: "미발송" },
     { id: "auto-sent", label: "자동 발송됨" },
   ];
 

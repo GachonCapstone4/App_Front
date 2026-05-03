@@ -525,7 +525,6 @@ export function InboxPage() {
   };
 
   const pendingCount = emails.filter((item: EmailItem) => item.status === "pending").length;
-  const unsentCount = emails.filter((item: EmailItem) => item.status === "unsent").length;
 
   useEffect(() => {
     if (useDemoDataMode || !selectedEmailId || !selectedEmail) {
@@ -1001,7 +1000,6 @@ export function InboxPage() {
               <InboxStatusTabs
                 activeStatus={activeStatus}
                 pendingCount={pendingCount}
-                unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
             </div>
@@ -1046,7 +1044,6 @@ export function InboxPage() {
               <InboxStatusTabs
                 activeStatus={activeStatus}
                 pendingCount={pendingCount}
-                unsentCount={unsentCount}
                 onChange={handleStatusChange}
               />
             </div>
