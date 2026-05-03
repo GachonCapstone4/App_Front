@@ -1,6 +1,61 @@
 const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
+export const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
 const GOOGLE_OAUTH_POPUP_WIDTH = 640;
 const GOOGLE_OAUTH_POPUP_HEIGHT = 820;
+
+export type GoogleOAuthPopupMessage = {
+  type: "emailassist-google-oauth";
+  result: string;
+  message?: string;
+  gmailConnected?: string;
+  calendarConnected?: string;
+  tempToken?: string;
+  email?: string;
+  name?: string;
+  token?: string;
+};
+
+export function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
+
+    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
+      return null;
+    }
+
+    return {
+      type: "emailassist-google-oauth",
+      result: parsed.result,
+      message: typeof parsed.message === "string" ? parsed.message : "",
+      gmailConnected:
+        typeof parsed.gmailConnected === "string" ? parsed.gmailConnected : "false",
+      calendarConnected:
+        typeof parsed.calendarConnected === "string" ? parsed.calendarConnected : "false",
+      tempToken: typeof parsed.tempToken === "string" ? parsed.tempToken : "",
+      email: typeof parsed.email === "string" ? parsed.email : "",
+      name: typeof parsed.name === "string" ? parsed.name : "",
+      token: typeof parsed.token === "string" ? parsed.token : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function consumeStoredGoogleOAuthResult() {
+  const payload = parseStoredGoogleOAuthResult(
+    window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
+  );
+
+  if (payload) {
+    window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+  }
+
+  return payload;
+}
 
 function buildGoogleOAuthPopupFeatures() {
   const screenLeft =

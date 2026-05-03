@@ -57,8 +57,12 @@ import {
   getTemplateGenerationJobs,
 } from "../../shared/api/onboarding";
 import {
+  consumeStoredGoogleOAuthResult,
+  GOOGLE_OAUTH_STORAGE_KEY,
+  type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
+  parseStoredGoogleOAuthResult,
 } from "../../shared/lib/google-oauth-popup";
 import { buildAppEventStreamUrl } from "../../shared/lib/app-event-stream";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
@@ -71,6 +75,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 
 const mainSteps = [
   { id: 1, label: "이메일 연동" },
@@ -189,6 +194,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const generationTimeoutsRef = useRef<number[]>([]);
   const integrationPollingRef = useRef<number | null>(null);
+  const popupWindowRef = useRef<Window | null>(null);
   const generationEventSourceRef = useRef<EventSource | null>(null);
   const generationStatusPollingRef = useRef<number | null>(null);
   const generationStatusPollingFailureCountRef = useRef(0);
@@ -248,6 +254,14 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const templateGenerationErrorScenario =
     scenarioId === "onboarding-template-generation-error";
   const emailNormalScenario = scenarioId === "onboarding-email-normal";
+  const currentAiGenerationWork =
+    {
+      0: "AI 작업을 시작할 준비를 하고 있습니다.",
+      1: "AI가 업로드 자료와 FAQ에서 회사 문맥을 읽고 핵심 정보를 추출하고 있습니다.",
+      2: "AI가 카테고리별 고객 문의 의도와 답변 방향을 구성하고 있습니다.",
+      3: "LLM이 맞춤 답변 템플릿 초안을 생성하고 RAG 검색 결과와 맞춰 보고 있습니다.",
+      4: "생성된 AI 템플릿을 저장하고 온보딩 완료 상태를 반영하고 있습니다.",
+    }[generationStep] ?? "AI가 맞춤 템플릿 생성 작업을 이어가고 있습니다.";
 
   const clearGenerationTimeouts = () => {
     generationTimeoutsRef.current.forEach((timeoutId) => {
@@ -283,6 +297,58 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     }
   };
 
+  const completeEmailConnectionFromServer = async () => {
+    try {
+      const integration = await getMyIntegrationSafe();
+
+      if (!integration?.connectedEmail) {
+        return false;
+      }
+
+      setConnectedEmail(integration.connectedEmail);
+      setEmailConnected(true);
+      persistConnectedEmail(integration.connectedEmail);
+      setCheckingIntegration(false);
+      if (!emailConnected || connectedEmail !== integration.connectedEmail) {
+        toast.success("이메일 계정 연결을 완료했습니다.");
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleGoogleOAuthPopupResult = async (payload: GoogleOAuthPopupMessage) => {
+    if (popupWindowRef.current && !popupWindowRef.current.closed) {
+      popupWindowRef.current.close();
+    }
+    popupWindowRef.current = null;
+
+    if (payload.result !== "success") {
+      setCheckingIntegration(false);
+      toast.error(payload.message || "Google OAuth 인증을 확인하지 못했습니다.");
+      return;
+    }
+
+    const completed = await completeEmailConnectionFromServer();
+    if (!completed) {
+      toast("연동 상태 반영을 기다리고 있습니다. 잠시 후 자동으로 다시 확인합니다.");
+      return;
+    }
+
+    clearIntegrationPolling();
+  };
+
+  const consumeGoogleOAuthPopupResult = () => {
+    const payload = consumeStoredGoogleOAuthResult();
+    if (!payload) {
+      return false;
+    }
+
+    void handleGoogleOAuthPopupResult(payload);
+    return true;
+  };
+
   useEffect(
     () => () => {
       clearGenerationTimeouts();
@@ -291,6 +357,68 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (demoMode || scenarioId) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent<GoogleOAuthPopupMessage>) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data?.type !== "emailassist-google-oauth") {
+        return;
+      }
+
+      void handleGoogleOAuthPopupResult(event.data);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== GOOGLE_OAUTH_STORAGE_KEY) {
+        return;
+      }
+
+      const payload = parseStoredGoogleOAuthResult(event.newValue);
+      if (!payload) {
+        return;
+      }
+
+      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+      void handleGoogleOAuthPopupResult(payload);
+    };
+
+    const handleWindowFocus = () => {
+      if (consumeGoogleOAuthPopupResult()) {
+        return;
+      }
+
+      if (popupWindowRef.current?.closed) {
+        popupWindowRef.current = null;
+        void completeEmailConnectionFromServer();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    consumeGoogleOAuthPopupResult();
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [demoMode, scenarioId]);
 
   useEffect(() => {
     clearGenerationTimeouts();
@@ -741,6 +869,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
       }
 
       const authorizationUrl = await getGoogleAuthorizationUrl();
+      popupWindowRef.current = popup;
       navigateGoogleOAuthPopup(popup, authorizationUrl);
       toast("연결 창에서 권한 동의를 마치면 이 화면에서 자동으로 상태를 확인합니다.");
 
@@ -751,16 +880,11 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
         attempts += 1;
 
         try {
-          const integration = await getMyIntegrationSafe();
+          const completed = await completeEmailConnectionFromServer();
 
-          if (integration?.connectedEmail) {
+          if (completed) {
             window.clearInterval(intervalId);
             integrationPollingRef.current = null;
-            setConnectedEmail(integration.connectedEmail);
-            setEmailConnected(true);
-            persistConnectedEmail(integration.connectedEmail);
-            setCheckingIntegration(false);
-            toast.success("이메일 계정 연결을 완료했습니다.");
             return;
           }
         } catch {
@@ -1699,11 +1823,14 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                   {currentSubStep === 0 && (
                     <div className="space-y-6">
                       <div>
-                        <h2 className="text-[#1E2A3A] text-[20px] mb-2">
-                          회사 프로필 설정
-                        </h2>
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <h2 className="text-[#1E2A3A] text-[20px]">
+                            회사 프로필 설정
+                          </h2>
+                          <AiUsageBadge label="AI 응답 생성 기준" />
+                        </div>
                         <p className="text-[14px] text-[#94A3B8]">
-                          AI가 맞춤형 이메일 응답을 생성하기 위한 기본 정보입니다
+                          입력한 회사 정보와 어조는 AI가 맞춤형 이메일 응답을 생성할 때 기준으로 사용됩니다.
                         </p>
                       </div>
 
@@ -2006,7 +2133,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                           </span>
                         </div>
                         <p className="text-[14px] text-[#94A3B8]">
-                          선택한 업종 / 비즈니스 유형에 해당하는 카테고리는 기본 등록되며, 다른 업종의 카테고리도 추가할 수 있습니다.
+                          카테고리와 키워드는 AI가 메일을 분류하고 RAG 검색으로 맞춤 템플릿을 찾을 때 함께 사용됩니다.
                         </p>
                       </div>
 
@@ -2210,8 +2337,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                         <Sparkles className="w-4 h-4" />
                       </button>
                       <p className="text-[11px] text-[#94A3B8] text-right max-w-[300px]">
-                        설정한 카테고리를 기반으로 AI가 맞춤 템플릿을 자동
-                        생성합니다
+                        설정한 카테고리와 비즈니스 자료를 기반으로 AI가 맞춤 템플릿을 자동 생성합니다.
                       </p>
                     </div>
                   )}
@@ -2228,13 +2354,29 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                   </div>
                 </div>
 
+                <div className="mb-2 flex justify-center">
+                  <AiUsageBadge label="AI 템플릿 생성 중" />
+                </div>
                 <h2 className="text-[#1E2A3A] text-[20px] text-center mb-2">
-                  맞춤 템플릿을 생성하고 있습니다
+                  AI가 맞춤 템플릿을 생성하고 있습니다
                 </h2>
                 <p className="text-[14px] text-[#94A3B8] text-center mb-8">
-                  입력하신 비즈니스 정보를 분석하여 카테고리별 템플릿을 만들고
-                  있습니다
+                  AI가 비즈니스 자료를 분석하고 RAG 검색 컨텍스트를 반영해 카테고리별 템플릿을 만들고 있습니다.
                 </p>
+
+                <div className="mx-auto mb-6 max-w-[560px] rounded-2xl border border-[#99F6E4] bg-[#F0FDFA] px-5 py-4 text-left">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-[12px] font-semibold text-[#0F766E]">
+                      현재 AI 작업
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0F766E]">
+                      RAG + LLM
+                    </span>
+                  </div>
+                  <p className="text-[13px] leading-6 text-[#115E59]">
+                    {currentAiGenerationWork}
+                  </p>
+                </div>
 
                 {templateGenerationStatus ? (
                   <div className="mb-6 rounded-xl border border-[#CFFAFE] bg-[#F0FDFA] px-4 py-3 text-[13px] text-[#0F766E]">
@@ -2267,7 +2409,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                           : "text-[#94A3B8]"
                       }`}
                     >
-                      업로드한 자료를 확인하고 있습니다
+                      AI가 업로드 자료와 FAQ에서 회사 문맥을 추출하고 있습니다
                     </p>
                   </div>
 
@@ -2286,7 +2428,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                           : "text-[#94A3B8]"
                       }`}
                     >
-                      카테고리별 맞춤 템플릿을 만들고 있습니다
+                      AI가 카테고리별 답변 전략을 구성하고 있습니다
                     </p>
                   </div>
 
@@ -2306,7 +2448,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                             : "text-[#94A3B8]"
                         }`}
                       >
-                        생성된 템플릿을 정리하고 있습니다
+                        LLM이 템플릿 초안을 생성하고 RAG 검색 결과와 매칭하고 있습니다
                       </p>
                       {generationStep >= 2 && (
                         <div className="space-y-1">
@@ -2344,14 +2486,14 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                           : "text-[#94A3B8]"
                       }`}
                     >
-                      작업을 마무리하고 있습니다
+                      AI 생성 결과를 저장하고 온보딩 완료 상태를 반영하고 있습니다
                     </p>
                   </div>
                 </div>
 
                 <div className="text-center mb-4">
                   <p className="text-[12px] text-[#94A3B8]">
-                    작업 상태는 백엔드 처리 결과와 실시간으로 동기화됩니다
+                    AI 작업 상태는 백엔드 처리 결과와 실시간으로 동기화됩니다
                   </p>
                 </div>
 

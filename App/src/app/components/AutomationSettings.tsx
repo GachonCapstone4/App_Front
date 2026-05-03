@@ -59,8 +59,12 @@ import {
   type IntegrationSnapshot,
 } from "../../shared/api/integrations";
 import {
+  consumeStoredGoogleOAuthResult,
+  GOOGLE_OAUTH_STORAGE_KEY,
+  type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
+  parseStoredGoogleOAuthResult,
 } from "../../shared/lib/google-oauth-popup";
 import { formatKstDateTime } from "../../shared/lib/date-time";
 import {
@@ -88,42 +92,6 @@ type DialogState = {
   categoryId: string;
   templates: AutomationDialogTemplateDraft[];
 };
-
-type GoogleOAuthPopupMessage = {
-  type: "emailassist-google-oauth";
-  result: string;
-  message: string;
-  gmailConnected: string;
-  calendarConnected: string;
-};
-
-const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
-
-function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
-
-    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
-      return null;
-    }
-
-    return {
-      type: "emailassist-google-oauth",
-      result: parsed.result,
-      message: typeof parsed.message === "string" ? parsed.message : "",
-      gmailConnected:
-        typeof parsed.gmailConnected === "string" ? parsed.gmailConnected : "false",
-      calendarConnected:
-        typeof parsed.calendarConnected === "string" ? parsed.calendarConnected : "false",
-    };
-  } catch {
-    return null;
-  }
-}
 
 function formatSyncDate(value: string | null) {
   if (!value) {
@@ -375,6 +343,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
   const [refreshingIntegration, setRefreshingIntegration] = useState(false);
   const [connectingCalendar, setConnectingCalendar] = useState(false);
   const popupWindowRef = useRef<Window | null>(null);
+  const popupClosePollingRef = useRef<number | null>(null);
 
   const rulesWithTemplateNumbers = useMemo(() => {
     const userTemplateNoByTemplateId = new Map(
@@ -408,7 +377,40 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     return nextIntegration;
   };
 
+  const clearPopupClosePolling = () => {
+    if (popupClosePollingRef.current !== null) {
+      window.clearInterval(popupClosePollingRef.current);
+      popupClosePollingRef.current = null;
+    }
+  };
+
+  const refreshAfterPopupClosed = async () => {
+    try {
+      await loadIntegrationStatus();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "캘린더 연동 상태를 다시 불러오지 못했습니다."));
+    }
+  };
+
+  const startPopupClosePolling = () => {
+    clearPopupClosePolling();
+
+    popupClosePollingRef.current = window.setInterval(() => {
+      const popup = popupWindowRef.current;
+
+      if (!popup || !popup.closed) {
+        return;
+      }
+
+      clearPopupClosePolling();
+      popupWindowRef.current = null;
+      void refreshAfterPopupClosed();
+    }, 700);
+  };
+
   const handlePopupResult = async (payload: GoogleOAuthPopupMessage) => {
+    clearPopupClosePolling();
+
     if (popupWindowRef.current && !popupWindowRef.current.closed) {
       popupWindowRef.current.close();
     }
@@ -540,11 +542,36 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       void handlePopupResult(payload);
     };
 
+    const handleWindowFocus = () => {
+      const payload = consumeStoredGoogleOAuthResult();
+      if (payload) {
+        void handlePopupResult(payload);
+        return;
+      }
+
+      if (popupWindowRef.current?.closed) {
+        clearPopupClosePolling();
+        popupWindowRef.current = null;
+        void refreshAfterPopupClosed();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    };
+
     window.addEventListener("message", handleMessage);
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.removeEventListener("message", handleMessage);
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearPopupClosePolling();
     };
   }, [scenarioMode]);
 
@@ -553,15 +580,12 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       return;
     }
 
-    const payload = parseStoredGoogleOAuthResult(
-      window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
-    );
+    const payload = consumeStoredGoogleOAuthResult();
 
     if (!payload) {
       return;
     }
 
-    window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
     void handlePopupResult(payload);
   }, [scenarioMode]);
 
@@ -1113,10 +1137,12 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
       }
 
       popupWindowRef.current = popup;
+      startPopupClosePolling();
       const authorizationUrl = await getGoogleAuthorizationUrl();
       navigateGoogleOAuthPopup(popup, authorizationUrl);
       toast("Google 권한 동의가 완료되면 이 화면에서 Calendar 상태를 갱신합니다.");
     } catch (error) {
+      clearPopupClosePolling();
       if (popupWindowRef.current && !popupWindowRef.current.closed) {
         popupWindowRef.current.close();
       }

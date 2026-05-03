@@ -9,9 +9,14 @@ import {
   type IntegrationSnapshot,
 } from "../../../shared/api/integrations";
 import { getErrorMessage } from "../../../shared/api/http";
+import { formatKstDateTime } from "../../../shared/lib/date-time";
 import {
+  consumeStoredGoogleOAuthResult,
+  GOOGLE_OAUTH_STORAGE_KEY,
+  type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
+  parseStoredGoogleOAuthResult,
 } from "../../../shared/lib/google-oauth-popup";
 import { setConnectedEmails } from "../../../shared/lib/app-session";
 import { SectionCard } from "../../../shared/ui/primitives/SectionCard";
@@ -24,42 +29,6 @@ interface EmailIntegrationSettingsPanelProps {
   oauthMessage?: string | null;
   gmailConnected?: string | null;
   calendarConnected?: string | null;
-}
-
-type GoogleOAuthPopupMessage = {
-  type: "emailassist-google-oauth";
-  result: string;
-  message: string;
-  gmailConnected: string;
-  calendarConnected: string;
-};
-
-const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
-
-function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
-
-    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
-      return null;
-    }
-
-    return {
-      type: "emailassist-google-oauth",
-      result: parsed.result,
-      message: typeof parsed.message === "string" ? parsed.message : "",
-      gmailConnected:
-        typeof parsed.gmailConnected === "string" ? parsed.gmailConnected : "false",
-      calendarConnected:
-        typeof parsed.calendarConnected === "string" ? parsed.calendarConnected : "false",
-    };
-  } catch {
-    return null;
-  }
 }
 
 function GmailIcon() {
@@ -93,15 +62,7 @@ function formatSyncDate(value: string | null) {
     return "동기화 이력 없음";
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatKstDateTime(value);
 }
 
 export function EmailIntegrationSettingsPanel({
@@ -122,12 +83,45 @@ export function EmailIntegrationSettingsPanel({
   const [disconnecting, setDisconnecting] = useState(false);
   const [popupResult, setPopupResult] = useState<GoogleOAuthPopupMessage | null>(null);
   const popupWindowRef = useRef<Window | null>(null);
+  const popupClosePollingRef = useRef<number | null>(null);
   const bannerResult = popupResult?.result ?? oauthResult;
   const bannerMessage = popupResult?.message ?? oauthMessage;
   const bannerGmailConnected = popupResult?.gmailConnected ?? gmailConnected;
   const bannerCalendarConnected = popupResult?.calendarConnected ?? calendarConnected;
+  const clearPopupClosePolling = () => {
+    if (popupClosePollingRef.current !== null) {
+      window.clearInterval(popupClosePollingRef.current);
+      popupClosePollingRef.current = null;
+    }
+  };
+
+  const refreshAfterPopupClosed = async () => {
+    try {
+      await loadIntegration();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "연동 상태를 다시 불러오지 못했습니다."));
+    }
+  };
+
+  const startPopupClosePolling = () => {
+    clearPopupClosePolling();
+
+    popupClosePollingRef.current = window.setInterval(() => {
+      const popup = popupWindowRef.current;
+
+      if (!popup || !popup.closed) {
+        return;
+      }
+
+      clearPopupClosePolling();
+      popupWindowRef.current = null;
+      void refreshAfterPopupClosed();
+    }, 700);
+  };
+
   const handlePopupResult = async (payload: GoogleOAuthPopupMessage) => {
     setPopupResult(payload);
+    clearPopupClosePolling();
 
     if (popupWindowRef.current && !popupWindowRef.current.closed) {
       popupWindowRef.current.close();
@@ -232,11 +226,36 @@ export function EmailIntegrationSettingsPanel({
       void handlePopupResult(payload);
     };
 
+    const handleWindowFocus = () => {
+      const payload = consumeStoredGoogleOAuthResult();
+      if (payload) {
+        void handlePopupResult(payload);
+        return;
+      }
+
+      if (popupWindowRef.current?.closed) {
+        clearPopupClosePolling();
+        popupWindowRef.current = null;
+        void refreshAfterPopupClosed();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    };
+
     window.addEventListener("message", handleMessage);
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.removeEventListener("message", handleMessage);
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearPopupClosePolling();
     };
   }, [useDemoDataMode]);
 
@@ -307,9 +326,11 @@ export function EmailIntegrationSettingsPanel({
       }
 
       popupWindowRef.current = popup;
+      startPopupClosePolling();
       const authorizationUrl = await getGoogleAuthorizationUrl();
       navigateGoogleOAuthPopup(popup, authorizationUrl);
     } catch (error) {
+      clearPopupClosePolling();
       if (popupWindowRef.current && !popupWindowRef.current.closed) {
         popupWindowRef.current.close();
       }

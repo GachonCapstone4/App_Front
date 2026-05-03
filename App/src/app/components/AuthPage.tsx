@@ -25,8 +25,12 @@ import {
 import { getErrorMessage } from "../../shared/api/http";
 import { loginAndCreateSession, refreshStoredSession } from "../../shared/api/session";
 import {
+  consumeStoredGoogleOAuthResult,
+  GOOGLE_OAUTH_STORAGE_KEY,
+  type GoogleOAuthPopupMessage,
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
+  parseStoredGoogleOAuthResult,
 } from "../../shared/lib/google-oauth-popup";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
@@ -94,7 +98,6 @@ interface AuthPageProps {
 }
 
 const ADMIN_IP_DENIED_MOCK_CLIENT_IP = "203.0.113.25";
-const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
 
 type RuntimeBanner = {
   tone: "error" | "warning" | "info" | "neutral";
@@ -102,35 +105,11 @@ type RuntimeBanner = {
   description: string;
 };
 
-type GoogleOAuthPopupMessage = {
-  type: "emailassist-google-oauth";
-  result: string;
-  message?: string;
-  tempToken?: string;
-  email?: string;
-  name?: string;
-  token?: string;
-};
-
-function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
-    return parsed.type === "emailassist-google-oauth"
-      ? (parsed as GoogleOAuthPopupMessage)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthPage({ scenarioId }: AuthPageProps) {
   const navigate = useNavigate();
   const demoMode = isDemoModeEnabled();
   const popupWindowRef = useRef<Window | null>(null);
+  const popupClosePollingRef = useRef<number | null>(null);
   const oauthResultHandledRef = useRef(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginForm, setLoginForm] = useState<LoginForm>({
@@ -151,11 +130,49 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     null,
   );
 
+  const clearPopupClosePolling = () => {
+    if (popupClosePollingRef.current !== null) {
+      window.clearInterval(popupClosePollingRef.current);
+      popupClosePollingRef.current = null;
+    }
+  };
+
+  const consumePopupResult = () => {
+    const payload = consumeStoredGoogleOAuthResult();
+
+    if (payload) {
+      void handleGoogleSignupResult(payload);
+      return true;
+    }
+
+    return false;
+  };
+
+  const startPopupClosePolling = () => {
+    clearPopupClosePolling();
+
+    popupClosePollingRef.current = window.setInterval(() => {
+      const popup = popupWindowRef.current;
+
+      if (!popup || !popup.closed) {
+        return;
+      }
+
+      clearPopupClosePolling();
+      popupWindowRef.current = null;
+
+      if (!consumePopupResult()) {
+        setSubmittingMode(null);
+      }
+    }, 700);
+  };
+
   const handleGoogleSignupResult = async (payload: GoogleOAuthPopupMessage) => {
     if (oauthResultHandledRef.current) {
       return;
     }
     oauthResultHandledRef.current = true;
+    clearPopupClosePolling();
 
     if (popupWindowRef.current && !popupWindowRef.current.closed) {
       popupWindowRef.current.close();
@@ -249,20 +266,37 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
       void handleGoogleSignupResult(payload);
     };
 
+    const handleWindowFocus = () => {
+      if (consumePopupResult()) {
+        return;
+      }
+
+      if (popupWindowRef.current?.closed) {
+        clearPopupClosePolling();
+        popupWindowRef.current = null;
+        setSubmittingMode(null);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    };
+
     window.addEventListener("message", handleMessage);
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    const storedPayload = parseStoredGoogleOAuthResult(
-      window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
-    );
-    if (storedPayload) {
-      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
-      void handleGoogleSignupResult(storedPayload);
-    }
+    consumePopupResult();
 
     return () => {
       window.removeEventListener("message", handleMessage);
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearPopupClosePolling();
     };
   }, [demoMode, navigate]);
 
@@ -511,11 +545,13 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         }
 
         popupWindowRef.current = popup;
+        startPopupClosePolling();
         const authorizationUrl = await getGoogleSignupAuthorizationUrl();
         navigateGoogleOAuthPopup(popup, authorizationUrl);
         toast("Google 인증을 마치면 이 화면에서 회원가입을 이어갑니다.");
       }
     } catch (error) {
+      clearPopupClosePolling();
       if (popupWindowRef.current && !popupWindowRef.current.closed) {
         popupWindowRef.current.close();
       }
