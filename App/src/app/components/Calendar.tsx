@@ -55,6 +55,7 @@ import { getInboxDetail, getInboxList } from "../../shared/api/inbox";
 import { getErrorMessage } from "../../shared/api/http";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { StatePanel } from "../../shared/ui/primitives/StatePanel";
 import { mapInboxListItem, mergeInboxDetail } from "./inbox.helpers";
 import {

@@ -54,6 +54,7 @@ import {
 } from "./ui/select";
 import { AppStatePage } from "../../shared/ui/primitives/AppStatePage";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 
 const toneOptions = [
   { id: "formal", label: "격식체" },
