@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  CalendarDays,
   Check,
   ChevronDown,
+  ExternalLink,
   Loader2,
   Pencil,
   Plus,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,11 +56,13 @@ import { getErrorMessage } from "../../shared/api/http";
 import {
   getGoogleAuthorizationUrl,
   getMyIntegrationSafe,
+  type IntegrationSnapshot,
 } from "../../shared/api/integrations";
 import {
   navigateGoogleOAuthPopup,
   openGoogleOAuthPopup,
 } from "../../shared/lib/google-oauth-popup";
+import { formatKstDateTime } from "../../shared/lib/date-time";
 import {
   getTemplateLibrary,
   type TemplateSnapshot,
@@ -84,6 +88,50 @@ type DialogState = {
   categoryId: string;
   templates: AutomationDialogTemplateDraft[];
 };
+
+type GoogleOAuthPopupMessage = {
+  type: "emailassist-google-oauth";
+  result: string;
+  message: string;
+  gmailConnected: string;
+  calendarConnected: string;
+};
+
+const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
+
+function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthPopupMessage | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
+
+    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
+      return null;
+    }
+
+    return {
+      type: "emailassist-google-oauth",
+      result: parsed.result,
+      message: typeof parsed.message === "string" ? parsed.message : "",
+      gmailConnected:
+        typeof parsed.gmailConnected === "string" ? parsed.gmailConnected : "false",
+      calendarConnected:
+        typeof parsed.calendarConnected === "string" ? parsed.calendarConnected : "false",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatSyncDate(value: string | null) {
+  if (!value) {
+    return "동기화 이력 없음";
+  }
+
+  return formatKstDateTime(value);
+}
 
 const demoCategories: AutomationCategoryCatalogItem[] = [
   { categoryId: 1, categoryName: "가격문의", color: "#3B82F6" },
@@ -291,7 +339,6 @@ function mapTemplateCatalog(
 }
 
 export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
-  const navigate = useNavigate();
   const scenarioMode = Boolean(scenarioId);
   const loadErrorScenario = scenarioId === "automation-load-error";
   const ruleDialogNormalScenario = scenarioId === "automation-rule-dialog-normal";
@@ -324,6 +371,10 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(
     !calendarDisconnectedScenario,
   );
+  const [integration, setIntegration] = useState<IntegrationSnapshot | null>(null);
+  const [refreshingIntegration, setRefreshingIntegration] = useState(false);
+  const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const popupWindowRef = useRef<Window | null>(null);
 
   const rulesWithTemplateNumbers = useMemo(() => {
     const userTemplateNoByTemplateId = new Map(
@@ -349,6 +400,36 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     () => buildAvailableAutomationCategories(categories, templateCatalog, groups),
     [categories, templateCatalog, groups],
   );
+
+  const loadIntegrationStatus = async () => {
+    const nextIntegration = await getMyIntegrationSafe();
+    setIntegration(nextIntegration);
+    setGoogleCalendarConnected(Boolean(nextIntegration?.isCalendarConnected));
+    return nextIntegration;
+  };
+
+  const handlePopupResult = async (payload: GoogleOAuthPopupMessage) => {
+    if (popupWindowRef.current && !popupWindowRef.current.closed) {
+      popupWindowRef.current.close();
+    }
+    popupWindowRef.current = null;
+
+    if (payload.result !== "success") {
+      toast.error(payload.message || "Google 계정 연동을 완료하지 못했습니다.");
+      return;
+    }
+
+    try {
+      const nextIntegration = await loadIntegrationStatus();
+      if (nextIntegration?.isCalendarConnected) {
+        toast.success("Google Calendar 권한을 확인했습니다.");
+      } else {
+        toast.warning("Google 계정은 연결됐지만 Calendar 권한은 아직 미연결 상태입니다.");
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, "캘린더 연동 상태를 다시 불러오지 못했습니다."));
+    }
+  };
 
   const selectedDialogCategory = useMemo(() => {
     const categoryId = Number(dialogState.categoryId);
@@ -405,6 +486,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         setRules(nextRules);
         setCategories(nextCategoryCatalog);
         setTemplateCatalog(mapTemplateCatalog(nextTemplates, nextCategoryCatalog));
+        setIntegration(integration);
         setGoogleCalendarConnected(Boolean(integration?.isCalendarConnected));
       } catch (error) {
         if (!active) {
@@ -425,6 +507,62 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     return () => {
       active = false;
     };
+  }, [scenarioMode]);
+
+  useEffect(() => {
+    if (scenarioMode) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent<GoogleOAuthPopupMessage>) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data?.type !== "emailassist-google-oauth") {
+        return;
+      }
+
+      void handlePopupResult(event.data);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== GOOGLE_OAUTH_STORAGE_KEY) {
+        return;
+      }
+
+      const payload = parseStoredGoogleOAuthResult(event.newValue);
+      if (!payload) {
+        return;
+      }
+
+      window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+      void handlePopupResult(payload);
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [scenarioMode]);
+
+  useEffect(() => {
+    if (scenarioMode) {
+      return;
+    }
+
+    const payload = parseStoredGoogleOAuthResult(
+      window.localStorage.getItem(GOOGLE_OAUTH_STORAGE_KEY),
+    );
+
+    if (!payload) {
+      return;
+    }
+
+    window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+    void handlePopupResult(payload);
   }, [scenarioMode]);
 
   useEffect(() => {
@@ -949,6 +1087,23 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
   };
 
   const handleConnectCalendar = async () => {
+    if (scenarioMode) {
+      const now = new Date().toISOString();
+      setIntegration({
+        provider: "GOOGLE",
+        connectedEmail: integration?.connectedEmail ?? "demo@gmail.com",
+        syncStatus: "CONNECTED",
+        isGmailConnected: true,
+        isCalendarConnected: true,
+        lastSyncedAt: now,
+      });
+      setGoogleCalendarConnected(true);
+      toast.success("데모 모드에서 Google Calendar 연결 상태로 전환했습니다.");
+      return;
+    }
+
+    setConnectingCalendar(true);
+
     try {
       const popup = openGoogleOAuthPopup();
 
@@ -957,13 +1112,51 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         return;
       }
 
+      popupWindowRef.current = popup;
       const authorizationUrl = await getGoogleAuthorizationUrl();
       navigateGoogleOAuthPopup(popup, authorizationUrl);
-      toast("연동이 완료되면 설정 또는 이 화면을 새로고침해 상태를 확인해 주세요.");
+      toast("Google 권한 동의가 완료되면 이 화면에서 Calendar 상태를 갱신합니다.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Google 캘린더 연결을 시작하지 못했습니다."));
+      if (popupWindowRef.current && !popupWindowRef.current.closed) {
+        popupWindowRef.current.close();
+      }
+      popupWindowRef.current = null;
+      toast.error(getErrorMessage(error, "Google Calendar 권한 확인을 시작하지 못했습니다."));
+    } finally {
+      setConnectingCalendar(false);
     }
   };
+
+  const handleRefreshCalendarIntegration = async () => {
+    if (scenarioMode) {
+      toast.success("데모 모드에서 캘린더 연동 상태를 새로고침했습니다.");
+      return;
+    }
+
+    setRefreshingIntegration(true);
+
+    try {
+      await loadIntegrationStatus();
+      toast.success("캘린더 연동 상태를 새로고침했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "캘린더 연동 상태를 새로고침하지 못했습니다."));
+    } finally {
+      setRefreshingIntegration(false);
+    }
+  };
+
+  const calendarStatusTone = googleCalendarConnected
+    ? "bg-[#E6FAF8] text-[#0F766E] dark:bg-emerald-500/10 dark:text-emerald-200"
+    : "bg-[#FEF3C7] text-[#B45309] dark:bg-amber-500/10 dark:text-amber-200";
+  const calendarStatusLabel = googleCalendarConnected
+    ? "Calendar 연결됨"
+    : "Calendar 미연결";
+  const gmailStatusLabel = integration?.isGmailConnected
+    ? "Gmail 연결됨"
+    : "Gmail 미연결";
+  const connectedEmailLabel =
+    integration?.connectedEmail ?? (scenarioMode ? "demo@gmail.com" : "Google 계정 미연결");
+  const lastSyncedLabel = formatSyncDate(integration?.lastSyncedAt ?? null);
 
   if (loadErrorScenario || loadError) {
     return (
@@ -1250,30 +1443,81 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           )}
         </div>
 
-        <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm dark:border-border dark:bg-card">
-          <div className="flex items-center justify-between gap-4">
+        <div className="mt-6 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm dark:border-border dark:bg-card">
+          <div className="flex flex-col gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] p-6 dark:border-border dark:bg-muted/30 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-[#1E2A3A] dark:text-foreground">캘린더 연동</h3>
-              <p className="mt-1 text-[12px] text-[#94A3B8] dark:text-muted-foreground">
-                캘린더 자동 등록 토글은 위 자동화 규칙에서 템플릿별로 설정합니다.
+              <p className="mt-1 text-[12px] text-[#64748B] dark:text-muted-foreground">
+                기존 Google 통합 OAuth를 다시 진행해 Calendar 권한과 연동 상태를 확인합니다.
               </p>
             </div>
-            {!googleCalendarConnected ? (
-              <button
-                onClick={handleConnectCalendar}
-                className="app-secondary-button flex items-center gap-2 rounded-lg px-4 py-2 text-[13px]"
-              >
-                <Plus className="h-4 w-4" />
-                Google 캘린더 연결
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate("/app/settings?tab=email")}
-                className="app-secondary-button rounded-lg px-4 py-2 text-[13px]"
-              >
-                연동 관리
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleRefreshCalendarIntegration}
+              disabled={refreshingIntegration || connectingCalendar}
+              className="app-secondary-button inline-flex w-fit items-center gap-2 rounded-lg px-4 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshingIntegration ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              상태 새로고침
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="rounded-[18px] border border-[#E2E8F0] bg-white px-4 py-4 dark:border-border dark:bg-background">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#E6FAF8] text-[#0F766E] dark:bg-emerald-500/10 dark:text-emerald-200">
+                    <CalendarDays className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#1E2A3A] dark:text-foreground">
+                      Google Calendar
+                    </p>
+                    <p className="mt-1 truncate text-[13px] text-[#64748B] dark:text-muted-foreground">
+                      {connectedEmailLabel}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                      <span className={`rounded-full px-2.5 py-1 ${calendarStatusTone}`}>
+                        {calendarStatusLabel}
+                      </span>
+                      <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 text-[#4338CA] dark:bg-indigo-500/10 dark:text-indigo-200">
+                        {gmailStatusLabel}
+                      </span>
+                      <span className="rounded-full bg-[#F1F5F9] px-2.5 py-1 text-[#475569] dark:bg-muted dark:text-muted-foreground">
+                        최근 동기화: {lastSyncedLabel}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleConnectCalendar}
+                  disabled={connectingCalendar || refreshingIntegration}
+                  className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                    googleCalendarConnected
+                      ? "app-secondary-button"
+                      : "app-cta-primary text-white"
+                  }`}
+                >
+                  {connectingCalendar ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                  {googleCalendarConnected ? "권한 다시 확인" : "Google Calendar 연결"}
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-4 text-[12px] leading-relaxed text-[#64748B] dark:text-muted-foreground">
+              Calendar 권한이 없으면 템플릿별 캘린더 자동 등록 토글은 꺼진 상태로 유지됩니다.
+              같은 Google 계정으로 다시 동의하면 Gmail 연동은 유지되고 Calendar 권한만 함께 갱신됩니다.
+            </p>
           </div>
         </div>
       </div>
