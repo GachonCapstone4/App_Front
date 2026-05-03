@@ -2,25 +2,13 @@ import { useNavigate } from "react-router";
 import { AlertTriangle, CheckCircle2, FileText, Loader2, PencilLine, Send, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { emailStatusMeta } from "../../../entities/email/model/email-data";
-import type { EmailItem, EmailStatus } from "../../../shared/types";
+import type { EmailItem, EmailRecommendationItem, EmailStatus } from "../../../shared/types";
 import { StatePanel } from "../../../shared/ui/primitives/StatePanel";
 
 const metaByStatus = emailStatusMeta as Record<
   EmailStatus,
   { label: string; tone: string; banner: string }
 >;
-
-const variableTypeByToken: Record<string, "auto" | "required"> = {
-  "{{회사명}}": "auto",
-  "{{가격}}": "auto",
-  "{{할인율}}": "auto",
-  "{{미팅일시}}": "auto",
-  "{{날짜1}}": "auto",
-  "{{시간1}}": "auto",
-  "{{날짜2}}": "auto",
-  "{{시간2}}": "auto",
-  "{{담당자명}}": "required",
-};
 
 function getPanelTitle(status: EmailStatus) {
   if (status === "completed") {
@@ -47,40 +35,68 @@ function getPanelDescription(status: EmailStatus) {
 function getVariableCounts(text: string) {
   const tokens = text.match(/{{[^}]+}}/g) || [];
 
-  return tokens.reduce(
-    (accumulator: { auto: number; required: number }, token: string) => {
-      const type = variableTypeByToken[token] || "auto";
-
-      if (type === "required") {
-        accumulator.required += 1;
-      } else {
-        accumulator.auto += 1;
-      }
-
-      return accumulator;
-    },
-    { auto: 0, required: 0 }
-  );
+  return { auto: 0, required: tokens.length };
 }
 
-function renderDraftText(text: string, highlight: boolean) {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderAutoCompletedText(text: string, autoCompletedValues: Record<string, string>) {
+  const entries = Object.entries(autoCompletedValues)
+    .map(([key, value]) => [key, value.trim()] as const)
+    .filter(([, value]) => value.length >= 2)
+    .sort((left, right) => right[1].length - left[1].length)
+    .slice(0, 12);
+
+  if (!entries.length) {
+    return <span>{text}</span>;
+  }
+
+  const pattern = new RegExp(`(${entries.map(([, value]) => escapeRegExp(value)).join("|")})`, "g");
+  const labelByValue = new Map(entries.map(([key, value]) => [value, key]));
+
+  return text.split(pattern).map((part, index) => {
+    const key = labelByValue.get(part);
+    if (!key) {
+      return <span key={`${part}-${index}`}>{part}</span>;
+    }
+
+    return (
+      <span
+        key={`${part}-${index}`}
+        title={`${key} 자동완성`}
+        className="rounded-md bg-[#E6FAF8] px-1.5 py-0.5 text-[#0F766E] dark:bg-[#0B2728] dark:text-[#5EEAD4]"
+      >
+        {part}
+      </span>
+    );
+  });
+}
+
+function renderDraftText(
+  text: string,
+  highlight: boolean,
+  autoCompletedValues: Record<string, string> = {},
+) {
   return text.split(/({{[^}]+}})/).map((part: string, index: number) => {
     if (!part.startsWith("{{") || !part.endsWith("}}")) {
-      return <span key={`${part}-${index}`}>{part}</span>;
+      return (
+        <span key={`${part}-${index}`}>
+          {highlight ? renderAutoCompletedText(part, autoCompletedValues) : part}
+        </span>
+      );
     }
 
     if (!highlight) {
       return <span key={`${part}-${index}`}>{part}</span>;
     }
 
-    const type = variableTypeByToken[part] || "auto";
-    const className =
-      type === "required"
-        ? "rounded-md bg-[#FEF3C7] px-1.5 py-0.5 text-[#D97706] dark:bg-[#2A1D10] dark:text-[#F4C98A]"
-        : "rounded-md bg-[#E6FAF8] px-1.5 py-0.5 text-[#0F766E] dark:bg-[#0B2728] dark:text-[#5EEAD4]";
-
     return (
-      <span key={`${part}-${index}`} className={className}>
+      <span
+        key={`${part}-${index}`}
+        className="rounded-md bg-[#FEF3C7] px-1.5 py-0.5 text-[#D97706] dark:bg-[#2A1D10] dark:text-[#F4C98A]"
+      >
         {part}
       </span>
     );
@@ -154,6 +170,7 @@ interface DraftPanelProps {
   onSend?: () => void;
   onEditSend?: () => void;
   onSkip?: () => void;
+  onSelectRecommendation?: (recommendation: EmailRecommendationItem) => void;
 }
 
 export function DraftPanel({
@@ -161,6 +178,7 @@ export function DraftPanel({
   onSend,
   onEditSend,
   onSkip,
+  onSelectRecommendation,
 }: DraftPanelProps) {
   const navigate = useNavigate();
 
@@ -233,23 +251,36 @@ export function DraftPanel({
             {recommendations.map((recommendation, index) => {
               const similarityLabel = `${Math.round(recommendation.similarity * 100)}%`;
               const isPrimary =
-                recommendation.templateTitle === templateName &&
-                recommendation.subject === (email.draftSubject || `Re: ${email.subject}`);
+                email.selectedRecommendationId === recommendation.draftId ||
+                (
+                  email.selectedRecommendationId == null &&
+                  recommendation.templateTitle === templateName &&
+                  recommendation.subject === (email.draftSubject || `Re: ${email.subject}`)
+                );
 
               return (
-                <div
+                <button
+                  type="button"
                   key={`${recommendation.draftId}-${index}`}
+                  onClick={() => onSelectRecommendation?.(recommendation)}
                   className={`rounded-xl border px-3 py-3 ${
                     isPrimary
                       ? "border-[#14B8A6] bg-[#F0FDFA] dark:border-[#5EEAD4] dark:bg-[#0B2728]"
                       : "border-border bg-muted/30"
-                  }`}
+                  } w-full text-left transition hover:border-[#14B8A6] hover:bg-[#F0FDFA] dark:hover:border-[#5EEAD4] dark:hover:bg-[#0B2728]`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-[#1E2A3A] dark:text-foreground">
-                        {recommendation.templateTitle}
-                      </p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium text-[#1E2A3A] dark:text-foreground">
+                          {recommendation.templateTitle}
+                        </p>
+                        {isPrimary ? (
+                          <span className="rounded-full bg-[#CCFBF1] px-2 py-0.5 text-[10px] font-semibold text-[#0F766E] dark:bg-[#134E4A] dark:text-[#99F6E4]">
+                            선택됨
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="mt-1 truncate text-xs text-[#64748B] dark:text-muted-foreground">
                         {recommendation.subject}
                       </p>
@@ -258,7 +289,7 @@ export function DraftPanel({
                       {similarityLabel}
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -323,7 +354,7 @@ export function DraftPanel({
 
           <div className="px-4 py-4">
             <div className="whitespace-pre-wrap text-sm leading-8 text-[#475569] dark:text-muted-foreground">
-              {renderDraftText(email.draft, !readonly)}
+              {renderDraftText(email.draft, !readonly, email.autoCompletedValues)}
             </div>
           </div>
         </div>

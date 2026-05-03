@@ -82,6 +82,11 @@ type InboxRecommendationApiItem = {
   body: string;
   similarity: number;
   email_id: number;
+  auto_completed_count?: number | null;
+  auto_completed_keys?: string[] | null;
+  auto_completed_values?: Record<string, string> | null;
+  required_input_count?: number | null;
+  required_input_keys?: string[] | null;
 };
 
 type InboxRecommendationsApiResponse = {

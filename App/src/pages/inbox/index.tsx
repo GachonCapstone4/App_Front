@@ -7,7 +7,7 @@ import { InboxStatusTabs } from "../../features/inbox/ui/InboxStatusTabs";
 import { EmailThreadPanel } from "../../features/inbox/ui/EmailThreadPanel";
 import { DraftPanel } from "../../features/inbox/ui/DraftPanel";
 import { emailItems } from "../../entities/email/model/email-data";
-import type { EmailItem, EmailStatus } from "../../shared/types";
+import type { EmailItem, EmailRecommendationItem, EmailStatus } from "../../shared/types";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
 import { StatePanel } from "../../shared/ui/primitives/StatePanel";
 import {
@@ -308,6 +308,29 @@ export function InboxPage() {
     toast.success(successMessage);
   };
 
+  const handleSelectRecommendation = (recommendation: EmailRecommendationItem) => {
+    if (!selectedEmailId) {
+      return;
+    }
+
+    setEmails((current) =>
+      current.map((item) =>
+        item.id === selectedEmailId
+          ? {
+              ...item,
+              selectedRecommendationId: recommendation.draftId,
+              templateName: recommendation.templateTitle,
+              draftSubject: recommendation.subject,
+              draft: recommendation.body,
+              autoCompletedCount: recommendation.autoCompletedCount,
+              autoCompletedValues: recommendation.autoCompletedValues,
+              requiredInputCount: recommendation.requiredInputCount,
+            }
+          : item,
+      ),
+    );
+  };
+
   const pendingCount = emails.filter((item: EmailItem) => item.status === "pending").length;
   const unsentCount = emails.filter((item: EmailItem) => item.status === "unsent").length;
 
@@ -567,13 +590,15 @@ export function InboxPage() {
     }
 
     try {
-      const response = await sendInboxReply(Number(selectedEmail.id));
+      const response = selectedEmail.selectedRecommendationId
+        ? await editAndSendInboxReply(Number(selectedEmail.id), selectedEmail.draft)
+        : await sendInboxReply(Number(selectedEmail.id));
       updateSelectedEmail(
         (item) => ({
           ...item,
           status: "completed",
           sentTime: getCurrentTimeLabel(),
-          draftStatus: "SENT",
+          draftStatus: selectedEmail.selectedRecommendationId ? "EDITED" : "SENT",
         }),
         response.message || "답변을 발송했습니다."
       );
@@ -728,6 +753,7 @@ export function InboxPage() {
                 onSend={() => void handleSend()}
                 onEditSend={() => void handleEditSend()}
                 onSkip={() => void handleSkip()}
+                onSelectRecommendation={handleSelectRecommendation}
               />
             </div>
           </div>
@@ -842,6 +868,7 @@ export function InboxPage() {
               onSend={() => void handleSend()}
               onEditSend={() => void handleEditSend()}
               onSkip={() => void handleSkip()}
+              onSelectRecommendation={handleSelectRecommendation}
             />
           </div>
         </div>

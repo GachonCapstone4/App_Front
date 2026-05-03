@@ -55,6 +55,11 @@ export interface EmailRecommendationItem {
   body: string;
   similarity: number;
   emailId: number;
+  autoCompletedCount?: number;
+  autoCompletedKeys?: string[];
+  autoCompletedValues?: Record<string, string>;
+  requiredInputCount?: number;
+  requiredInputKeys?: string[];
 }
 
 export type RecommendationState = "idle" | "loading" | "ready" | "empty" | "error";
@@ -81,12 +86,14 @@ export interface EmailItem {
   templateName?: string;
   draftSubject?: string;
   autoCompletedCount?: number;
+  autoCompletedValues?: Record<string, string>;
   requiredInputCount?: number;
   draftStatus?: string;
   attachments?: EmailAttachment[];
   recommendations?: EmailRecommendationItem[];
   recommendationState?: RecommendationState;
   recommendationError?: string;
+  selectedRecommendationId?: number;
 }
 
 export interface NotificationItem {

@@ -103,8 +103,8 @@ const initialTemplates: Template[] = [
   {
     id: "1",
     title: "가격 안내 템플릿",
-    subject: "가격 안내 드립니다 - {{제품명}} 관련",
-    body: "안녕하세요, {{고객명}}님. 문의하신 {{제품명}}의 가격 정보를 안내드립니다. 현재 기본 플랜은 월 49,000원부터 시작하며...",
+    subject: "{{문의주제}} 안내드립니다",
+    body: "안녕하세요, {{고객명}}님. 문의해 주신 {{문의주제}}에 대해 안내드립니다. {{문의요약}} 내용을 기준으로 확인했습니다...",
     confidence: 96,
     category: "가격문의",
     categoryId: "price",
@@ -113,8 +113,8 @@ const initialTemplates: Template[] = [
   {
     id: "2",
     title: "가격표 및 할인 안내 템플릿",
-    subject: "가격표 및 할인 조건 안내",
-    body: "안녕하세요, {{고객명}}님. 요청하신 가격표를 첨부하여 보내드립니다. 연간 결제 시 20% 할인이 적용되며...",
+    subject: "{{문의주제}} 관련 추가 안내",
+    body: "안녕하세요, {{고객명}}님. {{수신일자}}에 보내주신 문의를 확인했습니다. {{문의요약}}에 대해 아래와 같이 안내드립니다...",
     confidence: 92,
     category: "가격문의",
     categoryId: "price",
@@ -123,8 +123,8 @@ const initialTemplates: Template[] = [
   {
     id: "3",
     title: "불만 접수 1차 응답 템플릿",
-    subject: "불편을 드려 죄송합니다 - {{이슈번호}} 관련",
-    body: "안녕하세요, {{고객명}}님. 말씀하신 불편 사항에 대해 진심으로 사과드립니다. 담당 부서에서 즉시 확인 후...",
+    subject: "{{문의주제}} 접수 확인 안내",
+    body: "안녕하세요, {{고객명}}님. 보내주신 {{문의주제}} 문의를 접수했습니다. 담당자가 내용을 확인한 뒤 안내드리겠습니다...",
     confidence: 94,
     category: "불만접수",
     categoryId: "complaint",
@@ -133,8 +133,8 @@ const initialTemplates: Template[] = [
   {
     id: "4",
     title: "미팅 일정 확인 템플릿",
-    subject: "미팅 일정 확인 - {{날짜}} {{시간}}",
-    body: "안녕하세요, {{고객명}}님. 요청하신 미팅 일정을 아래와 같이 확인드립니다. 일시: {{날짜}} {{시간}}...",
+    subject: "{{문의주제}} 관련 일정 안내",
+    body: "안녕하세요, {{고객명}}님. {{문의요약}} 내용을 확인했습니다. 일정 조율이 필요한 경우 담당자가 추가로 안내드리겠습니다...",
     confidence: 89,
     category: "미팅요청",
     categoryId: "meeting",
@@ -143,8 +143,8 @@ const initialTemplates: Template[] = [
   {
     id: "5",
     title: "기술 지원 접수 템플릿",
-    subject: "기술 지원 요청 접수 완료 - 티켓 #{{티켓번호}}",
-    body: "안녕하세요, {{고객명}}님. 기술 지원 요청이 정상적으로 접수되었습니다. 담당 엔지니어가 배정되어 24시간 이내에...",
+    subject: "{{문의주제}} 요청 접수 완료",
+    body: "안녕하세요, {{고객명}}님. {{수신일자}}에 보내주신 {{문의주제}} 요청이 정상적으로 접수되었습니다...",
     confidence: 91,
     category: "기술지원",
     categoryId: "tech",
@@ -154,7 +154,7 @@ const initialTemplates: Template[] = [
     id: "6",
     title: "계약 검토 안내 템플릿",
     subject: "계약 조건 검토 결과 안내",
-    body: "안녕하세요, {{고객명}}님. 요청하신 계약 조건 검토가 완료되었습니다. 주요 변경 사항은 아래와 같습니다...",
+    body: "안녕하세요, {{고객명}}님. 문의해 주신 {{문의주제}} 내용을 검토했습니다. {{문의요약}}에 대해 아래와 같이 안내드립니다...",
     confidence: 87,
     category: "계약문의",
     categoryId: "contract",
@@ -163,8 +163,8 @@ const initialTemplates: Template[] = [
   {
     id: "7",
     title: "배송 현황 안내 템플릿",
-    subject: "배송 현황 안내 - 주문번호 {{주문번호}}",
-    body: "안녕하세요, {{고객명}}님. 주문하신 상품의 배송 현황을 안내드립니다. 현재 배송 중이며 {{예상일자}}에...",
+    subject: "{{문의주제}} 처리 현황 안내",
+    body: "안녕하세요, {{고객명}}님. {{문의주제}} 관련 처리 현황을 안내드립니다. 추가 확인이 필요한 내용은 담당자가 이어서 안내드리겠습니다...",
     confidence: 93,
     category: "배송문의",
     categoryId: "shipping",
@@ -174,7 +174,7 @@ const initialTemplates: Template[] = [
     id: "8",
     title: "환불 완료 안내 템플릿",
     subject: "환불 처리 완료 안내",
-    body: "안녕하세요, {{고객명}}님. 요청하신 환불 처리가 완료되었습니다. 환불 금액은 {{금액}}원이며, 영업일 기준 3-5일...",
+    body: "안녕하세요, {{고객명}}님. 보내주신 {{문의주제}} 문의를 확인했습니다. 처리 결과와 후속 안내를 아래에 정리했습니다...",
     confidence: 95,
     category: "환불요청",
     categoryId: "refund",
@@ -459,8 +459,8 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
       setEditingTemplateId("1");
       setDraft({
         title: "가격 안내 템플릿",
-        subject: "가격 안내 드립니다 - {{제품명}} 관련",
-        body: "안녕하세요, {{고객명}}님. 문의하신 {{제품명}}의 가격 정보를 안내드립니다. 현재 기본 플랜은 월 49,000원부터 시작하며...",
+        subject: "{{문의주제}} 안내드립니다",
+        body: "안녕하세요, {{고객명}}님. 문의해 주신 {{문의주제}}에 대해 안내드립니다. {{문의요약}} 내용을 기준으로 확인했습니다...",
         categoryId: "price",
       });
       setEditorOpen(true);

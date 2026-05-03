@@ -73,6 +73,11 @@ type InboxRecommendationApiItem = {
   body: string;
   similarity: number;
   email_id: number;
+  auto_completed_count?: number | null;
+  auto_completed_keys?: string[] | null;
+  auto_completed_values?: Record<string, string> | null;
+  required_input_count?: number | null;
+  required_input_keys?: string[] | null;
 };
 
 type InboxScheduleApiItem = {
@@ -359,6 +364,23 @@ export function mapInboxRecommendation(item: InboxRecommendationApiItem): EmailR
     body: item.body,
     similarity: Number(item.similarity),
     emailId: item.email_id,
+    autoCompletedCount:
+      typeof item.auto_completed_count === "number"
+        ? item.auto_completed_count
+        : undefined,
+    autoCompletedKeys: Array.isArray(item.auto_completed_keys)
+      ? item.auto_completed_keys
+      : undefined,
+    autoCompletedValues: item.auto_completed_values && typeof item.auto_completed_values === "object"
+      ? item.auto_completed_values
+      : undefined,
+    requiredInputCount:
+      typeof item.required_input_count === "number"
+        ? item.required_input_count
+        : undefined,
+    requiredInputKeys: Array.isArray(item.required_input_keys)
+      ? item.required_input_keys
+      : undefined,
   };
 }
 
@@ -378,8 +400,20 @@ export function mergeInboxRecommendations(
     recommendations,
     recommendationState,
     recommendationError,
+    selectedRecommendationId: shouldPrefillDraft && primary
+      ? primary.draftId
+      : current.selectedRecommendationId,
     draft: shouldPrefillDraft && primary ? primary.body : current.draft,
     templateName: shouldPrefillTemplateName && primary ? primary.templateTitle : current.templateName,
     draftSubject: shouldPrefillDraftSubject && primary ? primary.subject : current.draftSubject,
+    autoCompletedCount: shouldPrefillDraft && primary
+      ? primary.autoCompletedCount
+      : current.autoCompletedCount,
+    autoCompletedValues: shouldPrefillDraft && primary
+      ? primary.autoCompletedValues
+      : current.autoCompletedValues,
+    requiredInputCount: shouldPrefillDraft && primary
+      ? primary.requiredInputCount
+      : current.requiredInputCount,
   };
 }
