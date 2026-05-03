@@ -4,6 +4,7 @@ import { Clock3, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { addInboxCalendarEvent, ignoreInboxCalendarEvent } from "../../../shared/api/inbox";
 import { getErrorMessage } from "../../../shared/api/http";
+import { AiUsageBadge } from "../../../shared/ui/primitives/AiUsageBadge";
 import type { DetectedSchedule, EmailSchedule } from "../../../shared/types";
 
 interface ScheduleDetectionCardProps {
@@ -73,10 +74,13 @@ export function ScheduleDetectionCard({
 
   return (
     <div className="app-violet-card rounded-2xl border p-5">
-      <p className="app-violet-text flex items-center gap-2 text-sm font-semibold">
-        <Sparkles className="h-4 w-4" />
-        AI가 일정 정보를 감지했습니다
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="app-violet-text flex items-center gap-2 text-sm font-semibold">
+          <Sparkles className="h-4 w-4" />
+          AI가 일정 정보를 감지했습니다
+        </p>
+        <AiUsageBadge label="AI 일정 감지" />
+      </div>
 
       <div className="mt-4">
         <h3 className="text-base font-semibold text-[#1E2A3A] dark:text-foreground">

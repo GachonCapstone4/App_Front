@@ -7,6 +7,8 @@ import {
   getAdminOperationJobSummary,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
+import { formatKstDateTime } from "../../shared/lib/date-time";
+import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { processingJobs } from "../shared/mock/adminData";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminModal } from "../shared/ui/AdminModal";
@@ -194,15 +196,18 @@ export function MonitoringPage() {
     <section className="admin-page">
       <PageHeader
         title="시스템 운영 모니터링"
-        description="실패 또는 대기 상태의 메일 처리 작업만 확인하고 강제 삭제합니다."
+        description="AI 메일 분류, 초안 생성, RAG 매칭으로 이어지는 메일 처리 작업 중 실패 또는 대기 상태만 확인하고 강제 삭제합니다."
       />
 
       <section className="admin-panel">
         <div className="admin-panel-head">
           <div>
-            <h2>강제 삭제 대상 작업</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2>강제 삭제 대상 작업</h2>
+              <AiUsageBadge label="AI 처리 파이프라인" />
+            </div>
             <p className="admin-panel-subtitle">
-              실패 또는 대기 상태의 작업만 표시됩니다.
+              AI 분석 또는 템플릿 생성 파이프라인에서 실패하거나 대기 중인 작업만 표시됩니다.
             </p>
           </div>
           <span className="admin-panel-note">
@@ -239,8 +244,8 @@ export function MonitoringPage() {
                     <span>
                       {job.userName} · {job.userEmail}
                     </span>
-                    <span>생성 {job.createdAt}</span>
-                    <span>갱신 {job.updatedAt}</span>
+                    <span>생성 {formatKstDateTime(job.createdAt)}</span>
+                    <span>갱신 {formatKstDateTime(job.updatedAt)}</span>
                   </div>
 
                   {job.failureReason ? (

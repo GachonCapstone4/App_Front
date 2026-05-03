@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { refreshStoredSession } from "../../shared/api/session";
 import { setAccessToken } from "../../shared/lib/app-session";
-import { isGoogleOAuthPopupWindow } from "../../shared/lib/google-oauth-popup";
+import {
+  GOOGLE_OAUTH_POPUP_MARKER_KEY,
+  isGoogleOAuthPopupWindow,
+} from "../../shared/lib/google-oauth-popup";
 
 type GoogleOAuthPopupMessage = {
   type: "emailassist-google-oauth";
@@ -50,6 +53,12 @@ export function GoogleOAuthCallbackPage() {
     const openedAsPopup = isGoogleOAuthPopupWindow() || Boolean(window.opener);
 
     if (openedAsPopup) {
+      try {
+        window.sessionStorage.removeItem(GOOGLE_OAUTH_POPUP_MARKER_KEY);
+      } catch {
+        // 저장소 접근이 막혀도 OAuth 결과 전달은 localStorage/postMessage로 계속 시도한다.
+      }
+
       window.localStorage.setItem(GOOGLE_OAUTH_STORAGE_KEY, JSON.stringify(payload));
 
       if (window.opener) {

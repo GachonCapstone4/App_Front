@@ -1,5 +1,6 @@
 const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
 export const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
+export const GOOGLE_OAUTH_POPUP_MARKER_KEY = "emailassist-google-oauth-popup";
 const GOOGLE_OAUTH_POPUP_WIDTH = 640;
 const GOOGLE_OAUTH_POPUP_HEIGHT = 820;
 
@@ -80,11 +81,19 @@ function buildGoogleOAuthPopupFeatures() {
 }
 
 export function openGoogleOAuthPopup() {
-  return window.open(
+  const popup = window.open(
     "",
     `${GOOGLE_OAUTH_POPUP_NAME}-${Date.now()}`,
     buildGoogleOAuthPopupFeatures(),
   );
+
+  try {
+    popup?.sessionStorage.setItem(GOOGLE_OAUTH_POPUP_MARKER_KEY, "true");
+  } catch {
+    // 팝업이 이미 브라우저 정책에 의해 분리된 경우 callback의 다른 신호로 판단한다.
+  }
+
+  return popup;
 }
 
 export function navigateGoogleOAuthPopup(popup: Window, authorizationUrl: string) {
@@ -93,6 +102,14 @@ export function navigateGoogleOAuthPopup(popup: Window, authorizationUrl: string
 }
 
 export function isGoogleOAuthPopupWindow() {
+  try {
+    if (window.sessionStorage.getItem(GOOGLE_OAUTH_POPUP_MARKER_KEY) === "true") {
+      return true;
+    }
+  } catch {
+    // sessionStorage 접근이 막힌 경우 window.name만 확인한다.
+  }
+
   return window.name.startsWith(GOOGLE_OAUTH_POPUP_NAME);
 }
 

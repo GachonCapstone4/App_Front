@@ -10,6 +10,7 @@ import {
 } from "../../../shared/api/support";
 import { getErrorMessage } from "../../../shared/api/http";
 import { subscribeAppEvent } from "../../../shared/lib/app-event-stream";
+import { formatKstDateTime } from "../../../shared/lib/date-time";
 import { SectionCard } from "../../../shared/ui/primitives/SectionCard";
 import { StateBanner } from "../../../shared/ui/primitives/StateBanner";
 import { StatusBadge } from "../../../shared/ui/primitives/StatusBadge";
@@ -32,16 +33,7 @@ function formatTicketStatus(status: SupportTicketStatus) {
 }
 
 function formatTicketDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatKstDateTime(value);
 }
 
 interface AdminInquirySettingsPanelProps {

@@ -1127,9 +1127,12 @@ export function Calendar({ scenarioId }: CalendarProps) {
                   <Sparkles className="h-4 w-4 text-[#F59E0B]" />
                 </div>
                 <div className="flex-1">
-                  <p className="mb-0.5 text-[13px]">
-                    확인 대기 중인 일정이 {pendingEvents.length}건 있습니다
-                  </p>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p className="text-[13px]">
+                      확인 대기 중인 일정이 {pendingEvents.length}건 있습니다
+                    </p>
+                    <AiUsageBadge label="AI 일정 감지" />
+                  </div>
                   <p className="app-warning-subtle text-[11px]">
                     이메일에서 AI가 감지한 일정입니다. 확인하고 캘린더에 확정하세요.
                   </p>
