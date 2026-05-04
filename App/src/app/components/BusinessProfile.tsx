@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Building2,
   FileText,
@@ -6,20 +6,34 @@ import {
   Trash2,
   Plus,
   AlertTriangle,
+  CheckCircle2,
+  Loader2,
   Save,
   Sparkles,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { businessTypeOptions } from "../../shared/config/onboarding-options";
+import {
+  businessTypeOptions,
+  categoryColorPalette,
+  getBusinessTypeLabel,
+  getRecommendedCategoriesForDomain,
+  recommendedCategoryOptions,
+  type RecommendedCategoryOption,
+} from "../../shared/config/onboarding-options";
 import { formatKstCompactDate } from "../../shared/lib/date-time";
 import {
+  BusinessCategorySnapshot,
   createBusinessFaq,
+  createBusinessCategory,
+  deleteBusinessCategory,
   deleteBusinessFaq,
   deleteBusinessFile,
   FaqSnapshot,
   getBusinessFaqs,
   getBusinessProfile,
   getBusinessResources,
+  getBusinessCategories,
   getTemplates,
   regenerateBusinessTemplates,
   TemplateSummarySnapshot,
@@ -28,6 +42,18 @@ import {
   upsertBusinessProfile,
 } from "../../shared/api/business";
 import { getErrorMessage } from "../../shared/api/http";
+import {
+  generateInitialBusinessTemplates,
+  getTemplateGenerationJobs,
+} from "../../shared/api/onboarding";
+import { subscribeAppEvent } from "../../shared/lib/app-event-stream";
+import {
+  getTemplateJobStatusLabel,
+  getTemplateJobTitle,
+  resolveProgressFromEvent,
+  resolveProgressFromJobs,
+  type TemplateJobProgressState,
+} from "./business-profile.helpers";
 import {
   Dialog,
   DialogContent,
@@ -87,7 +113,19 @@ interface FAQDraft {
 interface TemplateSelectionItem {
   id: string;
   title: string;
+  categoryId: number | null;
+  categoryName: string;
 }
+
+interface BusinessCategoryItem {
+  id: string;
+  categoryId?: number;
+  name: string;
+  domain: string;
+  color: string;
+}
+
+const TEMPLATE_JOB_PROGRESS_STORAGE_KEY = "emailassist-template-job-progress";
 
 const demoUploadedFiles: UploadedFile[] = [
   { id: "1", name: "비즈니스_매뉴얼.pdf", uploadDate: "2025.01.15" },
@@ -108,10 +146,17 @@ const demoFaqItems: FAQItem[] = [
 ];
 
 const demoTemplates: TemplateSelectionItem[] = [
-  { id: "1", title: "가격 안내 템플릿" },
-  { id: "4", title: "미팅 일정 확인 템플릿" },
-  { id: "5", title: "기술 지원 접수 템플릿" },
-  { id: "6", title: "계약 안내 템플릿" },
+  { id: "1", title: "가격 안내 템플릿", categoryId: 1, categoryName: "가격 협상" },
+  { id: "4", title: "미팅 일정 확인 템플릿", categoryId: 2, categoryName: "미팅 일정 조율" },
+  { id: "5", title: "기술 지원 접수 템플릿", categoryId: 3, categoryName: "기술 지원 요청" },
+  { id: "6", title: "계약 안내 템플릿", categoryId: 4, categoryName: "계약 문의" },
+];
+
+const demoCategories: BusinessCategoryItem[] = [
+  { id: "1", categoryId: 1, name: "가격 협상", domain: "Sales", color: "#3B82F6" },
+  { id: "2", categoryId: 2, name: "미팅 일정 조율", domain: "Sales", color: "#3B82F6" },
+  { id: "3", categoryId: 3, name: "기술 지원 요청", domain: "Customer Support", color: "#EF4444" },
+  { id: "4", categoryId: 4, name: "계약 문의", domain: "Sales", color: "#3B82F6" },
 ];
 
 const emptyFaqDraft: FAQDraft = {
@@ -160,7 +205,60 @@ function mapTemplateSnapshot(snapshot: TemplateSummarySnapshot): TemplateSelecti
   return {
     id: String(snapshot.templateId),
     title: snapshot.title,
+    categoryId: snapshot.categoryId,
+    categoryName: snapshot.categoryName,
   };
+}
+
+function mapCategorySnapshot(
+  snapshot: BusinessCategorySnapshot,
+  fallbackDomain: string,
+): BusinessCategoryItem {
+  return {
+    id: String(snapshot.categoryId),
+    categoryId: snapshot.categoryId,
+    name: snapshot.categoryName,
+    domain: fallbackDomain || "사용자 정의",
+    color:
+      snapshot.color ??
+      recommendedCategoryOptions.find((option) => option.name === snapshot.categoryName)?.color ??
+      categoryColorPalette[0],
+  };
+}
+
+function readStoredTemplateJobProgress() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(TEMPLATE_JOB_PROGRESS_STORAGE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawValue) as TemplateJobProgressState;
+    if (!Array.isArray(parsed.jobIds) || typeof parsed.updatedAt !== "number") {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredTemplateJobProgress(progress: TemplateJobProgressState | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!progress) {
+    window.localStorage.removeItem(TEMPLATE_JOB_PROGRESS_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(TEMPLATE_JOB_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
 }
 
 export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
@@ -176,26 +274,53 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
   const regenerateErrorScenario = scenarioId === "profile-regenerate-error";
   const useDemoDataMode = Boolean(scenarioId?.startsWith("profile-"));
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const categoryComposerRef = useRef<HTMLDivElement | null>(null);
   const [businessType, setBusinessType] = useState("Sales");
   const [tone, setTone] = useState<ToneId>("neutral");
   const [description, setDescription] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [faqItems, setFAQItems] = useState<FAQItem[]>([]);
   const [templateOptions, setTemplateOptions] = useState<TemplateSelectionItem[]>([]);
+  const [categories, setCategories] = useState<BusinessCategoryItem[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [newCategory, setNewCategory] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [hasChanges, setHasChanges] = useState(useDemoDataMode);
   const [faqDialogOpen, setFaqDialogOpen] = useState(false);
   const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
   const [faqDraft, setFaqDraft] = useState<FAQDraft>(emptyFaqDraft);
   const [faqDeleteTarget, setFaqDeleteTarget] = useState<FAQItem | null>(null);
-  const [regenerateMode, setRegenerateMode] = useState<"bulk" | "select" | null>(null);
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<BusinessCategoryItem | null>(null);
+  const [regenerateMode, setRegenerateMode] = useState<"bulk" | "select" | "initial" | null>(null);
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(!useDemoDataMode);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [templateJobProgress, setTemplateJobProgress] =
+    useState<TemplateJobProgressState | null>(() => readStoredTemplateJobProgress());
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const impactedCount = templateOptions.length;
-  const canRegenerate = impactedCount > 0;
+  const hasGeneratedTemplates = impactedCount > 0;
+  const templatesBySelectedCategories = templateOptions.filter(
+    (template) =>
+      typeof template.categoryId === "number" &&
+      selectedCategoryIds.includes(template.categoryId),
+  );
+  const canInitialGenerate =
+    !hasGeneratedTemplates && selectedCategoryIds.length > 0;
+  const canRegenerate = hasGeneratedTemplates;
+  const canSubmitTemplateAction =
+    regenerateMode === "initial"
+      ? canInitialGenerate
+      : regenerateMode === "bulk"
+        ? templatesBySelectedCategories.length > 0
+        : selectedTemplates.length > 0;
+  const availableCategorySuggestions = recommendedCategoryOptions.filter(
+    (option) => !categories.some((category) => category.name === option.name),
+  );
+  const recommendedCategoriesForBusinessType = getRecommendedCategoriesForDomain(businessType);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +334,8 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
       setUploadedFiles(demoUploadedFiles);
       setFAQItems(demoFaqItems);
       setTemplateOptions(demoTemplates);
+      setCategories(demoCategories);
+      setSelectedCategoryIds(demoCategories.map((category) => category.categoryId ?? 0).filter(Boolean));
       setSelectedTemplates(demoTemplates.slice(0, 2).map((template) => template.id));
       setHasChanges(true);
       setIsLoading(false);
@@ -223,11 +350,12 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
       setLoadError(null);
 
       try {
-        const [profile, resources, faqs, templates] = await Promise.all([
+        const [profile, resources, faqs, templates, categories] = await Promise.all([
           getBusinessProfile(),
           getBusinessResources(),
           getBusinessFaqs(),
           getTemplates(),
+          getBusinessCategories(),
         ]);
 
         if (cancelled) {
@@ -247,6 +375,11 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
         );
         setFAQItems(faqs.map(mapFaqSnapshot));
         setTemplateOptions(templates.map(mapTemplateSnapshot));
+        const nextCategories = categories.map((category) =>
+          mapCategorySnapshot(category, profile?.industryType || businessTypeOptions[0].value),
+        );
+        setCategories(nextCategories);
+        setSelectedCategoryIds(nextCategories.map((category) => category.categoryId ?? 0).filter(Boolean));
         setSelectedTemplates(templates.slice(0, 2).map((template) => String(template.templateId)));
         setHasChanges(false);
       } catch (error) {
@@ -320,7 +453,212 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
     regenerateSelectNormalScenario,
   ]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!categoryComposerRef.current?.contains(event.target as Node)) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    writeStoredTemplateJobProgress(templateJobProgress);
+  }, [templateJobProgress]);
+
+  useEffect(() => {
+    if (!templateJobProgress?.jobIds.length) {
+      return undefined;
+    }
+
+    if (templateJobProgress.status === "COMPLETED" || templateJobProgress.status === "FAILED") {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const refreshProgress = async () => {
+      try {
+        const response = await getTemplateGenerationJobs(templateJobProgress.jobIds);
+        if (disposed) {
+          return;
+        }
+
+        setTemplateJobProgress((current) => {
+          if (!current || current.jobIds.join(",") !== templateJobProgress.jobIds.join(",")) {
+            return current;
+          }
+
+          return resolveProgressFromJobs(current, response.jobs);
+        });
+
+        if (response.allCompleted || response.hasFailure) {
+          void Promise.all([getTemplates(), getBusinessCategories()])
+            .then(([templates, nextCategories]) => {
+              if (disposed) {
+                return;
+              }
+
+              setTemplateOptions(templates.map(mapTemplateSnapshot));
+              setCategories(
+                nextCategories.map((category) =>
+                  mapCategorySnapshot(category, businessType),
+                ),
+              );
+            })
+            .catch(() => undefined);
+        }
+      } catch {
+        if (!disposed) {
+          setTemplateJobProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  message: "작업 상태를 확인하지 못했습니다. 잠시 후 다시 시도합니다.",
+                  updatedAt: Date.now(),
+                }
+              : current,
+          );
+        }
+      }
+    };
+
+    const unsubscribe = subscribeAppEvent("rag-job-updated", (payload) => {
+      setTemplateJobProgress((current) =>
+        current ? resolveProgressFromEvent(current, payload) : current,
+      );
+    });
+    void refreshProgress();
+    const pollingId = window.setInterval(() => {
+      void refreshProgress();
+    }, 5000);
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+      window.clearInterval(pollingId);
+    };
+  }, [businessType, templateJobProgress?.jobIds.join(","), templateJobProgress?.status]);
+
   const markChanged = () => setHasChanges(true);
+
+  const startTemplateJobProgress = (progress: TemplateJobProgressState) => {
+    setTemplateJobProgress(progress);
+    writeStoredTemplateJobProgress(progress);
+  };
+
+  const toggleSelectedCategory = (categoryId: number) => {
+    setSelectedCategoryIds((current) =>
+      current.includes(categoryId)
+        ? current.filter((item) => item !== categoryId)
+        : [...current, categoryId],
+    );
+  };
+
+  const createCategoryItem = async (
+    categoryName: string,
+    source?: RecommendedCategoryOption,
+  ) => {
+    if (categories.some((category) => category.name === categoryName)) {
+      toast.error("이미 추가된 카테고리입니다.");
+      return;
+    }
+
+    const nextCategory = source ?? {
+      id: `category-${Date.now()}`,
+      name: categoryName,
+      domain: businessType || "사용자 정의",
+      color:
+        recommendedCategoriesForBusinessType[0]?.color ??
+        categoryColorPalette[Math.floor(Math.random() * categoryColorPalette.length)],
+    };
+
+    if (useDemoDataMode) {
+      const demoCategoryId = Date.now();
+      setCategories((current) => [
+        ...current,
+        {
+          ...nextCategory,
+          id: String(demoCategoryId),
+          categoryId: demoCategoryId,
+        },
+      ]);
+      setSelectedCategoryIds((current) => [...current, demoCategoryId]);
+      setNewCategory("");
+      setCategoryDropdownOpen(false);
+      return;
+    }
+
+    try {
+      setIsSavingCategory(true);
+      const savedCategory = await createBusinessCategory({
+        categoryName,
+        color: nextCategory.color,
+      });
+      const savedItem = {
+        ...nextCategory,
+        id: String(savedCategory.categoryId),
+        categoryId: savedCategory.categoryId,
+        color: savedCategory.color ?? nextCategory.color,
+      };
+      setCategories((current) => [...current, savedItem]);
+      setSelectedCategoryIds((current) => [...current, savedCategory.categoryId]);
+      setNewCategory("");
+      setCategoryDropdownOpen(false);
+      toast.success("카테고리를 추가했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "카테고리를 추가하지 못했습니다."));
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    const categoryName = newCategory.trim();
+
+    if (!categoryName) {
+      return;
+    }
+
+    const suggestedCategory = availableCategorySuggestions.find(
+      (option) => option.name === categoryName,
+    );
+    await createCategoryItem(categoryName, suggestedCategory);
+  };
+
+  const handleRemoveCategory = async (category: BusinessCategoryItem) => {
+    if (useDemoDataMode || !category.categoryId) {
+      setCategories((current) => current.filter((item) => item.id !== category.id));
+      setTemplateOptions((current) =>
+        current.filter((template) => template.categoryId !== category.categoryId),
+      );
+      setSelectedCategoryIds((current) =>
+        current.filter((categoryId) => categoryId !== category.categoryId),
+      );
+      setCategoryDeleteTarget(null);
+      return;
+    }
+
+    try {
+      setIsSavingCategory(true);
+      await deleteBusinessCategory(category.categoryId);
+      setCategories((current) => current.filter((item) => item.id !== category.id));
+      setTemplateOptions((current) =>
+        current.filter((template) => template.categoryId !== category.categoryId),
+      );
+      setSelectedCategoryIds((current) =>
+        current.filter((categoryId) => categoryId !== category.categoryId),
+      );
+      setCategoryDeleteTarget(null);
+      toast.success("카테고리를 삭제했습니다.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "카테고리를 삭제하지 못했습니다."));
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (saveErrorScenario) {
@@ -536,9 +874,76 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
   };
 
   const handleRegenerateTemplates = async () => {
+    if (regenerateMode === "initial") {
+      if (!canInitialGenerate) {
+        toast.error("초기 템플릿 생성을 위한 카테고리 정보가 없습니다.");
+        return;
+      }
+
+      if (regenerateErrorScenario) {
+        toast.error("템플릿 생성을 완료하지 못했습니다.");
+        return;
+      }
+
+      if (useDemoDataMode) {
+        setRegenerateMode(null);
+        startTemplateJobProgress({
+          action: "initial",
+          status: "COMPLETED",
+          jobIds: [],
+          targetCount: selectedCategoryIds.length,
+          completedCount: selectedCategoryIds.length,
+          failedCount: 0,
+          message: "데모 템플릿 생성 작업이 완료되었습니다.",
+          updatedAt: Date.now(),
+        });
+        toast.success(`템플릿 ${selectedCategoryIds.length}개 생성 작업을 등록했습니다.`);
+        return;
+      }
+
+      try {
+        setIsRegenerating(true);
+        const resourceIds = uploadedFiles
+          .map((file) => file.resourceId)
+          .filter((resourceId): resourceId is number => typeof resourceId === "number");
+        const faqIds = faqItems
+          .map((faq) => faq.faqId)
+          .filter((faqId): faqId is number => typeof faqId === "number");
+        const result = await generateInitialBusinessTemplates({
+          industryType: businessType,
+          emailTone: mapUiToneToApi(tone),
+          companyDescription: description.trim(),
+          categoryIds: selectedCategoryIds,
+          faqIds,
+          resourceIds,
+        });
+
+        setRegenerateMode(null);
+        startTemplateJobProgress({
+          action: "initial",
+          status: result.jobIds.length ? "PROCESSING" : "REGISTERED",
+          jobIds: result.jobIds,
+          targetCount: result.jobIds.length || result.processingCount,
+          completedCount: 0,
+          failedCount: 0,
+          message: result.jobIds.length
+            ? "선택한 카테고리의 템플릿 생성 상태를 확인하고 있습니다."
+            : "템플릿 생성 작업이 등록되었습니다. 백엔드 응답에 job id가 없어 세부 진행률은 알림으로 확인합니다.",
+          updatedAt: Date.now(),
+        });
+        toast.success(`템플릿 ${result.processingCount}개 생성 작업을 등록했습니다.`);
+      } catch (error) {
+        toast.error(getErrorMessage(error, "초기 템플릿 생성 작업을 시작하지 못했습니다."));
+      } finally {
+        setIsRegenerating(false);
+      }
+
+      return;
+    }
+
     const selectedTemplateIds =
       regenerateMode === "bulk"
-        ? templateOptions.map((template) => Number(template.id))
+        ? templatesBySelectedCategories.map((template) => Number(template.id))
         : selectedTemplates.map((templateId) => Number(templateId));
 
     if (regenerateErrorScenario) {
@@ -553,9 +958,19 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
 
     if (useDemoDataMode) {
       const targetCount =
-        regenerateMode === "bulk" ? impactedCount : selectedTemplates.length;
+        regenerateMode === "bulk" ? templatesBySelectedCategories.length : selectedTemplates.length;
       setHasChanges(false);
       setRegenerateMode(null);
+      startTemplateJobProgress({
+        action: "regenerate",
+        status: "COMPLETED",
+        jobIds: [],
+        targetCount,
+        completedCount: targetCount,
+        failedCount: 0,
+        message: "데모 템플릿 재생성 작업이 완료되었습니다.",
+        updatedAt: Date.now(),
+      });
       toast.success(`템플릿 ${targetCount}개를 재생성했습니다.`);
       return;
     }
@@ -563,10 +978,22 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
     try {
       setIsRegenerating(true);
       const result = await regenerateBusinessTemplates({
-        regenerateAll: regenerateMode === "bulk",
+        regenerateAll: false,
         templateIds: selectedTemplateIds,
       });
       setRegenerateMode(null);
+      startTemplateJobProgress({
+        action: "regenerate",
+        status: result.jobIds.length ? "PROCESSING" : "REGISTERED",
+        jobIds: result.jobIds,
+        targetCount: result.jobIds.length || result.processingCount,
+        completedCount: 0,
+        failedCount: 0,
+        message: result.jobIds.length
+          ? "선택한 카테고리의 템플릿 재생성 상태를 확인하고 있습니다."
+          : "템플릿 재생성 작업이 등록되었습니다. 백엔드 응답에 job id가 없어 세부 진행률은 알림으로 확인합니다.",
+        updatedAt: Date.now(),
+      });
       toast.success(`템플릿 ${result.processingCount}개 재생성 작업을 등록했습니다.`);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -583,6 +1010,11 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
       />
     );
   }
+
+  const templateJobTargetCount = Math.max(templateJobProgress?.targetCount ?? 0, 1);
+  const templateJobProgressPercent = templateJobProgress
+    ? Math.min(100, Math.round((templateJobProgress.completedCount / templateJobTargetCount) * 100))
+    : 0;
 
   return (
     <>
@@ -632,6 +1064,67 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
             회사 정보, FAQ, 업로드 자료는 AI 템플릿 생성과 RAG 검색 품질에 직접 반영됩니다.
           </p>
         </div>
+
+        {templateJobProgress ? (
+          <div className="mb-6 rounded-xl border border-[#99F6E4] bg-[#F0FDFA] p-5 shadow-sm">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#0F766E] ring-1 ring-[#99F6E4]">
+                  {templateJobProgress.status === "COMPLETED" ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : templateJobProgress.status === "FAILED" ? (
+                    <AlertTriangle className="h-5 w-5 text-[#EF4444]" />
+                  ) : (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p className="text-[14px] font-semibold text-[#134E4A]">
+                      {getTemplateJobTitle(templateJobProgress.action)}
+                    </p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0F766E]">
+                      {getTemplateJobStatusLabel(templateJobProgress.status)}
+                    </span>
+                  </div>
+                  <p className="text-[12px] leading-5 text-[#0F766E]">
+                    {templateJobProgress.message}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTemplateJobProgress(null)}
+                className="rounded-full p-1.5 text-[#0F766E] transition-colors hover:bg-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-[#0F766E]">
+                <span>
+                  완료 {templateJobProgress.completedCount}/{templateJobProgress.targetCount}
+                  {templateJobProgress.failedCount ? ` · 실패 ${templateJobProgress.failedCount}` : ""}
+                </span>
+                <span>{templateJobProgressPercent}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    templateJobProgress.status === "FAILED" ? "bg-[#EF4444]" : "bg-[#2DD4BF]"
+                  }`}
+                  style={{ width: `${templateJobProgressPercent}%` }}
+                />
+              </div>
+              {templateJobProgress.status === "REGISTERED" ? (
+                <p className="text-[11px] text-[#0F766E]">
+                  화면을 이동해도 비즈니스 프로필로 돌아오면 최근 등록 상태를 다시 확인할 수 있습니다.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mb-6 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center gap-2">
@@ -718,6 +1211,133 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-[#2DD4BF]" />
+            <h3 className="text-[#1E2A3A]">이메일 카테고리</h3>
+          </div>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            {categories.length ? (
+              categories.map((category) => {
+                const selected = category.categoryId
+                  ? selectedCategoryIds.includes(category.categoryId)
+                  : false;
+
+                return (
+                  <div
+                    key={category.id}
+                    className={`flex items-center gap-2 rounded-full border px-3 py-2 text-[12px] transition-colors ${
+                      selected
+                        ? "border-[#2DD4BF] bg-[#F0FDFA] text-[#0F766E]"
+                        : "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B]"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (category.categoryId) {
+                          toggleSelectedCategory(category.categoryId);
+                        }
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span>{category.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryDeleteTarget(category)}
+                      disabled={isSavingCategory}
+                      className="rounded-full p-0.5 text-[#94A3B8] transition-colors hover:bg-white hover:text-[#EF4444] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <StateBanner
+                title="등록된 카테고리가 없습니다"
+                description="초기 템플릿 생성과 재생성은 카테고리를 기준으로 실행됩니다. 아래에서 카테고리를 추가해 주세요."
+                tone="warning"
+                className="w-full"
+              />
+            )}
+          </div>
+
+          <div ref={categoryComposerRef} className="relative">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={newCategory}
+                onFocus={() => setCategoryDropdownOpen(true)}
+                onChange={(event) => {
+                  setNewCategory(event.target.value);
+                  setCategoryDropdownOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleAddCategory();
+                  }
+                }}
+                placeholder="새 카테고리 추가..."
+                className="app-form-input min-h-[44px] flex-1 rounded-xl px-4 text-[14px]"
+              />
+              <button
+                type="button"
+                onClick={() => void handleAddCategory()}
+                disabled={isSavingCategory || !newCategory.trim()}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#1E2A3A] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus className="h-4 w-4" />
+                {isSavingCategory ? "추가 중..." : "추가"}
+              </button>
+            </div>
+
+            {categoryDropdownOpen ? (
+              <div className="absolute left-0 right-0 top-[52px] z-20 max-h-[280px] overflow-y-auto rounded-2xl border border-[#E2E8F0] bg-white p-2 shadow-xl">
+                <div className="px-2 py-2 text-[11px] font-semibold text-[#94A3B8]">
+                  {businessType ? getBusinessTypeLabel(businessType) : "추천"} 카테고리
+                </div>
+                {availableCategorySuggestions.length ? (
+                  <div className="grid gap-1 sm:grid-cols-2">
+                    {availableCategorySuggestions.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => void createCategoryItem(category.name, category)}
+                        disabled={isSavingCategory}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] text-[#1E2A3A] transition-colors hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <span className="flex-1">{category.name}</span>
+                        <span className="text-[10px] text-[#94A3B8]">
+                          {getBusinessTypeLabel(category.domain)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-3 py-4 text-[12px] text-[#94A3B8]">
+                    추천할 카테고리가 더 없습니다. 직접 입력해서 추가할 수 있습니다.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <p className="mt-3 text-[11px] text-[#94A3B8]">
+            선택된 카테고리만 초기 템플릿 생성 또는 재생성 대상에 포함됩니다.
+          </p>
         </div>
 
         <div className="mb-6 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
@@ -814,35 +1434,45 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
           </div>
         </div>
 
-        {canRegenerate ? (
-          <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#0F766E]" />
-              <div className="flex-1">
-                <p className="mb-1 text-[14px] font-semibold text-[#1E2A3A]">
-                  템플릿을 다시 생성할 수 있습니다.
-                </p>
-                <p className="text-[12px] text-[#64748B]">
-                  현재 비즈니스 프로필과 자료를 기준으로 AI 생성 원본 템플릿만 다시 생성합니다.
-                  직접 만든 템플릿과 사용자가 수정한 템플릿은 유지됩니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setRegenerateMode("bulk")}
-                disabled={!canRegenerate}
-                className="inline-flex min-h-[44px] items-center gap-2.5 rounded-xl bg-[#1E2A3A] px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </span>
-                템플릿 재생성
-              </button>
+        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#0F766E]" />
+            <div className="flex-1">
+              <p className="mb-1 text-[14px] font-semibold text-[#1E2A3A]">
+                {hasGeneratedTemplates
+                  ? "템플릿을 다시 생성할 수 있습니다."
+                  : "초기 템플릿 생성을 다시 시작할 수 있습니다."}
+              </p>
+              <p className="text-[12px] text-[#64748B]">
+                {hasGeneratedTemplates
+                  ? "선택된 카테고리에 속한 AI 생성 원본 템플릿만 다시 생성합니다. 직접 만든 템플릿과 사용자가 수정한 템플릿은 유지됩니다."
+                  : "온보딩에서 템플릿 생성을 건너뛰었거나 완료하지 못했다면 선택된 카테고리로 초기 템플릿 생성을 다시 요청할 수 있습니다."}
+              </p>
             </div>
           </div>
-        ) : null}
+
+          {!selectedCategoryIds.length ? (
+            <StateBanner
+              title="카테고리 정보가 필요합니다"
+              description="템플릿 생성과 재생성은 선택된 카테고리를 기준으로 실행됩니다. 위에서 카테고리를 하나 이상 선택해 주세요."
+              tone="warning"
+              className="mb-4"
+            />
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setRegenerateMode(hasGeneratedTemplates ? "bulk" : "initial")}
+              disabled={hasGeneratedTemplates ? !canRegenerate || !selectedCategoryIds.length : !canInitialGenerate}
+              className="inline-flex min-h-[44px] items-center gap-2.5 rounded-xl bg-[#1E2A3A] px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-[#2A3A4E] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20">
+                <Sparkles className="h-3.5 w-3.5" />
+              </span>
+              {hasGeneratedTemplates ? "템플릿 재생성" : "초기 템플릿 생성"}
+            </button>
+          </div>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -940,18 +1570,50 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={Boolean(categoryDeleteTarget)}
+        onOpenChange={(open) => !open && setCategoryDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>카테고리를 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{categoryDeleteTarget?.name}" 카테고리가 비즈니스 프로필에서 제거됩니다.
+              연결된 템플릿과 자동화 설정도 영향을 받을 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSavingCategory}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSavingCategory}
+              onClick={() => {
+                if (categoryDeleteTarget) {
+                  void handleRemoveCategory(categoryDeleteTarget);
+                }
+              }}
+            >
+              {isSavingCategory ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={Boolean(regenerateMode)} onOpenChange={(open) => !open && setRegenerateMode(null)}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>
-              {regenerateMode === "bulk"
-                ? "영향받는 템플릿 일괄 재생성"
-                : "재생성할 템플릿 선택"}
+              {regenerateMode === "initial"
+                ? "초기 템플릿 생성"
+                : regenerateMode === "bulk"
+                  ? "카테고리별 템플릿 재생성"
+                  : "재생성할 템플릿 선택"}
             </DialogTitle>
             <DialogDescription>
-              {regenerateMode === "bulk"
-                ? "AI 생성 원본 템플릿만 교체합니다. 직접 만든 템플릿과 사용자가 수정한 템플릿은 유지됩니다."
-                : "변경된 비즈니스 자료를 반영할 템플릿을 선택하세요."}
+              {regenerateMode === "initial"
+                ? "선택한 비즈니스 카테고리마다 맞춤 템플릿 생성 작업을 등록합니다."
+                : regenerateMode === "bulk"
+                  ? "선택한 카테고리에 속한 AI 생성 원본 템플릿만 재생성합니다."
+                  : "변경된 비즈니스 자료를 반영할 템플릿을 선택하세요."}
             </DialogDescription>
           </DialogHeader>
 
@@ -961,6 +1623,65 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
               description="변경 내용은 유지되지만 재생성 작업을 끝내지 못했습니다. 다시 시도해 주세요."
               tone="error"
             />
+          ) : null}
+
+          {regenerateMode === "initial" ? (
+            <StateBanner
+              title="온보딩 템플릿 생성을 다시 요청합니다"
+              description={`선택된 카테고리 ${selectedCategoryIds.length}개를 기준으로 생성 작업을 등록합니다. 생성된 템플릿은 완료 후 템플릿 라이브러리에서 확인할 수 있습니다.`}
+              tone="info"
+            />
+          ) : null}
+
+          {regenerateMode === "initial" || regenerateMode === "bulk" ? (
+            <div className="space-y-2">
+              {categories.map((category) => {
+                const categoryId = category.categoryId;
+                const selected = categoryId
+                  ? selectedCategoryIds.includes(categoryId)
+                  : false;
+                const templateCount = categoryId
+                  ? templateOptions.filter((template) => template.categoryId === categoryId).length
+                  : 0;
+
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    disabled={!categoryId}
+                    onClick={() => {
+                      if (categoryId) {
+                        toggleSelectedCategory(categoryId);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm transition ${
+                      selected
+                        ? "border-[#2DD4BF] bg-[#2DD4BF]/5 text-[#0F766E]"
+                        : "border-border bg-background text-foreground"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="truncate">{category.name}</span>
+                    </span>
+                    <span className="shrink-0 text-[12px] text-[#94A3B8]">
+                      {regenerateMode === "bulk" ? `템플릿 ${templateCount}개` : selected ? "선택됨" : "선택"}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {regenerateMode === "bulk" && !templatesBySelectedCategories.length ? (
+                <StateBanner
+                  title="선택한 카테고리에 재생성할 템플릿이 없습니다"
+                  description="템플릿이 있는 카테고리를 선택하거나 초기 템플릿 생성을 먼저 진행해 주세요."
+                  tone="warning"
+                />
+              ) : null}
+            </div>
           ) : null}
 
           {regenerateMode === "select" ? (
@@ -984,7 +1705,10 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
                         : "border-border bg-background text-foreground"
                     }`}
                   >
-                    <span>{template.title}</span>
+                    <span className="flex min-w-0 flex-col text-left">
+                      <span className="truncate">{template.title}</span>
+                      <span className="text-[11px] text-[#94A3B8]">{template.categoryName}</span>
+                    </span>
                     <span>{selected ? "선택됨" : "선택"}</span>
                   </button>
                 );
@@ -1002,11 +1726,15 @@ export function BusinessProfile({ scenarioId }: BusinessProfileProps) {
             </button>
             <button
               type="button"
-              disabled={isRegenerating || !canRegenerate}
+              disabled={isRegenerating || !canSubmitTemplateAction}
               className="rounded-xl bg-[#1E2A3A] px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => void handleRegenerateTemplates()}
             >
-              {isRegenerating ? "재생성 요청 중..." : "재생성 시작"}
+              {isRegenerating
+                ? "요청 중..."
+                : regenerateMode === "initial"
+                  ? "생성 시작"
+                  : "재생성 시작"}
             </button>
           </DialogFooter>
         </DialogContent>

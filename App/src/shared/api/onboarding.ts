@@ -24,6 +24,19 @@ type TemplateGenerationJobApiItem = {
   completed_at?: string | null;
 };
 
+export type TemplateGenerationJobSnapshot = {
+  jobId: string;
+  requestId: string | null;
+  jobType: string | null;
+  status: string;
+  progressStep: string | null;
+  progressMessage: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  targetId: string | null;
+  completedAt: string | null;
+};
+
 type TemplateGenerationJobsApiResponse = {
   all_completed: boolean;
   has_failure: boolean;

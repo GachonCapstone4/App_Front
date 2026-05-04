@@ -1026,12 +1026,8 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
     }
   };
 
-  const handleCancelGeneration = async () => {
-    clearGenerationTimeouts();
-    clearGenerationEventSource();
-    setIsGenerating(false);
-    setGenerationStep(0);
-    setTemplateProgress(0);
+  const handleSkipTemplateGeneration = async () => {
+    setTemplateGenerationMessage(null);
     setTemplateGenerationStatus(null);
 
     const completed = await finalizeOnboarding();
@@ -1040,7 +1036,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
       return;
     }
 
-    toast.message("템플릿 생성은 백그라운드에서 계속 진행됩니다. 나중에 템플릿 라이브러리에서 확인해 주세요.");
+    toast.message("템플릿 생성을 건너뛰었습니다. 비즈니스 프로필에서 다시 시작할 수 있습니다.");
     navigate("/app");
   };
 
@@ -2336,10 +2332,19 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                       ) : null}
                       <button
                         onClick={() => void handleNextMainStep()}
+                        disabled={completingOnboarding}
                         className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[14px] bg-[#2DD4BF] text-[#1E2A3A] hover:bg-[#14B8A6] transition-colors"
                       >
                         템플릿 생성 시작
                         <Sparkles className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleSkipTemplateGeneration()}
+                        disabled={completingOnboarding}
+                        className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {completingOnboarding ? "완료 상태 저장 중..." : "취소하고 나중에 설정하기"}
                       </button>
                       <p className="text-[11px] text-[#94A3B8] text-right max-w-[300px]">
                         설정한 카테고리와 비즈니스 자료를 기반으로 AI가 맞춤 템플릿을 자동 생성합니다.
@@ -2503,16 +2508,9 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                 </div>
 
                 <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleCancelGeneration();
-                    }}
-                    disabled={completingOnboarding}
-                    className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
-                  >
-                    {completingOnboarding ? "완료 상태 저장 중..." : "취소하고 나중에 설정하기"}
-                  </button>
+                  <p className="text-[12px] text-[#94A3B8]">
+                    생성 요청이 시작되면 완료될 때까지 상태를 확인합니다
+                  </p>
                 </div>
               </div>
             )}

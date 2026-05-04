@@ -36,6 +36,8 @@ type FaqListApiResponse = {
 type TemplateApiResponse = {
   template_id: number;
   user_template_no?: number | null;
+  category_id?: number | null;
+  category_name?: string | null;
   title: string;
 };
 
@@ -56,6 +58,7 @@ type CategoryListApiResponse = {
 type TemplateRegenerateApiResponse = {
   status: string;
   processing_count: number;
+  job_ids?: string[];
 };
 
 export type BusinessProfileSnapshot = {
@@ -81,6 +84,8 @@ export type FaqSnapshot = {
 export type TemplateSummarySnapshot = {
   templateId: number;
   userTemplateNo: number | null;
+  categoryId: number | null;
+  categoryName: string;
   title: string;
 };
 
@@ -215,6 +220,8 @@ export async function getTemplates() {
   return (response.data.templates ?? []).map((template) => ({
     templateId: template.template_id,
     userTemplateNo: template.user_template_no ?? null,
+    categoryId: template.category_id ?? null,
+    categoryName: template.category_name ?? "카테고리 미지정",
     title: template.title,
   })) satisfies TemplateSummarySnapshot[];
 }
@@ -261,5 +268,6 @@ export async function regenerateBusinessTemplates(payload: {
   return {
     status: response.data.status,
     processingCount: response.data.processing_count,
+    jobIds: response.data.job_ids ?? [],
   };
 }
