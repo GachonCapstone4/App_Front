@@ -96,10 +96,13 @@ jobs:
           name: desktop-${{ matrix.os }}
           path: |
             App/release/*.dmg
+            App/release/*.zip
             App/release/*.exe
             App/release/*.msi
             App/release/*.AppImage
             App/release/*.deb
+            App/release/latest*.yml
+            App/release/*.blockmap
           if-no-files-found: error
           retention-days: 7
 

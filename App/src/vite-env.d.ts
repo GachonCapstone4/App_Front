@@ -10,3 +10,33 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+type EmailAssistUpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "latest"
+  | "error"
+  | "unsupported";
+
+interface EmailAssistUpdateState {
+  status: EmailAssistUpdateStatus;
+  version: string | null;
+  releaseDate: string | null;
+  percent: number | null;
+  error: string | null;
+}
+
+interface Window {
+  readonly emailAssistUpdater?: {
+    getState: () => Promise<EmailAssistUpdateState>;
+    check: () => Promise<EmailAssistUpdateState>;
+    download: () => Promise<EmailAssistUpdateState>;
+    install: () => Promise<EmailAssistUpdateState>;
+    onStatus: (
+      callback: (state: EmailAssistUpdateState) => void,
+    ) => () => void;
+  };
+}
