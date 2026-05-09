@@ -3,6 +3,8 @@ import { Activity, FileSearch, ListChecks, Play, Search } from "lucide-react";
 import {
   executeAdminNetworkDictJob,
   executeAdminOSDictJob,
+  executeAdminDatasetJob,
+  executeAdminSagemakerTrainingJob,
   executeAdminVPNDictJob,
   getAdminOperationJobDetail,
   getAdminOperationJobError,
@@ -63,6 +65,20 @@ const requestButtons = [
     id: "vpn-dict",
     label: "VPN 진단 실행",
     description: "각 서버 노드의 VPN 접속 환경 진단 작업을 실행합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "dataset-job",
+    label: "데이터셋 Job 실행",
+    description: "Kubernetes 데이터셋 생성 Job을 실행합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "sagemaker-training",
+    label: "SageMaker 학습 실행",
+    description: "SageMaker 학습 Job 생성을 요청합니다.",
     icon: Play,
     dangerous: true,
   },
@@ -280,6 +296,18 @@ export function InternalMonitoringPage() {
         data = await executeAdminVPNDictJob();
       }
 
+      if (button.id === "dataset-job") {
+        method = "POST";
+        endpoint = "/api/admin/k8s/jobs/dataset";
+        data = await executeAdminDatasetJob();
+      }
+
+      if (button.id === "sagemaker-training") {
+        method = "POST";
+        endpoint = "/api/admin/sagemakertraining";
+        data = await executeAdminSagemakerTrainingJob();
+      }
+
       appendLog(
         createLogEntry({
           title: button.label,
@@ -371,6 +399,18 @@ export function InternalMonitoringPage() {
                   button.id === "network-dict" ||
                   button.id === "os-dict" ||
                   button.id === "vpn-dict"
+                )
+                .map(renderRequestButton)}
+            </div>
+          </div>
+
+          <div className="admin-request-section">
+            <span className="admin-request-section-label">분류 모델 재학습</span>
+            <div className="admin-internal-monitoring-actions">
+              {requestButtons
+                .filter((button) =>
+                  button.id === "dataset-job" ||
+                  button.id === "sagemaker-training"
                 )
                 .map(renderRequestButton)}
             </div>

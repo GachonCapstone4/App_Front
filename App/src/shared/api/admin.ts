@@ -227,6 +227,11 @@ type AdminKubernetesJobApiResponse = {
   created_at: string;
 };
 
+type AdminSagemakerJobApiResponse = {
+  training_job_arn: string;
+  created_at: string;
+};
+
 export type AdminSupportTicketSummary = {
   ticketId: string;
   userId: string;
@@ -707,6 +712,20 @@ export async function executeAdminOSDictJob() {
 export async function executeAdminVPNDictJob() {
   const response = await adminApi.post<AdminKubernetesJobApiResponse>(
     "/api/admin/k8s/jobs/vpn-dict",
+  );
+  return response.data;
+}
+
+export async function executeAdminDatasetJob() {
+  const response = await adminApi.post<AdminKubernetesJobApiResponse>(
+    "/api/admin/k8s/jobs/dataset",
+  );
+  return response.data;
+}
+
+export async function executeAdminSagemakerTrainingJob() {
+  const response = await adminApi.post<AdminSagemakerJobApiResponse>(
+    "/api/admin/sagemakertraining",
   );
   return response.data;
 }
