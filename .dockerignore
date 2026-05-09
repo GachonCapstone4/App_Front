@@ -2,8 +2,13 @@
 .github
 App/node_modules
 App/dist
+App/release
+App/.vite
+App/coverage
 App/.env.local
 App/.env.*.local
+.DS_Store
+Thumbs.db
 *.log
 npm-debug.log*
 yarn-debug.log*

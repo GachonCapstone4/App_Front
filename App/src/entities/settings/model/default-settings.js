@@ -12,6 +12,7 @@ export const defaultSettingsState = {
     unclassified: false,
     calendarQueue: true,
     dailySummary: false,
+    autoSendFailure: true,
   },
   display: {
     theme: "light",

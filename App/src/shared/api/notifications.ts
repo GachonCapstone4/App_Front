@@ -29,6 +29,7 @@ type NotificationSettingsApiResponse = {
   UNCLASSIFIED_EMAIL?: boolean;
   EVENT_PENDING?: boolean;
   AUTO_SEND_SUMMARY?: boolean;
+  AUTO_SEND_FAILED?: boolean;
 };
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -39,6 +40,7 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   unclassified: true,
   calendarQueue: true,
   dailySummary: true,
+  autoSendFailure: true,
 };
 
 function mapSettingsFromApi(data: NotificationSettingsApiResponse): NotificationSettings {
@@ -56,6 +58,7 @@ function mapSettingsFromApi(data: NotificationSettingsApiResponse): Notification
     unclassified: data.UNCLASSIFIED_EMAIL ?? DEFAULT_NOTIFICATION_SETTINGS.unclassified,
     calendarQueue: data.EVENT_PENDING ?? DEFAULT_NOTIFICATION_SETTINGS.calendarQueue,
     dailySummary: data.AUTO_SEND_SUMMARY ?? DEFAULT_NOTIFICATION_SETTINGS.dailySummary,
+    autoSendFailure: data.AUTO_SEND_FAILED ?? DEFAULT_NOTIFICATION_SETTINGS.autoSendFailure,
   };
 }
 
@@ -68,6 +71,7 @@ function mapSettingsToApi(settings: NotificationSettings): NotificationSettingsA
     UNCLASSIFIED_EMAIL: settings.unclassified,
     EVENT_PENDING: settings.calendarQueue,
     AUTO_SEND_SUMMARY: settings.dailySummary,
+    AUTO_SEND_FAILED: settings.autoSendFailure,
   };
 }
 
@@ -89,11 +93,12 @@ function buildNotificationMeta(type: string) {
   if (
     normalizedType.includes("ERROR") ||
     normalizedType.includes("INTEGRATION") ||
-    normalizedType.includes("ACCOUNT")
+    normalizedType.includes("ACCOUNT") ||
+    normalizedType.includes("FAILED")
   ) {
     return {
-      actionLabel: "설정 확인",
-      actionPath: "/app/settings?tab=email",
+      actionLabel: normalizedType.includes("AUTO_SEND") ? "초안 확인" : "설정 확인",
+      actionPath: normalizedType.includes("AUTO_SEND") ? "/app/inbox" : "/app/settings?tab=email",
       tone: "red" as const,
     };
   }

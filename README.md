@@ -107,6 +107,19 @@ frontend/
 - `npm run test`
 - `npm run lint`
 
+## 데스크톱 응용프로그램 빌드
+
+`App`은 동일한 Vite 빌드를 Electron으로 감싸 데스크톱 응용프로그램으로 배포할 수 있습니다.
+
+- `npm run electron`
+  - 프로덕션 번들을 만든 뒤 Electron으로 실행합니다.
+- `npm run electron:pack`
+  - 설치 파일 없이 로컬 패키징 구조를 검증합니다.
+- `npm run electron:dist`
+  - GitHub Release에 올릴 설치 파일을 생성합니다.
+
+`v*` 형식의 태그를 푸시하면 GitHub Actions가 Windows, macOS, Linux 설치 파일을 빌드하고 GitHub Release에 게시합니다. 별도 Vercel 정적 페이지는 GitHub Releases API의 최신 릴리스를 읽어 다운로드 목록을 자동으로 갱신합니다.
+
 ## 문서와 산출물
 
 - 프론트엔드 상세 설계 참고: [`architect.md`](/home/hojin/Projects/email-assistant/frontend/architect.md)

@@ -190,6 +190,13 @@ export function NotificationSettingsPanel({
           disabled={isLoading || isSaving}
           onToggle={() => toggle("dailySummary")}
         />
+        <ToggleRow
+          label="자동 발송 실패 알림"
+          description="템플릿 항목을 자동으로 채우지 못해 발송이 중단되면 알림을 보냅니다"
+          checked={settings.autoSendFailure}
+          disabled={isLoading || isSaving}
+          onToggle={() => toggle("autoSendFailure")}
+        />
       </div>
       <div className="mt-5 flex justify-end">
         <button

@@ -138,6 +138,7 @@ export interface NotificationSettings {
   unclassified: boolean;
   calendarQueue: boolean;
   dailySummary: boolean;
+  autoSendFailure: boolean;
 }
 
 export interface DisplayWidget {

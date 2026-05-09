@@ -385,7 +385,6 @@ export function DraftPanel({
           </div>
           <div className="mt-3 space-y-2">
             {recommendations.map((recommendation, index) => {
-              const similarityLabel = `${Math.round(recommendation.similarity * 100)}%`;
               const isPrimary =
                 email.selectedRecommendationId === recommendation.draftId ||
                 (
@@ -421,9 +420,6 @@ export function DraftPanel({
                         {recommendation.subject}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[#0F766E] dark:bg-card dark:text-[#5EEAD4]">
-                      {similarityLabel}
-                    </span>
                   </div>
                 </button>
               );

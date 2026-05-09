@@ -68,7 +68,6 @@ interface Template {
   title: string;
   subject: string;
   body: string;
-  confidence: number;
   category: string;
   categoryId: string;
   origin?: "AI_GENERATED" | "USER_CREATED" | null;
@@ -105,7 +104,6 @@ const initialTemplates: Template[] = [
     title: "가격 안내 템플릿",
     subject: "{{문의주제}} 안내드립니다",
     body: "안녕하세요, {{고객명}}님. 문의해 주신 {{문의주제}}에 대해 안내드립니다. {{문의요약}} 내용을 기준으로 확인했습니다...",
-    confidence: 96,
     category: "가격문의",
     categoryId: "price",
     updatedAt: "2시간 전",
@@ -115,7 +113,6 @@ const initialTemplates: Template[] = [
     title: "가격표 및 할인 안내 템플릿",
     subject: "{{문의주제}} 관련 추가 안내",
     body: "안녕하세요, {{고객명}}님. {{수신일자}}에 보내주신 문의를 확인했습니다. {{문의요약}}에 대해 아래와 같이 안내드립니다...",
-    confidence: 92,
     category: "가격문의",
     categoryId: "price",
     updatedAt: "1일 전",
@@ -125,7 +122,6 @@ const initialTemplates: Template[] = [
     title: "불만 접수 1차 응답 템플릿",
     subject: "{{문의주제}} 접수 확인 안내",
     body: "안녕하세요, {{고객명}}님. 보내주신 {{문의주제}} 문의를 접수했습니다. 담당자가 내용을 확인한 뒤 안내드리겠습니다...",
-    confidence: 94,
     category: "불만접수",
     categoryId: "complaint",
     updatedAt: "3시간 전",
@@ -135,7 +131,6 @@ const initialTemplates: Template[] = [
     title: "미팅 일정 확인 템플릿",
     subject: "{{문의주제}} 관련 일정 안내",
     body: "안녕하세요, {{고객명}}님. {{문의요약}} 내용을 확인했습니다. 일정 조율이 필요한 경우 담당자가 추가로 안내드리겠습니다...",
-    confidence: 89,
     category: "미팅요청",
     categoryId: "meeting",
     updatedAt: "5시간 전",
@@ -145,7 +140,6 @@ const initialTemplates: Template[] = [
     title: "기술 지원 접수 템플릿",
     subject: "{{문의주제}} 요청 접수 완료",
     body: "안녕하세요, {{고객명}}님. {{수신일자}}에 보내주신 {{문의주제}} 요청이 정상적으로 접수되었습니다...",
-    confidence: 91,
     category: "기술지원",
     categoryId: "tech",
     updatedAt: "1일 전",
@@ -155,7 +149,6 @@ const initialTemplates: Template[] = [
     title: "계약 검토 안내 템플릿",
     subject: "계약 조건 검토 결과 안내",
     body: "안녕하세요, {{고객명}}님. 문의해 주신 {{문의주제}} 내용을 검토했습니다. {{문의요약}}에 대해 아래와 같이 안내드립니다...",
-    confidence: 87,
     category: "계약문의",
     categoryId: "contract",
     updatedAt: "2일 전",
@@ -165,7 +158,6 @@ const initialTemplates: Template[] = [
     title: "배송 현황 안내 템플릿",
     subject: "{{문의주제}} 처리 현황 안내",
     body: "안녕하세요, {{고객명}}님. {{문의주제}} 관련 처리 현황을 안내드립니다. 추가 확인이 필요한 내용은 담당자가 이어서 안내드리겠습니다...",
-    confidence: 93,
     category: "배송문의",
     categoryId: "shipping",
     updatedAt: "4시간 전",
@@ -175,7 +167,6 @@ const initialTemplates: Template[] = [
     title: "환불 완료 안내 템플릿",
     subject: "환불 처리 완료 안내",
     body: "안녕하세요, {{고객명}}님. 보내주신 {{문의주제}} 문의를 확인했습니다. 처리 결과와 후속 안내를 아래에 정리했습니다...",
-    confidence: 95,
     category: "환불요청",
     categoryId: "refund",
     updatedAt: "6시간 전",
@@ -220,7 +211,6 @@ function mapTemplateSnapshot(snapshot: TemplateSnapshot): Template {
     title: snapshot.title,
     subject: snapshot.subjectTemplate,
     body: snapshot.bodyTemplate,
-    confidence: snapshot.accuracyScore ? Number(snapshot.accuracyScore) : 0,
     category: snapshot.categoryName,
     categoryId: String(snapshot.categoryId),
     origin: snapshot.origin,
@@ -322,7 +312,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [minimumConfidence, setMinimumConfidence] = useState(0);
   const [recentOnly, setRecentOnly] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -438,7 +427,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
 
     setSearchQuery("없는 템플릿");
     setActiveCategory("all");
-    setMinimumConfidence(0);
     setRecentOnly(false);
     setPreviewTemplate(null);
   }, [emptyScenario, useDemoDataMode]);
@@ -538,12 +526,11 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
           template.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
           template.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
           template.category.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchedConfidence = template.confidence >= minimumConfidence;
         const matchedRecency = !recentOnly || isRecentlyUpdatedLabel(template.updatedAt);
 
-        return matchedCategory && matchedSearch && matchedConfidence && matchedRecency;
+        return matchedCategory && matchedSearch && matchedRecency;
       }),
-    [activeCategory, minimumConfidence, recentOnly, searchQuery, templates],
+    [activeCategory, recentOnly, searchQuery, templates],
   );
 
   const showEmpty = !isLoading && !loadError && filteredTemplates.length === 0;
@@ -551,19 +538,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
     categoryOptions.find((category) => category.id === draft.categoryId)?.name ||
     "카테고리를 선택하세요";
   const isCategoryLocked = Boolean(editingTemplateId) && !useDemoDataMode;
-
-  const getConfidenceColor = (score: number) => {
-    if (score >= 95) {
-      return "bg-[#10B981]/10 text-[#10B981] dark:bg-[#102317] dark:text-[#86EFAC]";
-    }
-    if (score >= 90) {
-      return "bg-[#2DD4BF]/10 text-[#0D9488] dark:bg-[#0B2728] dark:text-[#5EEAD4]";
-    }
-    if (score >= 85) {
-      return "bg-[#F59E0B]/10 text-[#D97706] dark:bg-[#24190F] dark:text-[#F4C98A]";
-    }
-    return "bg-[#94A3B8]/10 text-[#64748B] dark:bg-[#1E293B] dark:text-[#CBD5E1]";
-  };
 
   const openCreateDialog = (template?: Template) => {
     setEditingTemplateId(template?.id || null);
@@ -620,8 +594,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
             body: draft.body.trim(),
             category: selectedCategory.name,
             categoryId: selectedCategory.id,
-            confidence:
-              templates.find((template) => template.id === editingTemplateId)?.confidence || 90,
             updatedAt: "방금 전",
           } satisfies Template;
 
@@ -642,7 +614,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
             body: draft.body.trim(),
             category: selectedCategory.name,
             categoryId: selectedCategory.id,
-            confidence: 90,
             updatedAt: "방금 전",
           };
           setTemplates((current) => [newTemplate, ...current]);
@@ -872,25 +843,6 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
                 </button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-4 p-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">정확도 기준</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {[0, 85, 90, 95].map((score) => (
-                      <button
-                        key={score}
-                        type="button"
-                        onClick={() => setMinimumConfidence(score)}
-                        className={`rounded-full px-3 py-1 text-xs transition ${
-                          minimumConfidence === score
-                            ? "app-cta-primary"
-                            : "bg-[#F1F5F9] text-[#64748B] dark:bg-[#1E293B] dark:text-muted-foreground"
-                        }`}
-                      >
-                        {score === 0 ? "전체" : `${score}% 이상`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <button
                   type="button"
                   onClick={() => setRecentOnly((current) => !current)}
@@ -1021,14 +973,7 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
                     {template.body}
                   </p>
 
-                  <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3 dark:border-border">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${getConfidenceColor(
-                        template.confidence,
-                      )}`}
-                    >
-                      {template.confidence}% 정확도
-                    </span>
+                  <div className="flex items-center justify-end border-t border-[#F1F5F9] pt-3 dark:border-border">
                     <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <button
                         type="button"
@@ -1071,7 +1016,7 @@ export function TemplateLibrary({ scenarioId }: TemplateLibraryProps) {
           <DialogHeader>
             <DialogTitle>{previewTemplate?.title}</DialogTitle>
             <DialogDescription>
-              ID {previewTemplate?.userTemplateNo ?? previewTemplate?.id} · {previewTemplate?.category} · {previewTemplate?.confidence}% 정확도
+              ID {previewTemplate?.userTemplateNo ?? previewTemplate?.id} · {previewTemplate?.category}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
