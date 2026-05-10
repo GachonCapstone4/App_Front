@@ -3,7 +3,11 @@
   "private": true,
   "version": "0.2.0",
   "description": "EmailAssist desktop client",
-  "author": "GachonCapstone4",
+  "author": {
+    "name": "GachonCapstone4",
+    "email": "ghwls0622@gmail.com"
+  },
+  "homepage": "https://github.com/GachonCapstone4/App_Front",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -122,13 +126,6 @@
     "win": {
       "target": [
         "nsis"
-      ]
-    },
-    "linux": {
-      "category": "Office",
-      "target": [
-        "AppImage",
-        "deb"
       ]
     },
     "publish": [

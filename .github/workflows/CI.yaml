@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
 
     defaults:
       run:
@@ -99,8 +99,6 @@ jobs:
             App/release/*.zip
             App/release/*.exe
             App/release/*.msi
-            App/release/*.AppImage
-            App/release/*.deb
             App/release/latest*.yml
             App/release/*.blockmap
           if-no-files-found: error
