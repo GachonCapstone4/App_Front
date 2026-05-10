@@ -63,9 +63,12 @@ import {
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
   type GoogleOAuthPopupMessage,
+  isDesktopGoogleOAuthFlow,
   navigateGoogleOAuthPopup,
+  openGoogleOAuthInSystemBrowser,
   openGoogleOAuthPopup,
   parseStoredGoogleOAuthResult,
+  storeGoogleOAuthReturnPath,
 } from "../../shared/lib/google-oauth-popup";
 import { formatKstDateTime } from "../../shared/lib/date-time";
 import {
@@ -515,7 +518,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         return;
       }
 
-      if (event.data?.type !== "emailassist-google-oauth") {
+      if (event.data?.type !== "maily-google-oauth") {
         return;
       }
 
@@ -1117,6 +1120,15 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
     setConnectingCalendar(true);
 
     try {
+      storeGoogleOAuthReturnPath("/app/automation");
+
+      if (isDesktopGoogleOAuthFlow()) {
+        const authorizationUrl = await getGoogleAuthorizationUrl();
+        await openGoogleOAuthInSystemBrowser(authorizationUrl);
+        toast("브라우저에서 Google 권한 동의를 마치면 앱으로 자동 복귀합니다.");
+        return;
+      }
+
       const popup = openGoogleOAuthPopup();
 
       if (!popup) {

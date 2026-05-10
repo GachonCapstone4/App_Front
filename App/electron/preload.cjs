@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("emailAssistUpdater", {
+contextBridge.exposeInMainWorld("mailyUpdater", {
   getState: () => ipcRenderer.invoke("updater:get-state"),
   check: () => ipcRenderer.invoke("updater:check"),
   download: () => ipcRenderer.invoke("updater:download"),
@@ -16,4 +16,8 @@ contextBridge.exposeInMainWorld("emailAssistUpdater", {
       ipcRenderer.removeListener("updater:status", listener);
     };
   },
+});
+
+contextBridge.exposeInMainWorld("mailyShell", {
+  openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
 });

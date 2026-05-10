@@ -14,6 +14,7 @@ type ApiClientOptions = {
 
 const DEFAULT_NETWORK_ERROR_MESSAGE =
   "서버와의 연결이 원활하지 않습니다. 잠시 후 다시 시도해주세요.";
+const DESKTOP_RENDERER_PROTOCOL = "maily:";
 
 export class ApiError extends Error {
   status?: number;
@@ -27,9 +28,21 @@ export class ApiError extends Error {
   }
 }
 
+export function isDesktopRendererProtocol() {
+  return typeof window !== "undefined" && window.location.protocol === DESKTOP_RENDERER_PROTOCOL;
+}
+
+function normalizeBaseUrl(baseUrl: string) {
+  return baseUrl.replace(/\/$/, "");
+}
+
 function resolveBaseUrl() {
+  if (isDesktopRendererProtocol()) {
+    return "/";
+  }
+
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-  return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl : "/";
+  return envBaseUrl && envBaseUrl.length > 0 ? normalizeBaseUrl(envBaseUrl) : "/";
 }
 
 export function getApiBaseUrl() {

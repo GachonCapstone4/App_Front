@@ -29,8 +29,8 @@ export function ProfileMenu({
   useEffect(() => {
     const syncSession = () => setSession(getAppSession());
 
-    window.addEventListener("emailassist-session-updated", syncSession);
-    return () => window.removeEventListener("emailassist-session-updated", syncSession);
+    window.addEventListener("maily-session-updated", syncSession);
+    return () => window.removeEventListener("maily-session-updated", syncSession);
   }, []);
 
   return (

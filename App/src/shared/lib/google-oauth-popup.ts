@@ -1,11 +1,13 @@
-const GOOGLE_OAUTH_POPUP_NAME = "emailassist-google-oauth";
-export const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
-export const GOOGLE_OAUTH_POPUP_MARKER_KEY = "emailassist-google-oauth-popup";
+const GOOGLE_OAUTH_POPUP_NAME = "maily-google-oauth";
+export const GOOGLE_OAUTH_STORAGE_KEY = "maily-google-oauth-result";
+export const GOOGLE_OAUTH_POPUP_MARKER_KEY = "maily-google-oauth-popup";
+export const GOOGLE_OAUTH_RETURN_PATH_KEY = "maily-google-oauth-return-path";
+export const GOOGLE_OAUTH_DESKTOP_ORIGIN = "maily://app";
 const GOOGLE_OAUTH_POPUP_WIDTH = 640;
 const GOOGLE_OAUTH_POPUP_HEIGHT = 820;
 
 export type GoogleOAuthPopupMessage = {
-  type: "emailassist-google-oauth";
+  type: "maily-google-oauth";
   result: string;
   message?: string;
   gmailConnected?: string;
@@ -24,12 +26,12 @@ export function parseStoredGoogleOAuthResult(value: string | null): GoogleOAuthP
   try {
     const parsed = JSON.parse(value) as Partial<GoogleOAuthPopupMessage>;
 
-    if (parsed.type !== "emailassist-google-oauth" || typeof parsed.result !== "string") {
+    if (parsed.type !== "maily-google-oauth" || typeof parsed.result !== "string") {
       return null;
     }
 
     return {
-      type: "emailassist-google-oauth",
+      type: "maily-google-oauth",
       result: parsed.result,
       message: typeof parsed.message === "string" ? parsed.message : "",
       gmailConnected:
@@ -56,6 +58,45 @@ export function consumeStoredGoogleOAuthResult() {
   }
 
   return payload;
+}
+
+function isAllowedGoogleOAuthReturnPath(value: string) {
+  return (
+    value === "/onboarding" ||
+    value === "/app/automation" ||
+    value === "/app/settings?tab=email"
+  );
+}
+
+export function storeGoogleOAuthReturnPath(path: string) {
+  if (!isAllowedGoogleOAuthReturnPath(path)) {
+    return;
+  }
+
+  window.localStorage.setItem(GOOGLE_OAUTH_RETURN_PATH_KEY, path);
+}
+
+export function consumeGoogleOAuthReturnPath() {
+  const returnPath = window.localStorage.getItem(GOOGLE_OAUTH_RETURN_PATH_KEY);
+  window.localStorage.removeItem(GOOGLE_OAUTH_RETURN_PATH_KEY);
+
+  if (!returnPath || !isAllowedGoogleOAuthReturnPath(returnPath)) {
+    return null;
+  }
+
+  return returnPath;
+}
+
+export function isDesktopGoogleOAuthFlow() {
+  return typeof window !== "undefined" && window.location.protocol === "maily:";
+}
+
+export function getGoogleOAuthFrontendOrigin() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return isDesktopGoogleOAuthFlow() ? GOOGLE_OAUTH_DESKTOP_ORIGIN : window.location.origin;
 }
 
 function buildGoogleOAuthPopupFeatures() {
@@ -99,6 +140,15 @@ export function openGoogleOAuthPopup() {
 export function navigateGoogleOAuthPopup(popup: Window, authorizationUrl: string) {
   popup.location.href = authorizationUrl;
   popup.focus();
+}
+
+export async function openGoogleOAuthInSystemBrowser(authorizationUrl: string) {
+  if (!window.mailyShell) {
+    window.location.href = authorizationUrl;
+    return;
+  }
+
+  await window.mailyShell.openExternal(authorizationUrl);
 }
 
 export function isGoogleOAuthPopupWindow() {

@@ -125,7 +125,7 @@ interface BusinessCategoryItem {
   color: string;
 }
 
-const TEMPLATE_JOB_PROGRESS_STORAGE_KEY = "emailassist-template-job-progress";
+const TEMPLATE_JOB_PROGRESS_STORAGE_KEY = "maily-template-job-progress";
 
 const demoUploadedFiles: UploadedFile[] = [
   { id: "1", name: "비즈니스_매뉴얼.pdf", uploadDate: "2025.01.15" },

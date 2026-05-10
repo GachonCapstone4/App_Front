@@ -1,4 +1,5 @@
 import { api } from "./http";
+import { getGoogleOAuthFrontendOrigin } from "../lib/google-oauth-popup";
 
 type TokenLoginApiResponse = {
   access_token: string;
@@ -19,12 +20,14 @@ type UserProfileApiResponse = {
 };
 
 function getFrontendOriginParams() {
-  if (typeof window === "undefined") {
+  const frontendOrigin = getGoogleOAuthFrontendOrigin();
+
+  if (!frontendOrigin) {
     return undefined;
   }
 
   return {
-    frontend_origin: window.location.origin,
+    frontend_origin: frontendOrigin,
   };
 }
 

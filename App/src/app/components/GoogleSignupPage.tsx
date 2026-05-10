@@ -18,7 +18,7 @@ const footerItems = [
   },
   {
     icon: Lock,
-    text: "비밀번호는 EmailAssist 로그인용으로만 설정됩니다",
+    text: "비밀번호는 Maily 로그인용으로만 설정됩니다",
   },
 ];
 

@@ -1,8 +1,8 @@
 {
-  "name": "emailassist-app",
+  "name": "maily-app",
   "private": true,
   "version": "0.2.0",
-  "description": "EmailAssist desktop client",
+  "description": "Maily desktop client",
   "author": {
     "name": "GachonCapstone4",
     "email": "ghwls0622@gmail.com"
@@ -102,12 +102,20 @@
     "vitest": "^3.0.5"
   },
   "build": {
-    "appId": "click.studylink.emailassist",
-    "productName": "EmailAssist",
+    "appId": "click.studylink.maily",
+    "productName": "Maily",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
+    "protocols": [
+      {
+        "name": "Maily",
+        "schemes": [
+          "maily"
+        ]
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",

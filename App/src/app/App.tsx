@@ -12,13 +12,13 @@ import { isDemoModeEnabled } from "../shared/scenarios/demo-mode";
 import { Toaster } from "./components/ui/sonner";
 import { router } from "./router";
 
-const UPDATE_TOAST_ID = "emailassist-update";
+const UPDATE_TOAST_ID = "maily-update";
 
 function AppUpdateNotifier() {
   const downloadingRef = useRef(false);
 
   useEffect(() => {
-    const updater = window.emailAssistUpdater;
+    const updater = window.mailyUpdater;
 
     if (!updater) {
       return;
@@ -26,10 +26,10 @@ function AppUpdateNotifier() {
 
     const updaterApi = updater;
 
-    function handleUpdateState(state: EmailAssistUpdateState) {
+    function handleUpdateState(state: MailyUpdateState) {
       if (state.status === "available") {
         downloadingRef.current = false;
-        toast.info("새 버전의 EmailAssist가 준비되었습니다.", {
+        toast.info("새 버전의 Maily가 준비되었습니다.", {
           id: UPDATE_TOAST_ID,
           description: state.version
             ? `버전 ${state.version}을 설치할 수 있습니다.`
@@ -123,7 +123,7 @@ function SessionBootstrap({ children }: { children: ReactNode }) {
       if (adminPath) {
         createAuthenticatedSession({
           name: "데모 관리자",
-          email: "admin@emailassist.demo",
+          email: "admin@maily.demo",
           role: "ADMIN",
           onboardingCompleted: true,
           connectedEmail: "",
@@ -136,7 +136,7 @@ function SessionBootstrap({ children }: { children: ReactNode }) {
       if (onboardingPath || appPath) {
         createAuthenticatedSession({
           name: "데모 사용자",
-          email: "demo@emailassist.demo",
+          email: "demo@maily.demo",
           role: "USER",
           onboardingCompleted: appPath,
           connectedEmail: "demo@gmail.com",
@@ -167,7 +167,7 @@ export default function App() {
       defaultTheme={defaultSettingsState.display.theme}
       disableTransitionOnChange
       enableSystem={false}
-      storageKey="emailassist-theme"
+      storageKey="maily-theme"
     >
       <SessionBootstrap>
         <RouterProvider router={router} />

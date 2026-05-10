@@ -25,8 +25,8 @@ export function AdminShell() {
   useEffect(() => {
     const syncSession = () => setSession(getAppSession());
 
-    window.addEventListener("emailassist-session-updated", syncSession);
-    return () => window.removeEventListener("emailassist-session-updated", syncSession);
+    window.addEventListener("maily-session-updated", syncSession);
+    return () => window.removeEventListener("maily-session-updated", syncSession);
   }, []);
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export function AdminShell() {
         <div className="admin-logo-wrap">
           <div className="admin-logo-mark">EA</div>
           <div>
-            <p className="admin-logo-title">EmailAssist Admin</p>
+            <p className="admin-logo-title">Maily Admin</p>
             <p className="admin-logo-sub">운영 콘솔</p>
           </div>
         </div>

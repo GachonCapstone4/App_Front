@@ -1,4 +1,5 @@
 import { ApiError, api } from "./http";
+import { getGoogleOAuthFrontendOrigin } from "../lib/google-oauth-popup";
 
 type IntegrationApiResponse = {
   provider: string;
@@ -14,12 +15,14 @@ type AuthorizationUrlApiResponse = {
 };
 
 function getFrontendOriginParams() {
-  if (typeof window === "undefined") {
+  const frontendOrigin = getGoogleOAuthFrontendOrigin();
+
+  if (!frontendOrigin) {
     return undefined;
   }
 
   return {
-    frontend_origin: window.location.origin,
+    frontend_origin: frontendOrigin,
   };
 }
 

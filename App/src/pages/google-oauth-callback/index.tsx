@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from "react-router";
 import { refreshStoredSession } from "../../shared/api/session";
 import { setAccessToken } from "../../shared/lib/app-session";
 import {
+  consumeGoogleOAuthReturnPath,
+  GOOGLE_OAUTH_STORAGE_KEY,
   GOOGLE_OAUTH_POPUP_MARKER_KEY,
   isGoogleOAuthPopupWindow,
 } from "../../shared/lib/google-oauth-popup";
 
 type GoogleOAuthPopupMessage = {
-  type: "emailassist-google-oauth";
+  type: "maily-google-oauth";
   result: string;
   message: string;
   gmailConnected: string;
@@ -19,7 +21,6 @@ type GoogleOAuthPopupMessage = {
   token: string;
 };
 
-const GOOGLE_OAUTH_STORAGE_KEY = "emailassist-google-oauth-result";
 export function GoogleOAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export function GoogleOAuthCallbackPage() {
 
   useEffect(() => {
     const payload: GoogleOAuthPopupMessage = {
-      type: "emailassist-google-oauth",
+      type: "maily-google-oauth",
       result,
       message,
       gmailConnected,
@@ -80,6 +81,14 @@ export function GoogleOAuthCallbackPage() {
     }
 
     const timer = window.setTimeout(() => {
+      const returnPath = consumeGoogleOAuthReturnPath();
+
+      if (returnPath && result !== "pending_registration" && result !== "auto_login") {
+        window.localStorage.setItem(GOOGLE_OAUTH_STORAGE_KEY, JSON.stringify(payload));
+        navigate(returnPath, { replace: true });
+        return;
+      }
+
       if (result === "pending_registration") {
         const nextSearchParams = new URLSearchParams();
         nextSearchParams.set("temp_token", tempToken);
@@ -111,19 +120,8 @@ export function GoogleOAuthCallbackPage() {
         return;
       }
 
-      const nextSearchParams = new URLSearchParams();
-      nextSearchParams.set("tab", "email");
-      nextSearchParams.set("google_oauth", result);
-      nextSearchParams.set("gmail_connected", gmailConnected);
-      nextSearchParams.set("calendar_connected", calendarConnected);
-
-      if (message) {
-        nextSearchParams.set("message", message);
-      }
-
-      navigate(`/app/settings?${nextSearchParams.toString()}`, {
-        replace: true,
-      });
+      window.localStorage.setItem(GOOGLE_OAUTH_STORAGE_KEY, JSON.stringify(payload));
+      navigate("/app/settings?tab=email", { replace: true });
     }, 1200);
 
     return () => {

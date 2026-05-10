@@ -1,11 +1,15 @@
-import { ApiError, createApiClient, getApiBaseUrl } from "./http";
+import { ApiError, createApiClient, getApiBaseUrl, isDesktopRendererProtocol } from "./http";
 
 function resolveAdminApiBaseUrl() {
+  if (isDesktopRendererProtocol()) {
+    return "/";
+  }
+
   const envBaseUrl = import.meta.env.VITE_ADMIN_API_BASE_URL?.trim();
-  return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl : getApiBaseUrl();
+  return envBaseUrl && envBaseUrl.length > 0 ? envBaseUrl.replace(/\/$/, "") : getApiBaseUrl();
 }
 
-export const ADMIN_NETWORK_ERROR_EVENT = "emailassist-admin-network-error";
+export const ADMIN_NETWORK_ERROR_EVENT = "maily-admin-network-error";
 
 const adminApi = createApiClient(resolveAdminApiBaseUrl(), {
   networkErrorMessage:

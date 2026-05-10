@@ -7,6 +7,12 @@ const { pathToFileURL } = require("node:url");
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 const rendererRoot = path.join(__dirname, "../dist");
 const preloadPath = path.join(__dirname, "preload.cjs");
+const appApiBaseUrl = "https://capstone.studylink.click";
+const adminApiBaseUrl = "https://admin.studylink.click";
+const appProtocol = "maily";
+const appProtocolHost = "app";
+let mainWindow = null;
+let pendingDeepLinkUrl = null;
 let updateState = {
   status: "idle",
   version: null,
@@ -17,7 +23,7 @@ let updateState = {
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: "emailassist",
+    scheme: appProtocol,
     privileges: {
       standard: true,
       secure: true,
@@ -27,9 +33,109 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+function registerDeepLinkProtocolClient() {
+  if (app.isPackaged) {
+    app.setAsDefaultProtocolClient(appProtocol);
+    return;
+  }
+
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(appProtocol, process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+    return;
+  }
+
+  app.setAsDefaultProtocolClient(appProtocol);
+}
+
+function resolveUpstreamBaseUrl(pathname) {
+  if (pathname === "/sse" || pathname.startsWith("/sse/")) {
+    return appApiBaseUrl;
+  }
+
+  if (pathname === "/api/admin" || pathname.startsWith("/api/admin/")) {
+    return adminApiBaseUrl;
+  }
+
+  if (pathname === "/api" || pathname.startsWith("/api/")) {
+    return appApiBaseUrl;
+  }
+
+  return null;
+}
+
+async function proxyApiRequest(request, upstreamBaseUrl) {
+  const requestUrl = new URL(request.url);
+  const upstreamUrl = new URL(`${requestUrl.pathname}${requestUrl.search}`, upstreamBaseUrl);
+  const headers = new Headers(request.headers);
+  const method = request.method.toUpperCase();
+  let body;
+
+  for (const headerName of ["content-length", "host", "origin", "referer"]) {
+    headers.delete(headerName);
+  }
+
+  if (method !== "GET" && method !== "HEAD") {
+    body = Buffer.from(await request.arrayBuffer());
+  }
+
+  try {
+    return await net.fetch(upstreamUrl.toString(), {
+      method,
+      headers,
+      body,
+    });
+  } catch (error) {
+    console.error("API proxy request failed", error);
+    return new Response("Upstream request failed", { status: 502 });
+  }
+}
+
+function normalizeDeepLinkUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+
+    if (parsedUrl.protocol !== `${appProtocol}:` || parsedUrl.hostname !== appProtocolHost) {
+      return null;
+    }
+
+    return `${appProtocol}://${appProtocolHost}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function handleDeepLink(url) {
+  const normalizedUrl = normalizeDeepLinkUrl(url);
+
+  if (!normalizedUrl) {
+    return;
+  }
+
+  if (!mainWindow) {
+    pendingDeepLinkUrl = normalizedUrl;
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+  void mainWindow.loadURL(normalizedUrl);
+}
+
 function registerRendererProtocol() {
-  protocol.handle("emailassist", (request) => {
+  protocol.handle("maily", (request) => {
     const requestUrl = new URL(request.url);
+    const upstreamBaseUrl = resolveUpstreamBaseUrl(requestUrl.pathname);
+
+    if (upstreamBaseUrl) {
+      return proxyApiRequest(request, upstreamBaseUrl);
+    }
+
     const requestedPath =
       requestUrl.pathname === "/"
         ? "index.html"
@@ -159,15 +265,26 @@ function registerAutoUpdater() {
 
     return updateState;
   });
+
+  ipcMain.handle("shell:open-external", async (_event, url) => {
+    const parsedUrl = new URL(url);
+
+    if (parsedUrl.protocol !== "https:") {
+      throw new Error("Only HTTPS URLs can be opened externally.");
+    }
+
+    await shell.openExternal(parsedUrl.toString());
+    return true;
+  });
 }
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
     minWidth: 1080,
     minHeight: 720,
-    title: "EmailAssist",
+    title: "Maily",
     backgroundColor: "#f5f5f7",
     autoHideMenuBar: true,
     webPreferences: {
@@ -186,7 +303,7 @@ function createWindow() {
   if (isDev) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    void mainWindow.loadURL("emailassist://app/");
+    void mainWindow.loadURL("maily://app/");
   }
 
   mainWindow.webContents.once("did-finish-load", () => {
@@ -196,19 +313,52 @@ function createWindow() {
       }, 2200);
     }
   });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+
+  if (pendingDeepLinkUrl) {
+    const url = pendingDeepLinkUrl;
+    pendingDeepLinkUrl = null;
+    void mainWindow.loadURL(url);
+  }
 }
 
-app.whenReady().then(() => {
-  registerRendererProtocol();
-  registerAutoUpdater();
-  createWindow();
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  registerDeepLinkProtocolClient();
+
+  app.on("second-instance", (_event, commandLine) => {
+    const deepLinkUrl = commandLine.find((value) =>
+      value.startsWith(`${appProtocol}://`),
+    );
+
+    if (deepLinkUrl) {
+      handleDeepLink(deepLinkUrl);
     }
   });
-});
+
+  app.on("open-url", (event, url) => {
+    event.preventDefault();
+    handleDeepLink(url);
+  });
+
+  app.whenReady().then(() => {
+    registerRendererProtocol();
+    registerAutoUpdater();
+    createWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

@@ -29,7 +29,9 @@ import {
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
   type GoogleOAuthPopupMessage,
+  isDesktopGoogleOAuthFlow,
   navigateGoogleOAuthPopup,
+  openGoogleOAuthInSystemBrowser,
   openGoogleOAuthPopup,
   parseStoredGoogleOAuthResult,
 } from "../../shared/lib/google-oauth-popup";
@@ -65,12 +67,12 @@ const leftPanelContent: Record<
       </>
     ),
     subtitle:
-      "EmailAssist AI Agent는\n이메일 분류, 답변 초안 생성, 일정을 자동으로 처리\n반복되는 업무 이메일 처리를 한 흐름으로 정리합니다",
+      "Maily AI Agent는\n이메일 분류, 답변 초안 생성, 일정을 자동으로 처리\n반복되는 업무 이메일 처리를 한 흐름으로 정리합니다",
   },
   signup: {
     title: "Google 계정으로\n안전하게 시작하세요",
     subtitle:
-      "먼저 Gmail 소유권을 확인하고\n인증된 계정으로 EmailAssist 회원가입을 완료합니다",
+      "먼저 Gmail 소유권을 확인하고\n인증된 계정으로 Maily 회원가입을 완료합니다",
   },
   reset: {
     title: "비밀번호를 다시 만들고\n바로 복귀하세요",
@@ -233,7 +235,7 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         return;
       }
 
-      if (event.data?.type !== "emailassist-google-oauth") {
+      if (event.data?.type !== "maily-google-oauth") {
         return;
       }
 
@@ -520,20 +522,27 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
         toast.success("데모 Google 회원가입이 완료되었습니다. 온보딩으로 이동합니다.");
         navigate("/onboarding");
         return;
-      } else {
-        const popup = openGoogleOAuthPopup();
-
-        if (!popup) {
-          toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
-          return;
-        }
-
-        popupWindowRef.current = popup;
-        startPopupClosePolling();
-        const authorizationUrl = await getGoogleSignupAuthorizationUrl();
-        navigateGoogleOAuthPopup(popup, authorizationUrl);
-        toast("Google 인증을 마치면 이 화면에서 회원가입을 이어갑니다.");
       }
+
+      if (isDesktopGoogleOAuthFlow()) {
+        const authorizationUrl = await getGoogleSignupAuthorizationUrl();
+        await openGoogleOAuthInSystemBrowser(authorizationUrl);
+        toast("브라우저에서 Google 인증을 마치면 앱으로 자동 복귀합니다.");
+        return;
+      }
+
+      const popup = openGoogleOAuthPopup();
+
+      if (!popup) {
+        toast.error("브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+        return;
+      }
+
+      popupWindowRef.current = popup;
+      startPopupClosePolling();
+      const authorizationUrl = await getGoogleSignupAuthorizationUrl();
+      navigateGoogleOAuthPopup(popup, authorizationUrl);
+      toast("Google 인증을 마치면 이 화면에서 회원가입을 이어갑니다.");
     } catch (error) {
       clearPopupClosePolling();
       closeGoogleOAuthPopup(popupWindowRef.current);

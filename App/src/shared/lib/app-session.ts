@@ -12,8 +12,8 @@ export type AppSession = {
 
 export const ADMIN_VPN_CIDR = "192.168.0.0/24";
 
-const SESSION_STORAGE_KEY = "emailassist-app-session";
-const ACCESS_TOKEN_STORAGE_KEY = "emailassist-access-token";
+const SESSION_STORAGE_KEY = "maily-app-session";
+const ACCESS_TOKEN_STORAGE_KEY = "maily-access-token";
 
 const defaultSession: AppSession = {
   authenticated: false,
@@ -34,7 +34,7 @@ function notifySessionChange() {
     return;
   }
 
-  window.dispatchEvent(new Event("emailassist-session-updated"));
+  window.dispatchEvent(new Event("maily-session-updated"));
 }
 
 function normalizeConnectedEmails(connectedEmail: string, connectedEmails: string[]) {

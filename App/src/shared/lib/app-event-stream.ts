@@ -87,6 +87,10 @@ const listeners: {
 
 let eventSource: EventSource | null = null;
 
+function isDesktopRendererProtocol() {
+  return typeof window !== "undefined" && window.location.protocol === "maily:";
+}
+
 function hasActiveListeners() {
   return Object.values(listeners).some((listenerSet) => listenerSet.size > 0);
 }
@@ -97,6 +101,10 @@ function closeEventSource() {
 }
 
 function getSseBaseUrl() {
+  if (isDesktopRendererProtocol()) {
+    return "";
+  }
+
   const envBaseUrl = import.meta.env.VITE_SSE_BASE_URL?.trim();
 
   if (envBaseUrl && envBaseUrl.length > 0) {

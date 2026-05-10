@@ -15,9 +15,12 @@ import {
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
   type GoogleOAuthPopupMessage,
+  isDesktopGoogleOAuthFlow,
   navigateGoogleOAuthPopup,
+  openGoogleOAuthInSystemBrowser,
   openGoogleOAuthPopup,
   parseStoredGoogleOAuthResult,
+  storeGoogleOAuthReturnPath,
 } from "../../../shared/lib/google-oauth-popup";
 import { setConnectedEmails } from "../../../shared/lib/app-session";
 import { SectionCard } from "../../../shared/ui/primitives/SectionCard";
@@ -199,7 +202,7 @@ export function EmailIntegrationSettingsPanel({
         return;
       }
 
-      if (event.data?.type !== "emailassist-google-oauth") {
+      if (event.data?.type !== "maily-google-oauth") {
         return;
       }
 
@@ -306,6 +309,15 @@ export function EmailIntegrationSettingsPanel({
     }
 
     try {
+      storeGoogleOAuthReturnPath("/app/settings?tab=email");
+
+      if (isDesktopGoogleOAuthFlow()) {
+        const authorizationUrl = await getGoogleAuthorizationUrl();
+        await openGoogleOAuthInSystemBrowser(authorizationUrl);
+        toast("브라우저에서 Google 인증을 마치면 앱으로 자동 복귀합니다.");
+        return;
+      }
+
       const popup = openGoogleOAuthPopup();
 
       if (!popup) {

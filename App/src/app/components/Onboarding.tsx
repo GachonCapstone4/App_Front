@@ -61,9 +61,12 @@ import {
   consumeStoredGoogleOAuthResult,
   GOOGLE_OAUTH_STORAGE_KEY,
   type GoogleOAuthPopupMessage,
+  isDesktopGoogleOAuthFlow,
   navigateGoogleOAuthPopup,
+  openGoogleOAuthInSystemBrowser,
   openGoogleOAuthPopup,
   parseStoredGoogleOAuthResult,
+  storeGoogleOAuthReturnPath,
 } from "../../shared/lib/google-oauth-popup";
 import { buildAppEventStreamUrl } from "../../shared/lib/app-event-stream";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
@@ -367,7 +370,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
         return;
       }
 
-      if (event.data?.type !== "emailassist-google-oauth") {
+      if (event.data?.type !== "maily-google-oauth") {
         return;
       }
 
@@ -856,6 +859,15 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
 
     try {
       setCheckingIntegration(true);
+      storeGoogleOAuthReturnPath("/onboarding");
+
+      if (isDesktopGoogleOAuthFlow()) {
+        const authorizationUrl = await getGoogleAuthorizationUrl();
+        await openGoogleOAuthInSystemBrowser(authorizationUrl);
+        toast("브라우저에서 권한 동의를 마치면 앱으로 자동 복귀합니다.");
+        return;
+      }
+
       const popup = openGoogleOAuthPopup();
 
       if (!popup) {

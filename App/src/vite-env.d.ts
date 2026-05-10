@@ -11,7 +11,7 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-type EmailAssistUpdateStatus =
+type MailyUpdateStatus =
   | "idle"
   | "checking"
   | "available"
@@ -21,8 +21,8 @@ type EmailAssistUpdateStatus =
   | "error"
   | "unsupported";
 
-interface EmailAssistUpdateState {
-  status: EmailAssistUpdateStatus;
+interface MailyUpdateState {
+  status: MailyUpdateStatus;
   version: string | null;
   releaseDate: string | null;
   percent: number | null;
@@ -30,13 +30,16 @@ interface EmailAssistUpdateState {
 }
 
 interface Window {
-  readonly emailAssistUpdater?: {
-    getState: () => Promise<EmailAssistUpdateState>;
-    check: () => Promise<EmailAssistUpdateState>;
-    download: () => Promise<EmailAssistUpdateState>;
-    install: () => Promise<EmailAssistUpdateState>;
+  readonly mailyUpdater?: {
+    getState: () => Promise<MailyUpdateState>;
+    check: () => Promise<MailyUpdateState>;
+    download: () => Promise<MailyUpdateState>;
+    install: () => Promise<MailyUpdateState>;
     onStatus: (
-      callback: (state: EmailAssistUpdateState) => void,
+      callback: (state: MailyUpdateState) => void,
     ) => () => void;
+  };
+  readonly mailyShell?: {
+    openExternal: (url: string) => Promise<boolean>;
   };
 }

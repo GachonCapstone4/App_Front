@@ -1,6 +1,6 @@
-# EmailAssist App Front
+# Maily App Front
 
-EmailAssist는 반복적인 업무 이메일을 더 빠르고 일관되게 처리하기 위한 프론트엔드 애플리케이션입니다. 사용자는 수신 메일을 확인하고, AI가 제안한 답장 초안을 검토하며, 메일 속 일정 후보를 캘린더 작업으로 이어갈 수 있습니다. 관리자는 같은 애플리케이션 안에서 사용자, 문의, 템플릿 자동화, 운영 상태를 관리합니다.
+Maily는 반복적인 업무 이메일을 더 빠르고 일관되게 처리하기 위한 프론트엔드 애플리케이션입니다. 사용자는 수신 메일을 확인하고, AI가 제안한 답장 초안을 검토하며, 메일 속 일정 후보를 캘린더 작업으로 이어갈 수 있습니다. 관리자는 같은 애플리케이션 안에서 사용자, 문의, 템플릿 자동화, 운영 상태를 관리합니다.
 
 이 저장소는 웹 SPA, Docker 배포용 정적 번들, Electron 데스크톱 앱 빌드를 함께 관리합니다.
 
@@ -151,20 +151,20 @@ docker build \
   --build-arg VITE_ADMIN_API_BASE_URL=https://admin.studylink.click \
   --build-arg VITE_SSE_BASE_URL=https://capstone.studylink.click \
   --build-arg VITE_DEMO_MODE=false \
-  -t emailassist-app-front .
+  -t maily-app-front .
 ```
 
 실행:
 
 ```bash
-docker run --rm -p 8080:80 emailassist-app-front
+docker run --rm -p 8080:80 maily-app-front
 ```
 
 Docker 이미지는 Vite 빌드 결과물을 nginx로 서빙합니다. SPA 라우팅을 위해 모든 경로는 `index.html`로 fallback 됩니다.
 
 ## Electron 배포
 
-Electron 앱은 [App/electron/main.cjs](App/electron/main.cjs)를 메인 프로세스로 사용합니다. Vite 빌드 결과물인 `App/dist`를 Electron 창에서 로드하며, 내부 라우팅 새로고침을 위해 전용 `emailassist://` 프로토콜을 사용합니다.
+Electron 앱은 [App/electron/main.cjs](App/electron/main.cjs)를 메인 프로세스로 사용합니다. Vite 빌드 결과물인 `App/dist`를 Electron 창에서 로드하며, 내부 라우팅 새로고침을 위해 전용 `maily://` 프로토콜을 사용합니다.
 
 `electron-builder` 설정은 [App/package.json](App/package.json)의 `build` 필드에 있습니다.
 
