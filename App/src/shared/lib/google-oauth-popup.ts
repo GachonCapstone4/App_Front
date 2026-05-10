@@ -88,7 +88,10 @@ export function consumeGoogleOAuthReturnPath() {
 }
 
 export function isDesktopGoogleOAuthFlow() {
-  return typeof window !== "undefined" && window.location.protocol === "maily:";
+  return (
+    typeof window !== "undefined" &&
+    (window.location.protocol === "maily:" || Boolean(window.mailyShell))
+  );
 }
 
 export function getGoogleOAuthFrontendOrigin() {
