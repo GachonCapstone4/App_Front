@@ -39,7 +39,15 @@ export type NotificationUpdatedEventPayload = {
 
 export type DiagnosticEventPayload = {
   user_id?: number | string | null;
-  sse_type?: "network_test" | "os" | "vpn" | string;
+  sse_type?:
+    | "network_test"
+    | "os"
+    | "vpn"
+    | "ai-collecting-updated"
+    | "ai-training-updated"
+    | "k8s"
+    | "rabbitmq"
+    | string;
   data?: string | {
     message?: string;
     raw_output?: string;
@@ -67,6 +75,10 @@ type AppEventPayloadMap = {
   network_test: DiagnosticEventPayload;
   os: DiagnosticEventPayload;
   vpn: DiagnosticEventPayload;
+  "ai-collecting-updated": DiagnosticEventPayload;
+  "ai-training-updated": DiagnosticEventPayload;
+  k8s: DiagnosticEventPayload;
+  rabbitmq: DiagnosticEventPayload;
 };
 
 type AppEventName = keyof AppEventPayloadMap;
@@ -83,6 +95,10 @@ const listeners: {
   network_test: new Set(),
   os: new Set(),
   vpn: new Set(),
+  "ai-collecting-updated": new Set(),
+  "ai-training-updated": new Set(),
+  k8s: new Set(),
+  rabbitmq: new Set(),
 };
 
 let eventSource: EventSource | null = null;
@@ -206,6 +222,10 @@ function ensureEventSource() {
   bindEventListener(source, "network_test");
   bindEventListener(source, "os");
   bindEventListener(source, "vpn");
+  bindEventListener(source, "ai-collecting-updated");
+  bindEventListener(source, "ai-training-updated");
+  bindEventListener(source, "k8s");
+  bindEventListener(source, "rabbitmq");
 
   source.onerror = () => {
     if (eventSource?.readyState === EventSource.CLOSED) {

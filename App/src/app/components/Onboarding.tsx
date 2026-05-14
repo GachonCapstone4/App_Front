@@ -2354,7 +2354,7 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                         type="button"
                         onClick={() => void handleSkipTemplateGeneration()}
                         disabled={completingOnboarding}
-                        className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-xl border border-[#E2E8F0] bg-white px-4 py-2 text-[12px] font-medium text-[#64748B] shadow-sm transition-colors hover:border-[#CBD5E1] hover:bg-[#F8FAFC] hover:text-[#475569] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {completingOnboarding ? "완료 상태 저장 중..." : "취소하고 나중에 설정하기"}
                       </button>

@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Activity, FileSearch, ListChecks, Play, Search } from "lucide-react";
 import {
   executeAdminNetworkDictJob,
+  executeAdminNodeJob,
   executeAdminOSDictJob,
   executeAdminDatasetJob,
+  executeAdminModelDeploy,
+  executeAdminRabbitMQJob,
   executeAdminSagemakerTrainingJob,
   executeAdminVPNDictJob,
   getAdminOperationJobDetail,
@@ -18,7 +21,16 @@ import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminStateNotice } from "../shared/ui/AdminStateNotice";
 
 const LOG_SEPARATOR = "---------------";
-const DIAGNOSTIC_REQUEST_IDS = new Set(["network-dict", "os-dict", "vpn-dict"]);
+const JOB_REQUEST_ACK_MESSAGES = {
+  "network-dict": "클러스터 네트워크 진단 실행 요청을 보냈습니다. 실시간 진단 로그를 기다리는 중입니다.",
+  "os-dict": "OS 진단 실행 요청을 보냈습니다. 실시간 진단 로그를 기다리는 중입니다.",
+  "vpn-dict": "VPN 진단 실행 요청을 보냈습니다. 실시간 진단 로그를 기다리는 중입니다.",
+  "node-job": "Kubernetes 노드 점검 요청을 보냈습니다. 실시간 k8s 로그를 기다리는 중입니다.",
+  "rabbitmq-job": "RabbitMQ 점검 요청을 보냈습니다. 실시간 rabbitmq 로그를 기다리는 중입니다.",
+  "dataset-job": "데이터셋 Job 실행 요청을 보냈습니다. 실시간 데이터 수집 로그를 기다리는 중입니다.",
+  "sagemaker-training": "SageMaker 학습 실행 요청을 보냈습니다. 실시간 학습 로그를 기다리는 중입니다.",
+  "model-deploy": "모델 교체 요청을 보냈습니다. 배포 진행 로그를 기다리는 중입니다.",
+};
 
 const requestButtons = [
   {
@@ -69,6 +81,20 @@ const requestButtons = [
     dangerous: true,
   },
   {
+    id: "node-job",
+    label: "Kubernetes 노드 점검",
+    description: "Kubernetes 노드 상태 점검 Job을 실행합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "rabbitmq-job",
+    label: "RabbitMQ 점검",
+    description: "RabbitMQ 상태 점검 Job을 실행합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
     id: "dataset-job",
     label: "데이터셋 Job 실행",
     description: "Kubernetes 데이터셋 생성 Job을 실행합니다.",
@@ -79,6 +105,13 @@ const requestButtons = [
     id: "sagemaker-training",
     label: "SageMaker 학습 실행",
     description: "SageMaker 학습 Job 생성을 요청합니다.",
+    icon: Play,
+    dangerous: true,
+  },
+  {
+    id: "model-deploy",
+    label: "모델 교체",
+    description: "학습 완료 모델을 활성 모델로 교체하는 배포 요청을 전송합니다.",
     icon: Play,
     dangerous: true,
   },
@@ -111,6 +144,18 @@ function createLogEntry({ title, endpoint, method, startedAt, status, data, erro
     receivedAt: new Date().toISOString(),
     output: formatLogOutput(data, error),
   };
+}
+
+function getRequestSuccessOutput(buttonId, data) {
+  if (
+    data &&
+    typeof data === "object" &&
+    data.success === false
+  ) {
+    return data;
+  }
+
+  return JOB_REQUEST_ACK_MESSAGES[buttonId] ?? data;
 }
 
 function parseDiagnosticEventPayload(payload) {
@@ -225,11 +270,19 @@ export function InternalMonitoringPage() {
     const unsubscribeNetwork = subscribeDiagnosticEvent("network_test");
     const unsubscribeOS = subscribeDiagnosticEvent("os");
     const unsubscribeVPN = subscribeDiagnosticEvent("vpn");
+    const unsubscribeDataset = subscribeDiagnosticEvent("ai-collecting-updated");
+    const unsubscribeTraining = subscribeDiagnosticEvent("ai-training-updated");
+    const unsubscribeK8s = subscribeDiagnosticEvent("k8s");
+    const unsubscribeRabbitMQ = subscribeDiagnosticEvent("rabbitmq");
 
     return () => {
       unsubscribeNetwork();
       unsubscribeOS();
       unsubscribeVPN();
+      unsubscribeDataset();
+      unsubscribeTraining();
+      unsubscribeK8s();
+      unsubscribeRabbitMQ();
     };
   }, []);
 
@@ -296,6 +349,18 @@ export function InternalMonitoringPage() {
         data = await executeAdminVPNDictJob();
       }
 
+      if (button.id === "node-job") {
+        method = "POST";
+        endpoint = "/api/admin/k8s/jobs/node";
+        data = await executeAdminNodeJob();
+      }
+
+      if (button.id === "rabbitmq-job") {
+        method = "POST";
+        endpoint = "/api/admin/k8s/jobs/rabbitmq";
+        data = await executeAdminRabbitMQJob();
+      }
+
       if (button.id === "dataset-job") {
         method = "POST";
         endpoint = "/api/admin/k8s/jobs/dataset";
@@ -308,6 +373,12 @@ export function InternalMonitoringPage() {
         data = await executeAdminSagemakerTrainingJob();
       }
 
+      if (button.id === "model-deploy") {
+        method = "POST";
+        endpoint = "/api/admin/modeldeploy";
+        data = await executeAdminModelDeploy();
+      }
+
       appendLog(
         createLogEntry({
           title: button.label,
@@ -315,9 +386,7 @@ export function InternalMonitoringPage() {
           method,
           startedAt,
           status: "SUCCESS",
-          data: DIAGNOSTIC_REQUEST_IDS.has(button.id)
-            ? `${button.label} 요청을 보냈습니다. 실시간 진단 로그를 기다리는 중입니다.`
-            : data,
+          data: getRequestSuccessOutput(button.id, data),
           error: null,
         }),
       );
@@ -398,7 +467,9 @@ export function InternalMonitoringPage() {
                 .filter((button) =>
                   button.id === "network-dict" ||
                   button.id === "os-dict" ||
-                  button.id === "vpn-dict"
+                  button.id === "vpn-dict" ||
+                  button.id === "node-job" ||
+                  button.id === "rabbitmq-job"
                 )
                 .map(renderRequestButton)}
             </div>
@@ -410,7 +481,8 @@ export function InternalMonitoringPage() {
               {requestButtons
                 .filter((button) =>
                   button.id === "dataset-job" ||
-                  button.id === "sagemaker-training"
+                  button.id === "sagemaker-training" ||
+                  button.id === "model-deploy"
                 )
                 .map(renderRequestButton)}
             </div>
