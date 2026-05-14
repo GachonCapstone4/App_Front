@@ -223,6 +223,15 @@ type AdminJobErrorApiResponse = {
   fail_reason: string | null;
 };
 
+type AdminDlqCountApiResponse = {
+  count: number;
+};
+
+type AdminDlqPurgeApiResponse = {
+  message: string;
+  purged_at: string;
+};
+
 type AdminKubernetesJobApiResponse = {
   job_name: string;
   namespace: string;
@@ -696,6 +705,16 @@ export async function getAdminOperationJobError(jobId: string) {
 
 export async function deleteAdminOperationJob(jobId: string) {
   const response = await adminApi.delete(`/api/admin/operations/jobs/${jobId}`);
+  return response.data;
+}
+
+export async function getAdminDlqCount() {
+  const response = await adminApi.get<AdminDlqCountApiResponse>("/api/admin/rabbitmq/dlq/count");
+  return response.data;
+}
+
+export async function purgeAdminDlq() {
+  const response = await adminApi.delete<AdminDlqPurgeApiResponse>("/api/admin/rabbitmq/dlq/purge");
   return response.data;
 }
 

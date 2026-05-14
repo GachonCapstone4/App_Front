@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, FileSearch, ListChecks, Play, Search } from "lucide-react";
+import { Activity, FileSearch, ListChecks, Play, RefreshCw, Search, Trash2 } from "lucide-react";
 import {
   executeAdminNetworkDictJob,
   executeAdminNodeJob,
@@ -9,10 +9,12 @@ import {
   executeAdminRabbitMQJob,
   executeAdminSagemakerTrainingJob,
   executeAdminVPNDictJob,
+  getAdminDlqCount,
   getAdminOperationJobDetail,
   getAdminOperationJobError,
   getAdminOperationJobSummary,
   getAdminOperationJobs,
+  purgeAdminDlq,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
 import { subscribeAppEvent } from "../../shared/lib/app-event-stream";
@@ -30,6 +32,14 @@ const JOB_REQUEST_ACK_MESSAGES = {
   "dataset-job": "데이터셋 Job 실행 요청을 보냈습니다. 실시간 데이터 수집 로그를 기다리는 중입니다.",
   "sagemaker-training": "SageMaker 학습 실행 요청을 보냈습니다. 실시간 학습 로그를 기다리는 중입니다.",
   "model-deploy": "모델 교체 요청을 보냈습니다. 배포 진행 로그를 기다리는 중입니다.",
+};
+
+const DLQ_CONTROL_BUTTON = {
+  id: "dlq-control",
+  label: "DLQ 관리",
+  description: "RabbitMQ 실패 큐 메시지 수를 확인하고 전체 삭제합니다.",
+  icon: Trash2,
+  dangerous: true,
 };
 
 const requestButtons = [
@@ -231,14 +241,86 @@ export function InternalMonitoringPage() {
   const [activeRequestId, setActiveRequestId] = useState("");
   const [focusedButtonId, setFocusedButtonId] = useState("summary");
   const [logs, setLogs] = useState([]);
+  const [activeOutputPanel, setActiveOutputPanel] = useState("logs");
+  const [dlqCount, setDlqCount] = useState(null);
+  const [dlqLoading, setDlqLoading] = useState(false);
+  const [dlqPurging, setDlqPurging] = useState(false);
+  const [dlqError, setDlqError] = useState("");
+  const [dlqMessage, setDlqMessage] = useState("");
   const focusedButton =
-    requestButtons.find((button) => button.id === focusedButtonId) ?? requestButtons[0];
+    [...requestButtons, DLQ_CONTROL_BUTTON].find((button) => button.id === focusedButtonId) ?? requestButtons[0];
   const logStream = logs
     .map((log) => `${LOG_SEPARATOR}\n${log.output}`)
     .join("\n");
 
   const appendLog = (entry) => {
     setLogs((current) => [entry, ...current].slice(0, 20));
+  };
+
+  const loadDlqCount = async () => {
+    setDlqLoading(true);
+    setDlqError("");
+
+    try {
+      const data = await getAdminDlqCount();
+      setDlqCount(data.count);
+    } catch (error) {
+      setDlqError(getErrorMessage(error, "DLQ 메시지 수를 불러오지 못했습니다."));
+    } finally {
+      setDlqLoading(false);
+    }
+  };
+
+  const openDlqPanel = () => {
+    setFocusedButtonId(DLQ_CONTROL_BUTTON.id);
+    setActiveOutputPanel("dlq");
+    setDlqMessage("");
+    void loadDlqCount();
+  };
+
+  const handlePurgeDlq = async () => {
+    const confirmed = window.confirm("DLQ 메시지를 모두 삭제할까요?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDlqPurging(true);
+    setDlqError("");
+    setDlqMessage("");
+
+    try {
+      const data = await purgeAdminDlq();
+      setDlqMessage(`${data.message} (${data.purged_at})`);
+      setDlqCount(0);
+      appendLog(
+        createLogEntry({
+          title: "DLQ 전체 삭제",
+          endpoint: "/api/admin/rabbitmq/dlq/purge",
+          method: "DELETE",
+          startedAt: new Date().toISOString(),
+          status: "SUCCESS",
+          data,
+          error: null,
+        }),
+      );
+    } catch (error) {
+      const message = getErrorMessage(error, "DLQ 전체 삭제 요청을 처리하지 못했습니다.");
+      setDlqError(message);
+      appendLog(
+        createLogEntry({
+          title: "DLQ 전체 삭제",
+          endpoint: "/api/admin/rabbitmq/dlq/purge",
+          method: "DELETE",
+          startedAt: new Date().toISOString(),
+          status: "ERROR",
+          data: null,
+          error: message,
+        }),
+      );
+    } finally {
+      setDlqPurging(false);
+    }
   };
 
   const renderRequestButton = (button) => (
@@ -257,6 +339,52 @@ export function InternalMonitoringPage() {
         <strong>{button.label}</strong>
       </span>
     </button>
+  );
+
+  const renderDlqPanel = () => (
+    <div className="admin-dlq-panel">
+      <div className="admin-dlq-summary">
+        <span>현재 DLQ 메시지</span>
+        <strong>{dlqCount == null ? "-" : `${dlqCount}건`}</strong>
+      </div>
+
+      {dlqError ? (
+        <AdminStateNotice
+          title="DLQ 요청을 처리하지 못했습니다"
+          description={dlqError}
+          tone="error"
+          compact
+        />
+      ) : null}
+
+      {dlqMessage ? (
+        <div className="admin-dlq-message">
+          <strong>DLQ 삭제가 완료되었습니다</strong>
+          <span>{dlqMessage}</span>
+        </div>
+      ) : null}
+
+      <div className="admin-button-row admin-button-row--spaced">
+        <button
+          type="button"
+          className="admin-button admin-button--ghost"
+          onClick={() => void loadDlqCount()}
+          disabled={dlqLoading || dlqPurging}
+        >
+          <RefreshCw size={14} />
+          {dlqLoading ? "조회 중..." : "메시지 수 새로고침"}
+        </button>
+        <button
+          type="button"
+          className="admin-button"
+          onClick={() => void handlePurgeDlq()}
+          disabled={dlqLoading || dlqPurging || dlqCount === 0}
+        >
+          <Trash2 size={14} />
+          {dlqPurging ? "삭제 중..." : "DLQ 전체 삭제"}
+        </button>
+      </div>
+    </div>
   );
 
   useEffect(() => {
@@ -310,6 +438,8 @@ export function InternalMonitoringPage() {
 
     try {
       let data;
+
+      setActiveOutputPanel("logs");
 
       if (button.id === "summary") {
         endpoint = "/api/admin/operations/jobs/summary";
@@ -487,6 +617,26 @@ export function InternalMonitoringPage() {
                 .map(renderRequestButton)}
             </div>
           </div>
+
+          <div className="admin-request-section">
+            <span className="admin-request-section-label">실패 큐 관리</span>
+            <div className="admin-internal-monitoring-actions">
+              <button
+                type="button"
+                className="admin-request-card admin-request-card--accent"
+                onClick={openDlqPanel}
+                onFocus={() => setFocusedButtonId(DLQ_CONTROL_BUTTON.id)}
+                onMouseEnter={() => setFocusedButtonId(DLQ_CONTROL_BUTTON.id)}
+                disabled={Boolean(activeRequestId)}
+                title={DLQ_CONTROL_BUTTON.description}
+              >
+                <DLQ_CONTROL_BUTTON.icon size={18} />
+                <span>
+                  <strong>{DLQ_CONTROL_BUTTON.label}</strong>
+                </span>
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="admin-panel admin-log-panel">
@@ -500,10 +650,14 @@ export function InternalMonitoringPage() {
                 최신 요청과 실시간 진단 이벤트가 가장 위에 표시됩니다. AI/RAG 장애 확인 시 이 내용을 백엔드 로그와 함께 대조하면 됩니다.
               </p>
             </div>
-            <span className="admin-panel-note">{logs.length}개 로그</span>
+            <span className="admin-panel-note">
+              {activeOutputPanel === "dlq" ? "DLQ 관리" : `${logs.length}개 로그`}
+            </span>
           </div>
 
-          {logs.length === 0 ? (
+          {activeOutputPanel === "dlq" ? (
+            renderDlqPanel()
+          ) : logs.length === 0 ? (
             <AdminStateNotice
               title="아직 출력된 로그가 없습니다"
               description="왼쪽의 요청 버튼을 클릭하면 응답 또는 이벤트 로그가 이 영역에 표시됩니다."

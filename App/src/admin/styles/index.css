@@ -300,6 +300,18 @@
   margin-bottom: 16px;
 }
 
+.admin-grafana-panel {
+  overflow: hidden;
+}
+
+.admin-grafana-frame {
+  display: block;
+  min-height: 800px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
 .admin-split-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(320px, 1fr));
@@ -715,6 +727,60 @@
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.admin-dlq-panel {
+  flex: 1;
+  min-height: 630px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+  padding: 18px;
+}
+
+.admin-dlq-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 18px;
+}
+
+.admin-dlq-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-dlq-summary strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.admin-dlq-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(45, 143, 125, 0.24);
+  border-radius: 14px;
+  background: rgba(45, 143, 125, 0.08);
+  padding: 12px 14px;
+}
+
+.admin-dlq-message strong {
+  font-size: 13px;
+}
+
+.admin-dlq-message span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .admin-log-entry {
