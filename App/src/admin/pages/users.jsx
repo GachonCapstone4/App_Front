@@ -16,6 +16,7 @@ import {
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
 import { formatKstDateTime, parseKstDateTime } from "../../shared/lib/date-time";
+import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { adminUsers, userIndustryOptions } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -64,7 +65,7 @@ export function UsersPage() {
   const actionErrorScenario = scenarioId === "admin-users-action-error";
   const statusDialogScenario = scenarioId === "admin-users-status-dialog-normal";
   const googleDialogScenario = scenarioId === "admin-users-google-dialog-normal";
-  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
+  const useDemoDataMode = isDemoModeEnabled() || Boolean(scenarioId?.startsWith("admin-"));
 
   const [search, setSearch] = useState("");
   const [industry, setIndustry] = useState("all");

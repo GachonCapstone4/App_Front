@@ -9,7 +9,15 @@ import {
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
 import { formatKstDateKey, formatKstDateTime, formatKstMonthDay } from "../../shared/lib/date-time";
+import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
+import {
+  dashboardMetrics as demoDashboardMetrics,
+  emailDomainDistribution,
+  mailProcessingByPeriod,
+  recentDashboardInquiries,
+  recentSevenDayTrend,
+} from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
 import { AdminStateNotice } from "../shared/ui/AdminStateNotice";
@@ -31,25 +39,82 @@ function getRecentDateRange() {
   };
 }
 
+const demoDateKeys = [
+  "2026-03-13",
+  "2026-03-14",
+  "2026-03-15",
+  "2026-03-16",
+  "2026-03-17",
+  "2026-03-18",
+  "2026-03-19",
+];
+
+const demoSummary = {
+  total_users: 128,
+  gmail_connected_users: 94,
+  calendar_connected_users: 76,
+  today_analyzed_emails: 1842,
+  today_generated_drafts: 716,
+  total_support_tickets: 18,
+};
+
+const demoEmailVolume = mailProcessingByPeriod.map((item, index) => ({
+  date: demoDateKeys[index] ?? demoDateKeys[0],
+  count: item.total,
+}));
+
+const demoDomainDistribution = emailDomainDistribution.map((item) => ({
+  domain: item.label,
+  count: Number.parseInt(item.count.replace(/[^0-9]/g, ""), 10) || 0,
+}));
+
+const demoWeeklyTrend = recentSevenDayTrend.map((item, index) => ({
+  date: demoDateKeys[index] ?? demoDateKeys[0],
+  received_count: item.processed,
+  draft_count: mailProcessingByPeriod[index]?.drafted ?? Math.round(item.processed * 0.38),
+}));
+
+const demoRecentTickets = recentDashboardInquiries.map((ticket, index) => ({
+  ticketId: ticket.id,
+  userId: String(index + 1),
+  title: ticket.title,
+  status: ticket.status === "답변완료" ? "ANSWERED" : "PENDING",
+  createdAt: `2026-03-19T0${Math.min(index + 7, 9)}:12:00+09:00`,
+}));
+
 export function DashboardPage() {
   const [searchParams] = useSearchParams();
   const scenarioId = searchParams.get("scenario");
+  const useDemoDataMode = isDemoModeEnabled() || Boolean(scenarioId?.startsWith("admin-"));
   const loadErrorScenario = scenarioId === "admin-dashboard-load-error";
   const trendErrorScenario =
     scenarioId === "admin-dashboard-trend-error" ||
     scenarioId === "admin-dashboard-queue-error";
   const permissionScenario = scenarioId === "admin-permission-denied";
   const unexpectedScenario = scenarioId === "admin-unexpected-error";
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!useDemoDataMode);
   const [loadError, setLoadError] = useState("");
-  const [summary, setSummary] = useState(null);
-  const [emailVolume, setEmailVolume] = useState([]);
-  const [domainDistribution, setDomainDistribution] = useState([]);
-  const [weeklyTrend, setWeeklyTrend] = useState([]);
-  const [recentTickets, setRecentTickets] = useState([]);
+  const [summary, setSummary] = useState(useDemoDataMode ? demoSummary : null);
+  const [emailVolume, setEmailVolume] = useState(useDemoDataMode ? demoEmailVolume : []);
+  const [domainDistribution, setDomainDistribution] = useState(
+    useDemoDataMode ? demoDomainDistribution : [],
+  );
+  const [weeklyTrend, setWeeklyTrend] = useState(useDemoDataMode ? demoWeeklyTrend : []);
+  const [recentTickets, setRecentTickets] = useState(useDemoDataMode ? demoRecentTickets : []);
 
   useEffect(() => {
     if (loadErrorScenario || permissionScenario || unexpectedScenario) {
+      setLoading(false);
+      return;
+    }
+
+    if (useDemoDataMode) {
+      setSummary(demoSummary);
+      setEmailVolume(demoEmailVolume);
+      setDomainDistribution(demoDomainDistribution);
+      setWeeklyTrend(demoWeeklyTrend);
+      setRecentTickets(demoRecentTickets);
+      setLoadError("");
       setLoading(false);
       return;
     }
@@ -95,11 +160,11 @@ export function DashboardPage() {
     return () => {
       mounted = false;
     };
-  }, [loadErrorScenario, permissionScenario, unexpectedScenario]);
+  }, [loadErrorScenario, permissionScenario, unexpectedScenario, useDemoDataMode]);
 
   const dashboardMetrics = useMemo(() => {
     if (!summary) {
-      return [];
+      return useDemoDataMode ? demoDashboardMetrics : [];
     }
 
     return [
@@ -134,7 +199,7 @@ export function DashboardPage() {
         hint: "누적 관리자 문의 건수",
       },
     ];
-  }, [summary]);
+  }, [summary, useDemoDataMode]);
 
   const maxProcessed = useMemo(
     () => Math.max(...emailVolume.map((item) => item.count), 1),

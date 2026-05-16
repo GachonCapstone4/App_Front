@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
 import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Terminal, Users } from "lucide-react";
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
+import { isDemoModeEnabled } from "../../../shared/scenarios/demo-mode";
 import { ADMIN_NETWORK_ERROR_EVENT } from "../../../shared/api/admin";
 import { AdminStatePage } from "./AdminStatePage";
 
@@ -31,6 +32,10 @@ export function AdminShell() {
 
   useEffect(() => {
     const handleNetworkError = (event) => {
+      if (isDemoModeEnabled()) {
+        return;
+      }
+
       setNetworkErrorMessage(
         event.detail?.message ||
           "관리자 서버에 연결하지 못했습니다. VPN 연결 상태와 서버 상태를 확인한 뒤 다시 시도해주세요.",

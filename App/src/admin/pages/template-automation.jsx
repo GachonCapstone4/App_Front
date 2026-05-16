@@ -19,8 +19,6 @@ import {
   userIndustryOptions,
 } from "../shared/mock/adminData";
 import {
-  createAdminCategoryKeyword,
-  deleteAdminCategoryKeyword,
   getAdminCategoryKeywords,
   getAdminTemplateCategoryStats,
   getAdminTemplates,
@@ -29,6 +27,7 @@ import {
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
 import { formatKstDateTime } from "../../shared/lib/date-time";
+import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AiUsageBadge } from "../../shared/ui/primitives/AiUsageBadge";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -44,7 +43,7 @@ const emptyRuleDraft = {
 };
 
 const presetRuleDraft = {
-  categoryName: "미팅/일정 조율",
+  categoryName: "미팅 일정 조율",
   color: "#14B8A6",
   keywordsText: "미팅\n일정\n회의\n시간\n장소",
 };
@@ -182,10 +181,8 @@ export function TemplateAutomationPage() {
   const templatesEmptyScenario = scenarioId === "admin-template-automation-templates-empty";
   const rulesEmptyScenario = scenarioId === "admin-template-automation-rules-empty";
   const ruleDialogScenario = scenarioId === "admin-template-automation-rule-dialog-normal";
-  const ruleDeleteDialogScenario =
-    scenarioId === "admin-template-automation-rule-delete-dialog-normal";
   const ruleSaveErrorScenario = scenarioId === "admin-template-automation-rule-save-error";
-  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
+  const useDemoDataMode = isDemoModeEnabled() || Boolean(scenarioId?.startsWith("admin-"));
   const activeTab = searchParams.get("tab") === "rules" ? "rules" : "templates";
 
   const [search, setSearch] = useState("");
@@ -208,13 +205,13 @@ export function TemplateAutomationPage() {
   const [ruleDialogOpen, setRuleDialogOpen] = useState(
     ruleDialogScenario || ruleSaveErrorScenario,
   );
-  const [editingRuleId, setEditingRuleId] = useState(null);
+  const [editingRuleId, setEditingRuleId] = useState(
+    ruleDialogScenario || ruleSaveErrorScenario ? presetRuleDraft.categoryName : null,
+  );
   const [ruleDraft, setRuleDraft] = useState(
     ruleDialogScenario || ruleSaveErrorScenario ? presetRuleDraft : emptyRuleDraft,
   );
-  const [deleteTarget, setDeleteTarget] = useState(
-    ruleDeleteDialogScenario ? demoCategoryKeywordItems[0] ?? null : null,
-  );
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [ruleErrorNotice, setRuleErrorNotice] = useState(
     ruleSaveErrorScenario
       ? "운영 규칙 저장 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
@@ -479,8 +476,15 @@ export function TemplateAutomationPage() {
   };
 
   const openCreateRule = () => {
+    const firstEmptyRule = ruleItems.find((rule) => rule.keywords.length === 0);
+    const targetRule = firstEmptyRule ?? ruleItems[0];
+
     setEditingRuleId(null);
-    setRuleDraft(emptyRuleDraft);
+    setRuleDraft({
+      categoryName: targetRule?.categoryName ?? "",
+      color: targetRule?.color ?? "#14B8A6",
+      keywordsText: "",
+    });
     setRuleErrorNotice("");
     setRuleDialogOpen(true);
   };
@@ -494,7 +498,7 @@ export function TemplateAutomationPage() {
     }
 
     if (!editingRuleId && !ruleCategoryNames.includes(categoryName)) {
-      setRuleErrorNotice("현재 운영 규칙 또는 사용자 카테고리로 등록된 이름만 선택할 수 있습니다.");
+      setRuleErrorNotice("운영 카테고리 목록에 있는 카테고리만 선택할 수 있습니다.");
       return;
     }
 
@@ -509,18 +513,10 @@ export function TemplateAutomationPage() {
       setSavingRule(true);
       setRuleErrorNotice("");
 
-      const request = editingRuleId
-        ? updateAdminCategoryKeyword(categoryName, {
-            color: ruleDraft.color.trim() || null,
-            keywords,
-          })
-        : createAdminCategoryKeyword({
-            categoryName,
-            color: ruleDraft.color.trim() || null,
-            keywords,
-          });
-
-      void request
+      void updateAdminCategoryKeyword(categoryName, {
+        color: ruleDraft.color.trim() || null,
+        keywords,
+      })
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
           setRuleItems(buildCategoryKeywordRows(categories));
@@ -536,33 +532,18 @@ export function TemplateAutomationPage() {
       return;
     }
 
-    if (editingRuleId) {
-      setRuleItems((current) =>
-        current.map((rule) =>
-          rule.id === editingRuleId
-            ? {
-                ...rule,
-                categoryName,
-                color: ruleDraft.color.trim() || null,
-                keywords,
-              }
-            : rule,
-        ),
-      );
-    } else {
-      setRuleItems((current) => [
-        {
-          id: ruleDraft.categoryName.trim(),
-          categoryName,
-          ...getCategoryDomainMeta(categoryName),
-          color: ruleDraft.color.trim() || null,
-          keywords,
-          categoryCount: 1,
-          userCount: 1,
-        },
-        ...current,
-      ]);
-    }
+    setRuleItems((current) =>
+      current.map((rule) =>
+        (editingRuleId ? rule.id === editingRuleId : rule.categoryName === categoryName)
+          ? {
+              ...rule,
+              categoryName,
+              color: ruleDraft.color.trim() || null,
+              keywords,
+            }
+          : rule,
+      ),
+    );
 
     setRuleErrorNotice("");
     setRuleDialogOpen(false);
@@ -577,14 +558,17 @@ export function TemplateAutomationPage() {
       setDeletingRule(true);
       setRuleErrorNotice("");
 
-      void deleteAdminCategoryKeyword(deleteTarget.id)
+      void updateAdminCategoryKeyword(deleteTarget.categoryName, {
+        color: deleteTarget.color || null,
+        keywords: [],
+      })
         .then(async () => {
           const categories = await getAdminCategoryKeywords();
           setRuleItems(buildCategoryKeywordRows(categories));
           setDeleteTarget(null);
         })
         .catch((error) => {
-          setRuleErrorNotice(getErrorMessage(error, "운영 규칙 초기화 요청을 처리하지 못했습니다."));
+          setRuleErrorNotice(getErrorMessage(error, "운영 규칙 삭제 요청을 처리하지 못했습니다."));
         })
         .finally(() => {
           setDeletingRule(false);
@@ -646,7 +630,12 @@ export function TemplateAutomationPage() {
         description="AI가 생성한 템플릿 사용 현황과 RAG 검색용 카테고리 키워드를 함께 관리합니다. 운영 규칙은 백엔드 카테고리 키워드 기준으로 저장됩니다."
         actions={
           activeTab === "rules" ? (
-            <button type="button" className="admin-button" onClick={openCreateRule}>
+            <button
+              type="button"
+              className="admin-button"
+              onClick={openCreateRule}
+              disabled={ruleItems.length === 0}
+            >
               <Plus size={16} />
               키워드 등록
             </button>
@@ -1008,9 +997,9 @@ export function TemplateAutomationPage() {
                                   type="button"
                                   className="admin-icon-button admin-icon-button--danger"
                                   onClick={() => setDeleteTarget(rule)}
-                                  aria-label={`${rule.categoryName} 키워드 초기화`}
+                                  aria-label={`${rule.categoryName} 키워드 삭제`}
                                   disabled={rule.keywords.length === 0}
-                                  title={rule.keywords.length === 0 ? "초기화할 검색용 키워드가 없습니다" : "검색용 키워드 초기화"}
+                                  title={rule.keywords.length === 0 ? "삭제할 검색용 키워드가 없습니다" : "검색용 키워드 삭제"}
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -1030,7 +1019,7 @@ export function TemplateAutomationPage() {
               description={
                 ruleItems.length
                   ? "검색어나 미등록 필터를 조정하면 다른 카테고리 키워드를 확인할 수 있습니다."
-                  : "키워드 등록 버튼으로 카테고리별 검색용 키워드를 추가할 수 있습니다."
+                  : "운영 카테고리 시드 데이터가 비어 있습니다. category_keyword_rules 초기 데이터를 먼저 등록해 주세요."
               }
               tone="empty"
             />
@@ -1040,8 +1029,8 @@ export function TemplateAutomationPage() {
 
       <AdminModal
         open={ruleDialogOpen}
-        title="검색용 키워드 편집"
-        description="저장한 키워드는 같은 카테고리명에 공통으로 반영됩니다."
+        title={editingRuleId ? "검색용 키워드 수정" : "검색용 키워드 등록"}
+        description="카테고리 자체는 새로 만들지 않고, 운영 카테고리에 연결된 검색용 키워드만 저장합니다."
         onClose={() => setRuleDialogOpen(false)}
         width={680}
         footer={
@@ -1081,30 +1070,38 @@ export function TemplateAutomationPage() {
               ) : (
                 <Select
                   value={ruleDraft.categoryName}
-                  onValueChange={(value) => setRuleDraft((current) => ({ ...current, categoryName: value }))}
+                  onValueChange={(value) => {
+                    const selectedRule = ruleItems.find((rule) => rule.categoryName === value);
+                    setRuleDraft((current) => ({
+                      ...current,
+                      categoryName: value,
+                      color: selectedRule?.color ?? current.color,
+                      keywordsText: selectedRule?.keywords?.length
+                        ? formatKeywords(selectedRule.keywords)
+                        : "",
+                    }));
+                  }}
                   disabled={ruleCategoryNames.length === 0}
                 >
                   <SelectTrigger className="app-form-input h-11 w-full rounded-xl px-4 text-sm">
                     <SelectValue placeholder="카테고리를 선택하세요" />
                   </SelectTrigger>
                   <SelectContent className="app-select-content max-h-72 rounded-2xl p-1">
-                  {ruleCategoryNames.map((categoryName) => (
-                    <SelectItem
-                      key={categoryName}
-                      value={categoryName}
-                      className="app-select-item rounded-xl px-3 py-2.5 text-sm"
-                    >
-                      {categoryName}
-                    </SelectItem>
-                  ))}
+                    {ruleCategoryNames.map((categoryName) => (
+                      <SelectItem
+                        key={categoryName}
+                        value={categoryName}
+                        className="app-select-item rounded-xl px-3 py-2.5 text-sm"
+                      >
+                        {categoryName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
-              {!editingRuleId ? (
-                <span className="admin-field-help">
-                  운영 규칙 DB에 등록된 카테고리만 선택할 수 있습니다.
-                </span>
-              ) : null}
+              <span className="admin-field-help">
+                운영 카테고리는 서비스 기준값으로 관리하고, 이 화면에서는 검색용 키워드만 수정합니다.
+              </span>
             </label>
             <label className="admin-field">
               <span>색상</span>
@@ -1140,8 +1137,8 @@ export function TemplateAutomationPage() {
 
       <AdminModal
         open={Boolean(deleteTarget)}
-        title="검색용 키워드를 초기화할까요?"
-        description="카테고리 자체는 삭제하지 않고, 같은 카테고리명에 저장된 검색용 키워드만 비웁니다."
+        title="검색용 키워드를 삭제할까요?"
+        description="카테고리 자체는 유지하고, 같은 카테고리명에 저장된 검색용 키워드만 비웁니다."
         onClose={() => setDeleteTarget(null)}
         footer={
           <>
@@ -1153,7 +1150,7 @@ export function TemplateAutomationPage() {
               취소
             </button>
             <button type="button" className="admin-button" onClick={handleDeleteRule} disabled={deletingRule}>
-              {deletingRule ? "초기화 중..." : "초기화"}
+              {deletingRule ? "삭제 중..." : "삭제"}
             </button>
           </>
         }

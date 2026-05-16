@@ -8,6 +8,7 @@ import {
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
 import { formatKstDateTime } from "../../shared/lib/date-time";
+import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { inquiries, responseHistory } from "../shared/mock/adminData";
 import { MetricCard } from "../shared/ui/MetricCard";
 import { PageHeader } from "../shared/ui/PageHeader";
@@ -18,7 +19,7 @@ import { StatusBadge } from "../shared/ui/StatusBadge";
 export function InquiriesPage() {
   const [searchParams] = useSearchParams();
   const scenarioId = searchParams.get("scenario");
-  const useDemoDataMode = Boolean(scenarioId?.startsWith("admin-"));
+  const useDemoDataMode = isDemoModeEnabled() || Boolean(scenarioId?.startsWith("admin-"));
   const loadErrorScenario = scenarioId === "admin-inquiries-load-error";
   const emptyScenario = scenarioId === "admin-inquiries-empty";
   const replyErrorScenario = scenarioId === "admin-inquiries-reply-error";
@@ -37,7 +38,7 @@ export function InquiriesPage() {
       ? "관리자 답변 저장 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
       : "",
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!useDemoDataMode);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingReply, setSavingReply] = useState(false);
 
@@ -65,12 +66,14 @@ export function InquiriesPage() {
     if (useDemoDataMode && emptyScenario) {
       setInquiryItems([]);
       setSelectedId("");
+      setLoading(false);
       return;
     }
 
     if (useDemoDataMode) {
       setInquiryItems(inquiries);
       setSelectedId((current) => current || inquiries[0]?.id || "");
+      setLoading(false);
       return;
     }
 
