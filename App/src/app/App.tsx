@@ -13,6 +13,43 @@ import { Toaster } from "./components/ui/sonner";
 import { router } from "./router";
 
 const UPDATE_TOAST_ID = "maily-update";
+const DESKTOP_DEEP_LINK_ORIGIN = "maily://app";
+
+function getRouteFromDeepLinkUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+
+    if (`${parsedUrl.protocol}//${parsedUrl.host}` !== DESKTOP_DEEP_LINK_ORIGIN) {
+      return null;
+    }
+
+    return `${parsedUrl.pathname || "/"}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function DesktopDeepLinkRouter() {
+  useEffect(() => {
+    const deepLink = window.mailyDeepLink;
+
+    if (!deepLink) {
+      return;
+    }
+
+    return deepLink.onOpen((url) => {
+      const route = getRouteFromDeepLinkUrl(url);
+
+      if (!route) {
+        return;
+      }
+
+      void router.navigate(route);
+    });
+  }, []);
+
+  return null;
+}
 
 function AppUpdateNotifier() {
   const downloadingRef = useRef(false);
@@ -170,6 +207,7 @@ export default function App() {
       storageKey="maily-theme"
     >
       <SessionBootstrap>
+        <DesktopDeepLinkRouter />
         <RouterProvider router={router} />
       </SessionBootstrap>
       <AppUpdateNotifier />

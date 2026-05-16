@@ -106,6 +106,24 @@ function normalizeDeepLinkUrl(url) {
   }
 }
 
+function findDeepLinkUrl(values) {
+  return values.find((value) => value.startsWith(`${appProtocol}://`));
+}
+
+function sendDeepLinkToRenderer(url) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingDeepLinkUrl = url;
+    return;
+  }
+
+  if (mainWindow.webContents.isLoadingMainFrame()) {
+    pendingDeepLinkUrl = url;
+    return;
+  }
+
+  mainWindow.webContents.send("deep-link:open", url);
+}
+
 function handleDeepLink(url) {
   const normalizedUrl = normalizeDeepLinkUrl(url);
 
@@ -124,7 +142,7 @@ function handleDeepLink(url) {
 
   mainWindow.show();
   mainWindow.focus();
-  void mainWindow.loadURL(normalizedUrl);
+  sendDeepLinkToRenderer(normalizedUrl);
 }
 
 function registerRendererProtocol() {
@@ -296,6 +314,11 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(`${appProtocol}://`)) {
+      handleDeepLink(url);
+      return { action: "deny" };
+    }
+
     void shell.openExternal(url);
     return { action: "deny" };
   });
@@ -305,6 +328,14 @@ function createWindow() {
   } else {
     void mainWindow.loadURL("maily://app/");
   }
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    if (pendingDeepLinkUrl) {
+      const url = pendingDeepLinkUrl;
+      pendingDeepLinkUrl = null;
+      sendDeepLinkToRenderer(url);
+    }
+  });
 
   mainWindow.webContents.once("did-finish-load", () => {
     if (app.isPackaged) {
@@ -318,11 +349,6 @@ function createWindow() {
     mainWindow = null;
   });
 
-  if (pendingDeepLinkUrl) {
-    const url = pendingDeepLinkUrl;
-    pendingDeepLinkUrl = null;
-    void mainWindow.loadURL(url);
-  }
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -331,11 +357,10 @@ if (!gotSingleInstanceLock) {
   app.quit();
 } else {
   registerDeepLinkProtocolClient();
+  pendingDeepLinkUrl = normalizeDeepLinkUrl(findDeepLinkUrl(process.argv) || "") || null;
 
   app.on("second-instance", (_event, commandLine) => {
-    const deepLinkUrl = commandLine.find((value) =>
-      value.startsWith(`${appProtocol}://`),
-    );
+    const deepLinkUrl = findDeepLinkUrl(commandLine);
 
     if (deepLinkUrl) {
       handleDeepLink(deepLinkUrl);

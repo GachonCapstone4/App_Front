@@ -42,4 +42,7 @@ interface Window {
   readonly mailyShell?: {
     openExternal: (url: string) => Promise<boolean>;
   };
+  readonly mailyDeepLink?: {
+    onOpen: (callback: (url: string) => void) => () => void;
+  };
 }

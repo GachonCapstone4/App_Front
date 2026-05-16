@@ -21,3 +21,17 @@ contextBridge.exposeInMainWorld("mailyUpdater", {
 contextBridge.exposeInMainWorld("mailyShell", {
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
 });
+
+contextBridge.exposeInMainWorld("mailyDeepLink", {
+  onOpen: (callback) => {
+    const listener = (_event, url) => {
+      callback(url);
+    };
+
+    ipcRenderer.on("deep-link:open", listener);
+
+    return () => {
+      ipcRenderer.removeListener("deep-link:open", listener);
+    };
+  },
+});
