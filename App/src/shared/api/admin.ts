@@ -48,6 +48,14 @@ type AdminWeeklyTrendApiResponse = {
   }>;
 };
 
+type AdminMonitoringDashboardListApiResponse = {
+  dashboards: Array<{
+    key: string;
+    label: string;
+    url: string;
+  }>;
+};
+
 type AdminSupportTicketListApiResponse = {
   total_count: number;
   tickets: Array<{
@@ -338,6 +346,12 @@ export type AdminJobItem = {
   createdAt: string;
 };
 
+export type AdminMonitoringDashboard = {
+  key: string;
+  label: string;
+  url: string;
+};
+
 export async function getAdminDashboardSummary() {
   const response = await adminApi.get<AdminDashboardSummaryApiResponse>("/api/admin/dashboard/summary");
   return response.data;
@@ -368,6 +382,18 @@ export async function getAdminDomainDistribution(limit = 5) {
 export async function getAdminWeeklyTrend() {
   const response = await adminApi.get<AdminWeeklyTrendApiResponse>("/api/admin/dashboard/weekly-trend");
   return response.data.trend_data;
+}
+
+export async function getAdminMonitoringDashboards() {
+  const response = await adminApi.get<AdminMonitoringDashboardListApiResponse>(
+    "/api/admin/monitoring/dashboards",
+  );
+
+  return response.data.dashboards.map((dashboard) => ({
+    key: dashboard.key,
+    label: dashboard.label,
+    url: dashboard.url,
+  })) satisfies AdminMonitoringDashboard[];
 }
 
 export async function getAdminSupportTickets(size = 20) {
