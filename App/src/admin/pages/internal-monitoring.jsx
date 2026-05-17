@@ -58,7 +58,7 @@ const requestButtons = [
   },
   {
     id: "training-jobs",
-    label: "학습 Job 목록",
+    label: "AI 학습 Job 목록",
     description: "AI 학습 배치 작업의 상태와 실패 원인을 확인합니다.",
     icon: ListChecks,
   },
@@ -658,8 +658,7 @@ export function InternalMonitoringPage() {
               {requestButtons
                 .filter((button) =>
                   button.id === "summary" ||
-                  button.id === "recent-jobs" ||
-                  button.id === "training-jobs"
+                  button.id === "recent-jobs"
                 )
                 .map(renderRequestButton)}
             </div>
@@ -707,7 +706,8 @@ export function InternalMonitoringPage() {
                 .filter((button) =>
                   button.id === "dataset-job" ||
                   button.id === "sagemaker-training" ||
-                  button.id === "model-deploy"
+                  button.id === "model-deploy" ||
+                  button.id === "training-jobs"
                 )
                 .map(renderRequestButton)}
             </div>
