@@ -783,6 +783,70 @@
   font-size: 12px;
 }
 
+.admin-dlq-list {
+  margin-top: 16px;
+}
+
+.admin-dlq-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-dlq-list-header strong {
+  font-size: 14px;
+}
+
+.admin-dlq-list-header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-dlq-table-scroll {
+  max-height: 390px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.admin-dlq-table {
+  min-width: 1120px;
+}
+
+.admin-dlq-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.admin-dlq-meta,
+.admin-dlq-payload {
+  margin: 0;
+  max-width: 360px;
+  color: var(--text);
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-dlq-meta {
+  color: var(--muted);
+}
+
+.admin-dlq-payload-meta {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .admin-job-table-panel {
   flex: 1;
   min-height: 630px;

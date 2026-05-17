@@ -244,6 +244,25 @@ type AdminDlqCountApiResponse = {
   count: number;
 };
 
+type AdminDlqMessageListApiResponse = {
+  requested_count: number;
+  returned_count: number;
+  messages: Array<{
+    index: number;
+    exchange: string;
+    routing_key: string;
+    redelivered: boolean;
+    message_count: number;
+    payload_bytes: number;
+    payload_encoding: string;
+    payload_preview: string;
+    message_id: string;
+    content_type: string;
+    timestamp: string;
+    headers: Record<string, string>;
+  }>;
+};
+
 type AdminDlqPurgeApiResponse = {
   message: string;
   purged_at: string;
@@ -360,6 +379,21 @@ export type AdminTrainingJobItem = {
   jobType: string;
   status: string;
   errorMessage: string | null;
+};
+
+export type AdminDlqMessageItem = {
+  index: number;
+  exchange: string;
+  routingKey: string;
+  redelivered: boolean;
+  messageCount: number;
+  payloadBytes: number;
+  payloadEncoding: string;
+  payloadPreview: string;
+  messageId: string;
+  contentType: string;
+  timestamp: string;
+  headers: Record<string, string>;
 };
 
 export type AdminMonitoringDashboard = {
@@ -764,6 +798,30 @@ export async function deleteAdminOperationJob(jobId: string) {
 export async function getAdminDlqCount() {
   const response = await adminApi.get<AdminDlqCountApiResponse>("/api/admin/rabbitmq/dlq/count");
   return response.data;
+}
+
+export async function getAdminDlqMessages(limit = 20) {
+  const response = await adminApi.get<AdminDlqMessageListApiResponse>(
+    "/api/admin/rabbitmq/dlq/messages",
+    {
+      params: { limit },
+    },
+  );
+
+  return response.data.messages.map((message) => ({
+    index: message.index,
+    exchange: message.exchange,
+    routingKey: message.routing_key,
+    redelivered: message.redelivered,
+    messageCount: message.message_count,
+    payloadBytes: message.payload_bytes,
+    payloadEncoding: message.payload_encoding,
+    payloadPreview: message.payload_preview,
+    messageId: message.message_id,
+    contentType: message.content_type,
+    timestamp: message.timestamp,
+    headers: message.headers ?? {},
+  })) satisfies AdminDlqMessageItem[];
 }
 
 export async function purgeAdminDlq() {

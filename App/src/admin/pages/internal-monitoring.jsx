@@ -10,6 +10,7 @@ import {
   executeAdminSagemakerTrainingJob,
   executeAdminVPNDictJob,
   getAdminDlqCount,
+  getAdminDlqMessages,
   getAdminOperationJobDetail,
   getAdminOperationJobError,
   getAdminOperationJobSummary,
@@ -266,7 +267,9 @@ export function InternalMonitoringPage() {
   const [logs, setLogs] = useState([]);
   const [activeOutputPanel, setActiveOutputPanel] = useState("logs");
   const [dlqCount, setDlqCount] = useState(null);
+  const [dlqMessages, setDlqMessages] = useState([]);
   const [dlqLoading, setDlqLoading] = useState(false);
+  const [dlqListLoading, setDlqListLoading] = useState(false);
   const [dlqPurging, setDlqPurging] = useState(false);
   const [dlqError, setDlqError] = useState("");
   const [dlqMessage, setDlqMessage] = useState("");
@@ -296,11 +299,26 @@ export function InternalMonitoringPage() {
     }
   };
 
+  const loadDlqMessages = async () => {
+    setDlqListLoading(true);
+    setDlqError("");
+
+    try {
+      const data = await getAdminDlqMessages(20);
+      setDlqMessages(data);
+    } catch (error) {
+      setDlqError(getErrorMessage(error, "DLQ 메시지 샘플을 불러오지 못했습니다."));
+    } finally {
+      setDlqListLoading(false);
+    }
+  };
+
   const openDlqPanel = () => {
     setFocusedButtonId(DLQ_CONTROL_BUTTON.id);
     setActiveOutputPanel("dlq");
     setDlqMessage("");
     void loadDlqCount();
+    void loadDlqMessages();
   };
 
   const handlePurgeDlq = async () => {
@@ -318,6 +336,7 @@ export function InternalMonitoringPage() {
       const data = await purgeAdminDlq();
       setDlqMessage(`${data.message} (${data.purged_at})`);
       setDlqCount(0);
+      setDlqMessages([]);
       appendLog(
         createLogEntry({
           title: "DLQ 전체 삭제",
@@ -346,6 +365,14 @@ export function InternalMonitoringPage() {
     } finally {
       setDlqPurging(false);
     }
+  };
+
+  const formatDlqHeaders = (headers) => {
+    const entries = Object.entries(headers ?? {});
+    if (entries.length === 0) {
+      return "-";
+    }
+    return entries.map(([key, value]) => `${key}: ${value}`).join("\n");
   };
 
   const renderRequestButton = (button) => (
@@ -394,10 +421,19 @@ export function InternalMonitoringPage() {
           type="button"
           className="admin-button admin-button--ghost"
           onClick={() => void loadDlqCount()}
-          disabled={dlqLoading || dlqPurging}
+          disabled={dlqLoading || dlqListLoading || dlqPurging}
         >
           <RefreshCw size={14} />
           {dlqLoading ? "조회 중..." : "메시지 수 새로고침"}
+        </button>
+        <button
+          type="button"
+          className="admin-button admin-button--ghost"
+          onClick={() => void loadDlqMessages()}
+          disabled={dlqLoading || dlqListLoading || dlqPurging}
+        >
+          <ListChecks size={14} />
+          {dlqListLoading ? "조회 중..." : "샘플 새로고침"}
         </button>
         <button
           type="button"
@@ -408,6 +444,60 @@ export function InternalMonitoringPage() {
           <Trash2 size={14} />
           {dlqPurging ? "삭제 중..." : "DLQ 전체 삭제"}
         </button>
+      </div>
+
+      <div className="admin-dlq-list">
+        <div className="admin-dlq-list-header">
+          <strong>DLQ 메시지 샘플</strong>
+          <span>{dlqMessages.length}건 표시</span>
+        </div>
+
+        {dlqMessages.length > 0 ? (
+          <div className="admin-table-wrap admin-dlq-table-scroll">
+            <table className="admin-table admin-dlq-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Routing Key</th>
+                  <th>Exchange</th>
+                  <th>Message ID</th>
+                  <th>Headers</th>
+                  <th>Payload</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dlqMessages.map((message) => (
+                  <tr key={`${message.index}-${message.messageId || message.routingKey}`}>
+                    <td>{message.index}</td>
+                    <td>
+                      <span className="admin-job-id">{message.routingKey || "-"}</span>
+                    </td>
+                    <td>{message.exchange || "-"}</td>
+                    <td>
+                      <span className="admin-job-id">{message.messageId || "-"}</span>
+                    </td>
+                    <td>
+                      <pre className="admin-dlq-meta">{formatDlqHeaders(message.headers)}</pre>
+                    </td>
+                    <td>
+                      <pre className="admin-dlq-payload">{message.payloadPreview || "-"}</pre>
+                      <span className="admin-dlq-payload-meta">
+                        {message.payloadBytes} bytes · {message.payloadEncoding || "unknown"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <AdminStateNotice
+            title={dlqListLoading ? "DLQ 메시지를 조회하는 중입니다" : "표시할 DLQ 샘플이 없습니다"}
+            description={dlqListLoading ? "잠시만 기다려 주세요." : "메시지가 없거나 샘플 조회 결과가 비어 있습니다."}
+            tone="empty"
+            compact
+          />
+        )}
       </div>
     </div>
   );
