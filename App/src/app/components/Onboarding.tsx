@@ -17,6 +17,7 @@ import {
   Zap,
   Shield,
   Settings,
+  LogIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,6 +29,7 @@ import {
   type RecommendedCategoryOption,
 } from "../../shared/config/onboarding-options";
 import {
+  clearAppSession,
   deriveGoogleIntegrationEmail,
   getAppSession,
   markOnboardingComplete,
@@ -1673,6 +1675,16 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
   const panelText = leftPanelContent[currentMainStep];
   const canSaveFaq =
     faqDraft.question.trim().length > 0 && faqDraft.answer.trim().length > 0;
+  const handleReturnToLogin = () => {
+    clearGenerationTimeouts();
+    clearIntegrationPolling();
+    clearGenerationEventSource();
+    closeGoogleOAuthPopup(popupWindowRef.current);
+    popupWindowRef.current = null;
+    window.localStorage.removeItem(GOOGLE_OAUTH_STORAGE_KEY);
+    clearAppSession();
+    navigate("/", { replace: true });
+  };
 
   return (
     <AuthOnboardingLayout
@@ -1680,7 +1692,8 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
       subtitle={panelText.subtitle}
       footerItems={footerItems}
       stepBar={
-        <div className="flex items-center gap-2 max-w-[600px]">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex max-w-[600px] flex-1 items-center gap-2">
             {mainSteps.map((step, i) => (
               <div key={step.id} className="flex items-center gap-2 flex-1">
                 <div
@@ -1722,6 +1735,15 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
                 )}
               </div>
             ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleReturnToLogin}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start text-[13px] font-medium text-[#64748B] transition-colors hover:text-[#1E2A3A] sm:self-auto"
+          >
+            <LogIn className="h-4 w-4" />
+            <span>로그인</span>
+          </button>
         </div>
       }
     >
