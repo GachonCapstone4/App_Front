@@ -5,6 +5,7 @@ import { Activity, Bot, LayoutGrid, LogOut, MessageSquare, Moon, Sun, Terminal, 
 import { clearAppSession, getAppSession } from "../../../shared/lib/app-session";
 import { isDemoModeEnabled } from "../../../shared/scenarios/demo-mode";
 import { ADMIN_NETWORK_ERROR_EVENT } from "../../../shared/api/admin";
+import { MailyBrandMark } from "../../../shared/ui/MailyBrandMark";
 import { AdminStatePage } from "./AdminStatePage";
 
 const navItems = [
@@ -50,7 +51,7 @@ export function AdminShell() {
     <div className="admin-layout">
       <aside className="admin-sidebar">
         <div className="admin-logo-wrap">
-          <div className="admin-logo-mark">EA</div>
+          <MailyBrandMark className="admin-logo-mark" />
           <div>
             <p className="admin-logo-title">Maily Admin</p>
             <p className="admin-logo-sub">운영 콘솔</p>

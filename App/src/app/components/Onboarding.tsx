@@ -73,6 +73,7 @@ import {
 import { buildAppEventStreamUrl } from "../../shared/lib/app-event-stream";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
+import { MailyBrandMark } from "../../shared/ui/MailyBrandMark";
 import {
   Select,
   SelectContent,
@@ -1752,10 +1753,8 @@ export function Onboarding({ scenarioId }: OnboardingProps) {
               <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0]/60 p-8 sm:p-10">
                 {/* Mobile brand header */}
                 <div className="lg:hidden text-center mb-8">
-                  <div className="w-12 h-12 rounded-xl bg-[#1E2A3A] flex items-center justify-center mx-auto mb-3">
-                    <Mail className="w-6 h-6 text-[#2DD4BF]" />
-                  </div>
-                  <p className="text-[13px] text-[#94A3B8]">업무용 이메일 자동화</p>
+                  <MailyBrandMark className="mx-auto mb-3 h-12 w-12" />
+                  <p className="text-[13px] text-[#94A3B8]">Maily</p>
                 </div>
 
                 <div className="mb-8 mx-auto max-w-[420px] text-center">

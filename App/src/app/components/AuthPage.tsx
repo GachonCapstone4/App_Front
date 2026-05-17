@@ -37,6 +37,7 @@ import {
 } from "../../shared/lib/google-oauth-popup";
 import { isDemoModeEnabled } from "../../shared/scenarios/demo-mode";
 import { AuthOnboardingLayout } from "../../shared/ui/AuthOnboardingLayout";
+import { MailyBrandMark } from "../../shared/ui/MailyBrandMark";
 import { StateBanner } from "../../shared/ui/primitives/StateBanner";
 
 type AuthMode = "login" | "signup" | "reset";
@@ -678,11 +679,9 @@ export function AuthPage({ scenarioId }: AuthPageProps) {
     >
       <div className="relative rounded-2xl border border-[#E2E8F0]/60 bg-white p-8 shadow-sm dark:border-[#243041] dark:bg-card sm:p-10">
         <div className="lg:hidden text-center mb-8">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#1E2A3A] dark:bg-[#18263A]">
-            <Mail className="w-6 h-6 text-[#2DD4BF]" />
-          </div>
+          <MailyBrandMark className="mx-auto mb-3 h-12 w-12" />
           <p className="text-[13px] text-[#94A3B8] dark:text-muted-foreground">
-            업무용 이메일 자동화
+            Maily
           </p>
         </div>
 

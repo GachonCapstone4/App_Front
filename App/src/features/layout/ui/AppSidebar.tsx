@@ -1,5 +1,6 @@
 import { NavLink } from "react-router";
-import { ChevronLeft, ChevronRight, Mail, X, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
+import { MailyBrandMark } from "../../../shared/ui/MailyBrandMark";
 import { navigationGroups } from "../model/navigation";
 
 interface NavigationItem {
@@ -53,13 +54,11 @@ export function AppSidebar({
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className={`mb-5 flex items-center border-b border-[#334155] px-2 pb-4 ${collapsed ? "justify-center" : "gap-3"}`}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2DD4BF] text-[#083344]">
-            <Mail className="h-5 w-5" />
-          </div>
+          <MailyBrandMark className="h-10 w-10" />
 
           {!collapsed ? (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">업무용 이메일 자동화</p>
+              <p className="truncate text-sm font-semibold">Maily</p>
             </div>
           ) : null}
 

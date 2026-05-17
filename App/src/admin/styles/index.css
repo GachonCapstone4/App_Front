@@ -110,13 +110,7 @@
 .admin-logo-mark {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #75e0cf 0%, #d5b16b 100%);
-  color: #17313f;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
+  border-radius: 13px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 

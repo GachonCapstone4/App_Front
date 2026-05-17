@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Bot, Calendar, Check, Mail, type LucideIcon } from "lucide-react";
+import { MailyBrandMark } from "./MailyBrandMark";
 
 type FooterItem = {
   icon: LucideIcon;
@@ -224,11 +225,9 @@ export function AuthOnboardingLayout({
 
         <div className="relative z-10 flex w-full flex-col justify-between">
           <div className="flex max-w-[320px] items-center gap-3 xl:max-w-[360px]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2DD4BF]/20">
-              <Mail className="h-5 w-5 text-[#2DD4BF]" />
-            </div>
+            <MailyBrandMark className="h-10 w-10" />
             <span className="text-[15px] tracking-tight text-white/90">
-              업무용 이메일 자동화
+              Maily
             </span>
           </div>
           <div className="max-w-[320px] xl:max-w-[360px]">

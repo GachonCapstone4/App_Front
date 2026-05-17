@@ -105,6 +105,7 @@
     "appId": "click.studylink.maily",
     "productName": "Maily",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "icon": "build/icon.png",
     "directories": {
       "output": "release"
     },
