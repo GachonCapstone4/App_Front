@@ -14,6 +14,7 @@ import {
   getAdminOperationJobError,
   getAdminOperationJobSummary,
   getAdminOperationJobs,
+  getAdminTrainingJobs,
   purgeAdminDlq,
 } from "../../shared/api/admin";
 import { getErrorMessage } from "../../shared/api/http";
@@ -51,8 +52,14 @@ const requestButtons = [
   },
   {
     id: "recent-jobs",
-    label: "최근 작업 목록",
+    label: "최근 메일 작업",
     description: "최근 메일 처리 작업 20건을 조회합니다.",
+    icon: ListChecks,
+  },
+  {
+    id: "training-jobs",
+    label: "학습 Job 목록",
+    description: "AI 학습 배치 작업의 상태와 실패 원인을 확인합니다.",
     icon: ListChecks,
   },
   {
@@ -236,6 +243,22 @@ function createDiagnosticLogEntry(eventName, payload) {
   };
 }
 
+function getTrainingStatusClassName(status) {
+  if (status === "COMPLETED") {
+    return "status status--ok";
+  }
+
+  if (status === "FAILED") {
+    return "status status--danger";
+  }
+
+  if (status === "RUNNING") {
+    return "status status--warn";
+  }
+
+  return "status status--muted";
+}
+
 export function InternalMonitoringPage() {
   const [jobId, setJobId] = useState("");
   const [activeRequestId, setActiveRequestId] = useState("");
@@ -247,6 +270,8 @@ export function InternalMonitoringPage() {
   const [dlqPurging, setDlqPurging] = useState(false);
   const [dlqError, setDlqError] = useState("");
   const [dlqMessage, setDlqMessage] = useState("");
+  const [trainingJobs, setTrainingJobs] = useState([]);
+  const [trainingJobError, setTrainingJobError] = useState("");
   const focusedButton =
     [...requestButtons, DLQ_CONTROL_BUTTON].find((button) => button.id === focusedButtonId) ?? requestButtons[0];
   const logStream = logs
@@ -387,6 +412,59 @@ export function InternalMonitoringPage() {
     </div>
   );
 
+  const renderTrainingJobsPanel = () => (
+    <div className="admin-job-table-panel">
+      {trainingJobError ? (
+        <AdminStateNotice
+          title="학습 Job 목록을 불러오지 못했습니다"
+          description={trainingJobError}
+          tone="error"
+          compact
+        />
+      ) : null}
+
+      {!trainingJobError && trainingJobs.length === 0 ? (
+        <AdminStateNotice
+          title="표시할 학습 Job이 없습니다"
+          description="SageMaker 학습 또는 모델 관련 배치 작업이 생성되면 이 영역에 표시됩니다."
+          tone="empty"
+          compact
+        />
+      ) : null}
+
+      {trainingJobs.length > 0 ? (
+        <div className="admin-table-wrap admin-internal-job-table-scroll">
+          <table className="admin-table admin-internal-job-table">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Job Type</th>
+                <th>Status</th>
+                <th>Error Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trainingJobs.map((job) => (
+                <tr key={job.jobId}>
+                  <td>
+                    <span className="admin-job-id">{job.jobId}</span>
+                  </td>
+                  <td>{job.jobType || "-"}</td>
+                  <td>
+                    <span className={getTrainingStatusClassName(job.status)}>{job.status || "-"}</span>
+                  </td>
+                  <td>
+                    <span className="admin-job-error">{job.errorMessage || "-"}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+
   useEffect(() => {
     const subscribeDiagnosticEvent = (eventName) => subscribeAppEvent(eventName, (payload) => {
       setLogs((current) => [
@@ -449,6 +527,14 @@ export function InternalMonitoringPage() {
       if (button.id === "recent-jobs") {
         endpoint = "/api/admin/operations/jobs?page=1&size=20";
         data = await getAdminOperationJobs(20);
+      }
+
+      if (button.id === "training-jobs") {
+        endpoint = "/api/admin/jobs";
+        data = await getAdminTrainingJobs();
+        setTrainingJobs(data);
+        setTrainingJobError("");
+        setActiveOutputPanel("training-jobs");
       }
 
       if (button.id === "job-detail") {
@@ -521,6 +607,11 @@ export function InternalMonitoringPage() {
         }),
       );
     } catch (error) {
+      const message = getErrorMessage(error, "요청 로그를 불러오지 못했습니다.");
+      if (button.id === "training-jobs") {
+        setTrainingJobError(message);
+        setActiveOutputPanel("training-jobs");
+      }
       appendLog(
         createLogEntry({
           title: button.label,
@@ -529,7 +620,7 @@ export function InternalMonitoringPage() {
           startedAt,
           status: "ERROR",
           data: null,
-          error: getErrorMessage(error, "요청 로그를 불러오지 못했습니다."),
+          error: message,
         }),
       );
     } finally {
@@ -565,7 +656,11 @@ export function InternalMonitoringPage() {
             <span className="admin-request-section-label">작업 현황 조회</span>
             <div className="admin-internal-monitoring-actions">
               {requestButtons
-                .filter((button) => button.id === "summary" || button.id === "recent-jobs")
+                .filter((button) =>
+                  button.id === "summary" ||
+                  button.id === "recent-jobs" ||
+                  button.id === "training-jobs"
+                )
                 .map(renderRequestButton)}
             </div>
           </div>
@@ -651,12 +746,18 @@ export function InternalMonitoringPage() {
               </p>
             </div>
             <span className="admin-panel-note">
-              {activeOutputPanel === "dlq" ? "DLQ 관리" : `${logs.length}개 로그`}
+              {activeOutputPanel === "dlq"
+                ? "DLQ 관리"
+                : activeOutputPanel === "training-jobs"
+                  ? `${trainingJobs.length}개 학습 Job`
+                  : `${logs.length}개 로그`}
             </span>
           </div>
 
           {activeOutputPanel === "dlq" ? (
             renderDlqPanel()
+          ) : activeOutputPanel === "training-jobs" ? (
+            renderTrainingJobsPanel()
           ) : logs.length === 0 ? (
             <AdminStateNotice
               title="아직 출력된 로그가 없습니다"

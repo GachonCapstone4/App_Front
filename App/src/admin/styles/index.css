@@ -783,6 +783,55 @@
   font-size: 12px;
 }
 
+.admin-job-table-panel {
+  flex: 1;
+  min-height: 630px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-internal-job-table-scroll {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.admin-internal-job-table {
+  min-width: 720px;
+}
+
+.admin-internal-job-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.admin-job-id {
+  display: inline-block;
+  max-width: 360px;
+  color: var(--text);
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.admin-job-error {
+  display: inline-block;
+  max-width: 360px;
+  color: var(--muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
 .admin-log-entry {
   border: 1px solid rgba(215, 247, 239, 0.12);
   border-radius: 16px;
