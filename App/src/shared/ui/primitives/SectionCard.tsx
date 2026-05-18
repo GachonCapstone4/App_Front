@@ -16,9 +16,9 @@ export function SectionCard({
   className = "",
 }: SectionCardProps) {
   return (
-    <section className={`rounded-2xl border border-border bg-card shadow-sm ${className}`.trim()}>
+    <section className={`rounded-xl border border-border bg-card shadow-sm sm:rounded-2xl ${className}`.trim()}>
       {(title || description || action) && (
-        <div className="flex flex-col gap-3 border-b border-border px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             {title ? <h2 className="text-base font-semibold text-foreground">{title}</h2> : null}
             {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
@@ -26,7 +26,7 @@ export function SectionCard({
           {action ? <div>{action}</div> : null}
         </div>
       )}
-      <div className="px-6 py-5">{children}</div>
+      <div className="px-4 py-4 sm:px-6 sm:py-5">{children}</div>
     </section>
   );
 }

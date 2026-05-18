@@ -1100,8 +1100,8 @@ export function Calendar({ scenarioId }: CalendarProps) {
 
   return (
     <>
-      <div className="flex h-full w-full min-h-0 min-w-0 flex-col bg-background lg:flex-row">
-        <div className="scrollbar-none min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
+      <div className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-y-auto bg-background lg:flex-row lg:overflow-hidden">
+        <div className="min-w-0 shrink-0 px-3 py-3 sm:px-4 sm:py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5">
           {useDemoDataMode ? (
             <StateBanner
               title="데모 데이터 모드"
@@ -1120,10 +1120,10 @@ export function Calendar({ scenarioId }: CalendarProps) {
             />
           ) : null}
 
-          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="mb-3 flex flex-col gap-3 sm:mb-6 lg:flex-row lg:items-start lg:justify-between">
             {pendingEvents.length > 0 ? (
-              <div className="app-warning-card flex items-start gap-3 rounded-xl border p-4 lg:max-w-[640px]">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F59E0B]/15 dark:bg-[#2F220F]">
+              <div className="app-warning-card flex items-start gap-3 rounded-xl border p-3 sm:p-4 lg:max-w-[640px]">
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F59E0B]/15 dark:bg-[#2F220F] sm:h-8 sm:w-8">
                   <Sparkles className="h-4 w-4 text-[#F59E0B]" />
                 </div>
                 <div className="flex-1">
@@ -1143,7 +1143,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
             <button
               onClick={openCreateDialog}
               className={`app-cta-accent flex items-center gap-2 rounded-lg px-4 py-2.5 shadow-sm ${
-                pendingEvents.length > 0 ? "self-start lg:self-auto" : "self-end"
+                pendingEvents.length > 0 ? "self-start lg:self-auto" : "self-start sm:self-end"
               }`}
             >
               <Plus className="h-4 w-4" />
@@ -1152,7 +1152,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
           </div>
 
           <div className="w-full overflow-hidden rounded-xl border border-[#E2E8F0] bg-card shadow-sm dark:border-border">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] p-4 dark:border-border">
+            <div className="flex items-center justify-between border-b border-[#E2E8F0] p-3 dark:border-border sm:p-4">
               <button
                 onClick={() => changeMonth(-1)}
                 className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#F1F5F9] dark:text-muted-foreground dark:hover:bg-[#1E293B]"
@@ -1191,7 +1191,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
               {Array.from({ length: firstDay }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
-                  className="h-[92px] border-r border-t border-[#F1F5F9] bg-[#FAFBFC] dark:border-border dark:bg-[#101826] lg:h-[112px]"
+                  className="h-[64px] border-r border-t border-[#F1F5F9] bg-[#FAFBFC] dark:border-border dark:bg-[#101826] sm:h-[92px] lg:h-[112px]"
                 />
               ))}
 
@@ -1211,14 +1211,14 @@ export function Calendar({ scenarioId }: CalendarProps) {
                       setSelectedDate(dateStr);
                       setSelectedEventId(null);
                     }}
-                    className={`relative h-[92px] border-r border-t border-[#F1F5F9] p-1.5 text-left transition-colors dark:border-border lg:h-[112px] ${
+                    className={`relative h-[64px] border-r border-t border-[#F1F5F9] p-1 text-left transition-colors dark:border-border sm:h-[92px] sm:p-1.5 lg:h-[112px] ${
                       isSelected
                         ? "bg-[#2DD4BF]/5 ring-2 ring-inset ring-[#2DD4BF]/30 dark:bg-[#0B2728] dark:ring-[#115E59]"
                         : "hover:bg-[#F8FAFC] dark:hover:bg-[#131D2F]"
                     }`}
                   >
                     <span
-                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] ${
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] sm:h-7 sm:w-7 sm:text-[13px] ${
                         isToday
                           ? "bg-[#1E2A3A] text-white dark:bg-[#18263A]"
                           : dayOfWeek === 0
@@ -1231,11 +1231,11 @@ export function Calendar({ scenarioId }: CalendarProps) {
                       {day}
                     </span>
 
-                    <div className="mt-1 flex min-h-[38px] flex-col gap-0.5">
+                    <div className="mt-0.5 flex min-h-[30px] flex-col gap-0.5 sm:mt-1 sm:min-h-[38px]">
                       {visibleDayEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="flex h-[17px] cursor-pointer items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px]"
+                          className="flex h-[14px] cursor-pointer items-center gap-0.5 truncate rounded px-1 py-0.5 text-[9px] sm:h-[17px] sm:gap-1 sm:px-1.5 sm:text-[10px]"
                           style={{
                             backgroundColor: `${event.color}15`,
                             color: event.color,
@@ -1246,7 +1246,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
                             setSelectedDate(event.date);
                           }}
                         >
-                          <span className="flex w-2.5 shrink-0 items-center justify-center">
+                          <span className="hidden w-2.5 shrink-0 items-center justify-center sm:flex">
                             {event.fromEmail ? (
                               <Mail className="h-2.5 w-2.5 shrink-0" />
                             ) : (
@@ -1264,7 +1264,7 @@ export function Calendar({ scenarioId }: CalendarProps) {
                         </div>
                       ))}
                       {dayEvents.length > 2 ? (
-                        <span className="px-1.5 text-[10px] text-[#94A3B8] dark:text-muted-foreground">
+                        <span className="px-1 text-[9px] text-[#94A3B8] dark:text-muted-foreground sm:px-1.5 sm:text-[10px]">
                           +{dayEvents.length - 2}개 더
                         </span>
                       ) : null}
@@ -1276,14 +1276,14 @@ export function Calendar({ scenarioId }: CalendarProps) {
               {Array.from({ length: trailingDays }).map((_, index) => (
                 <div
                   key={`trailing-${index}`}
-                  className="h-[92px] border-r border-t border-[#F1F5F9] bg-[#FAFBFC] dark:border-border dark:bg-[#101826] lg:h-[112px]"
+                  className="h-[64px] border-r border-t border-[#F1F5F9] bg-[#FAFBFC] dark:border-border dark:bg-[#101826] sm:h-[92px] lg:h-[112px]"
                 />
               ))}
             </div>
           </div>
         </div>
 
-        <div className="scrollbar-none min-h-0 shrink-0 overflow-y-auto border-l border-[#E2E8F0] bg-card dark:border-border lg:w-[360px] xl:w-[400px]">
+        <div className="shrink-0 overflow-visible border-t border-[#E2E8F0] bg-card dark:border-border lg:min-h-0 lg:w-[360px] lg:overflow-y-auto lg:border-l lg:border-t-0 xl:w-[400px]">
           {selectedEvent ? (
             <div>
               <div className="flex items-center justify-between border-b border-[#E2E8F0] p-4 dark:border-border">

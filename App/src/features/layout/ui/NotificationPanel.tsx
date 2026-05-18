@@ -51,8 +51,8 @@ export function NotificationPanel({
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-[min(92vw,380px)] rounded-2xl border border-border bg-card p-4 shadow-xl">
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="fixed right-3 top-[58px] z-30 w-[min(82vw,320px)] rounded-xl border border-border bg-card p-3 shadow-xl sm:absolute sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,380px)] sm:rounded-2xl sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
             <p className="text-sm font-semibold text-foreground">알림</p>
             <button
               type="button"
@@ -63,7 +63,7 @@ export function NotificationPanel({
             </button>
           </div>
 
-          <div className="mb-4 flex gap-2">
+          <div className="mb-3 flex gap-2 sm:mb-4">
             <button
               type="button"
               className={`rounded-full px-3 py-1.5 text-xs font-medium ${
@@ -88,7 +88,7 @@ export function NotificationPanel({
             </button>
           </div>
 
-          <div className="max-h-[360px] space-y-2 overflow-y-auto">
+          <div className="max-h-[min(48vh,300px)] space-y-2 overflow-y-auto sm:max-h-[360px]">
             {visibleNotifications.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
                 <p className="text-sm font-medium text-foreground">표시할 알림이 없습니다</p>
@@ -102,7 +102,7 @@ export function NotificationPanel({
               <button
                 key={item.id}
                 type="button"
-                className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                className={`w-full rounded-xl border px-2.5 py-2.5 text-left transition sm:px-3 sm:py-3 ${
                   item.read
                     ? "border-border bg-card hover:bg-[#F8FAFC] dark:hover:bg-[#131D2F]"
                     : "app-selected-surface"
@@ -112,12 +112,16 @@ export function NotificationPanel({
                   navigate(item.actionPath);
                 }}
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                <div className="mb-1.5 flex items-center justify-between gap-2 sm:mb-2">
+                  <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
                   <StatusBadge label={item.actionLabel} tone={toneToBadge[item.tone]} />
                 </div>
-                <p className="text-xs text-muted-foreground">{item.content}</p>
-                <p className="mt-2 text-[11px] text-slate-400">{item.time}</p>
+                <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                  {item.content}
+                </p>
+                <p className="mt-1.5 text-[10px] text-slate-400 sm:mt-2 sm:text-[11px]">
+                  {item.time}
+                </p>
               </button>
             ))}
           </div>

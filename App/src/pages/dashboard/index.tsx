@@ -366,26 +366,26 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:mb-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
         {statCards.map((card) => (
           <div
             key={card.label}
-            className={`rounded-2xl border bg-white p-5 shadow-sm dark:bg-card ${
+            className={`rounded-xl border bg-white p-3 shadow-sm dark:bg-card sm:rounded-2xl sm:p-5 ${
               card.tone === "amber" && (dashboardState.summary?.pending_drafts.count ?? 0) > 0
                 ? "border-[#FDE68A] dark:border-[#4A3417] dark:bg-[#17120D]"
                 : "border-[#E2E8F0] dark:border-border"
             }`}
           >
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8FAFC] dark:bg-[#1E293B]">
-              <card.icon className="h-5 w-5 text-[#1E2A3A] dark:text-foreground" />
+            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-[#F8FAFC] dark:bg-[#1E293B] sm:mb-4 sm:h-10 sm:w-10 sm:rounded-xl">
+              <card.icon className="h-4 w-4 text-[#1E2A3A] dark:text-foreground sm:h-5 sm:w-5" />
             </div>
-            <p className="text-2xl font-semibold text-[#1E2A3A] dark:text-foreground">{card.value}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <p className="text-sm text-[#64748B] dark:text-muted-foreground">{card.label}</p>
+            <p className="text-xl font-semibold text-[#1E2A3A] dark:text-foreground sm:text-2xl">{card.value}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <p className="text-[11px] leading-snug text-[#64748B] dark:text-muted-foreground sm:text-sm">{card.label}</p>
               {"aiLabel" in card ? <AiUsageBadge label={card.aiLabel} /> : null}
             </div>
             <p
-              className={`mt-2 text-xs ${
+              className={`mt-1 text-[11px] sm:mt-2 sm:text-xs ${
                 card.tone === "amber" && (dashboardState.summary?.pending_drafts.count ?? 0) > 0
                   ? "text-[#D97706] dark:text-[#F4C98A]"
                   : "text-[#94A3B8] dark:text-muted-foreground"
@@ -398,8 +398,8 @@ export function DashboardPage() {
       </div>
 
       {hasVisibleDashboardWidget ? (
-        <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-          <div className="space-y-6">
+        <div className="grid gap-4 sm:gap-6 xl:grid-cols-[1.3fr_1fr]">
+          <div className="space-y-4 sm:space-y-6">
             {showUpcomingWidget ? (
               <SectionCard
             title="다가오는 일정"
@@ -429,9 +429,9 @@ export function DashboardPage() {
                 {(dashboardState.schedules ?? []).map((event) => (
                   <div
                     key={event.event_id}
-                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-[#E2E8F0] px-4 py-4"
+                    className="flex flex-wrap items-center gap-3 rounded-xl border border-[#E2E8F0] px-3 py-3 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-4"
                   >
-                    <div className="h-12 w-1 rounded-full bg-[#2DD4BF]" />
+                    <div className="h-10 w-1 rounded-full bg-[#2DD4BF] sm:h-12" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {event.email_id ? (
@@ -449,7 +449,7 @@ export function DashboardPage() {
                         ) : null}
                         {event.email_id ? <AiUsageBadge label="AI 감지 일정" /> : null}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#64748B]">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[#64748B] sm:gap-3 sm:text-xs">
                         <span className="inline-flex items-center gap-1">
                           <CalendarDays className="h-3.5 w-3.5" />
                           {formatDateLabel(event.start_datetime)} {formatTimeLabel(event.start_datetime)}
@@ -503,9 +503,9 @@ export function DashboardPage() {
                   return (
                     <div
                       key={email.email_id}
-                      className="flex flex-wrap items-center gap-4 rounded-2xl border border-[#E2E8F0] px-4 py-4"
+                      className="flex flex-wrap items-center gap-3 rounded-xl border border-[#E2E8F0] px-3 py-3 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-4"
                     >
-                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#1E2A3A] text-sm font-semibold text-white">
+                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1E2A3A] text-sm font-semibold text-white sm:h-10 sm:w-10">
                         {email.sender_name.slice(0, 1)}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -550,8 +550,8 @@ export function DashboardPage() {
               tone="empty"
             />
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-              <div className="mx-auto h-[220px] w-[220px]">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-[220px_1fr]">
+              <div className="mx-auto h-[170px] w-[170px] sm:h-[220px] sm:w-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={weeklyData} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={3}>
@@ -565,7 +565,7 @@ export function DashboardPage() {
               </div>
               <div className="space-y-3">
                 {weeklyData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between rounded-xl bg-[#F8FAFC] px-4 py-3">
+                  <div key={item.name} className="flex items-center justify-between rounded-xl bg-[#F8FAFC] px-3 py-2.5 sm:px-4 sm:py-3">
                     <div className="flex items-center gap-3">
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
                       <span className="text-sm text-[#1E2A3A]">{item.name}</span>

@@ -1223,8 +1223,8 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm dark:border-border dark:bg-card">
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] p-6 dark:border-border">
-            <div>
+          <div className="flex flex-col gap-3 border-b border-[#E2E8F0] p-4 dark:border-border sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="min-w-0">
               <h3 className="text-[#1E2A3A] dark:text-foreground">자동화 규칙</h3>
               <p className="mt-1 text-[12px] text-[#94A3B8] dark:text-muted-foreground">
                 카테고리별 AI 추천 템플릿에 자동 발송과 캘린더 자동 등록 여부를 각각 설정합니다.
@@ -1233,7 +1233,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
             <button
               onClick={openCreateDialog}
               disabled={availableCategories.length === 0}
-              className="app-cta-primary flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
+              className="app-cta-primary inline-flex w-fit shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               규칙 추가
@@ -1241,7 +1241,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
           </div>
 
           {isLoading ? (
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               {[0, 1].map((index) => (
                 <div
                   key={index}
@@ -1253,8 +1253,8 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
               ))}
             </div>
           ) : groups.length === 0 ? (
-            <div className="p-8">
-              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-6 text-center dark:border-border dark:bg-[#131D2F]">
+            <div className="p-4 sm:p-8">
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-5 text-center dark:border-border dark:bg-[#131D2F] sm:p-6">
                 <p className="text-[15px] text-[#1E2A3A] dark:text-foreground">
                   아직 설정된 자동화 규칙이 없습니다
                 </p>
@@ -1264,7 +1264,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                 <button
                   onClick={openCreateDialog}
                   disabled={availableCategories.length === 0}
-                  className="app-cta-primary mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="app-cta-primary mt-4 inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
                   첫 규칙 추가
@@ -1272,7 +1272,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
               </div>
             </div>
           ) : (
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               {groups.map((group) => {
                 const deleting = deletingCategoryKey === group.key;
                 const isExpanded = expandedGroupKeys.includes(group.key);
@@ -1296,7 +1296,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                             toggleGroupExpanded(group.key);
                           }
                         }}
-                        className="flex cursor-pointer flex-col gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] p-5 text-left transition-colors hover:bg-[#F1F5F9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2DD4BF] dark:border-border dark:bg-[#131D2F] dark:hover:bg-[#182338] md:flex-row md:items-center md:justify-between"
+                        className="flex cursor-pointer flex-col gap-3 border-b border-[#E2E8F0] bg-[#F8FAFC] p-4 text-left transition-colors hover:bg-[#F1F5F9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2DD4BF] dark:border-border dark:bg-[#131D2F] dark:hover:bg-[#182338] sm:p-5 md:flex-row md:items-center md:justify-between"
                         aria-expanded={isExpanded}
                       >
                         <div className="min-w-0 flex-1">
@@ -1322,13 +1322,13 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-end md:self-auto">
+                        <div className="flex shrink-0 items-center gap-2 self-end md:self-auto">
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
                               openEditDialog(group);
                             }}
-                            className="app-secondary-button flex items-center gap-2 rounded-lg px-3 py-2 text-[12px]"
+                            className="app-secondary-button flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-[12px]"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                             관리
@@ -1339,7 +1339,7 @@ export function AutomationSettings({ scenarioId }: AutomationSettingsProps) {
                               setDeleteTarget(group);
                             }}
                             disabled={deleting}
-                            className="app-danger-button flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="app-danger-button flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {deleting ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
